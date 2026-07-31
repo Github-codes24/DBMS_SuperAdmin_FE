@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Header from './components/Header';
+import Sidebar from './components/Sidebar';
 import LoginPage from './components/LoginPage';
 import VendorSearch from './components/VendorSearch';
 import EditVendorModal from './components/EditVendorModal';
@@ -8,6 +9,7 @@ import PaymentHistoryModal from './components/PaymentHistoryModal';
 import PackageSuccessModal from './components/PackageSuccessModal';
 import AddVendorModal from './components/AddVendorModal';
 import NotificationReport from './components/NotificationReport';
+import ProfileSection from './components/ProfileSection';
 import { INITIAL_VENDORS } from './mockData';
 
 export default function App() {
@@ -15,6 +17,8 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState({
     id: '2547',
     name: 'Shivam',
+    email: 'shivam.lts@localtradestreet.com',
+    phone: '+91 98765 43210',
     role: 'CRM Telecaller Executive',
     financialYear: '2026-2027',
     avatar: 'S'
@@ -35,6 +39,15 @@ export default function App() {
   // Handle Logout
   const handleLogout = () => {
     setIsAuthenticated(false);
+  };
+
+  // Update Profile details
+  const handleUpdateUser = (updatedProfile) => {
+    setCurrentUser((prev) => ({
+      ...prev,
+      ...updatedProfile,
+      avatar: updatedProfile.name ? updatedProfile.name.charAt(0).toUpperCase() : prev.avatar
+    }));
   };
 
   // Open Edit Vendor Modal
@@ -97,40 +110,49 @@ export default function App() {
     <div className="crm-app">
       {/* Header Bar */}
       <Header
-        activeNav={activeNav}
-        setActiveNav={setActiveNav}
         currentUser={currentUser}
         onLogout={handleLogout}
+        onOpenProfile={() => setActiveNav('profile')}
       />
 
-      {/* Main Content Area */}
-      <main className="main-content">
-        {activeNav === 'vendor_mgmt' && (
-          <VendorSearch
-            vendors={vendors}
-            onOpenEdit={handleOpenEdit}
-            onOpenPaymentOrder={handleOpenPaymentOrder}
-            onSendPackageDetails={handleSendPackageDetails}
-            onOpenPaymentHistory={handleOpenPaymentHistory}
-            onOpenAddVendor={() => setModalState('addVendor')}
-          />
-        )}
+      {/* Main Layout Body (Sidebar + Content) */}
+      <div className="crm-body">
+        {/* Sidebar Navigation */}
+        <Sidebar activeNav={activeNav} setActiveNav={setActiveNav} />
 
-        {activeNav === 'reports' && (
-          <NotificationReport vendors={vendors} />
-        )}
+        {/* Main Content Area */}
+        <main className="main-content">
+          {activeNav === 'vendor_mgmt' && (
+            <VendorSearch
+              vendors={vendors}
+              onOpenEdit={handleOpenEdit}
+              onOpenPaymentOrder={handleOpenPaymentOrder}
+              onSendPackageDetails={handleSendPackageDetails}
+              onOpenPaymentHistory={handleOpenPaymentHistory}
+              onOpenAddVendor={() => setModalState('addVendor')}
+            />
+          )}
 
-        {activeNav !== 'vendor_mgmt' && activeNav !== 'reports' && (
-          <div className="card-panel" style={{ textAlign: 'center', padding: '60px 20px' }}>
-            <h2 style={{ fontSize: '20px', color: '#ff5500', marginBottom: '10px' }}>
-              {activeNav.toUpperCase().replace('_', ' ')}
-            </h2>
-            <p style={{ color: '#64748b' }}>
-              Select <strong>Vendor Management</strong> or <strong>Report</strong> from top bar.
-            </p>
-          </div>
-        )}
-      </main>
+          {activeNav === 'reports' && (
+            <NotificationReport vendors={vendors} />
+          )}
+
+          {activeNav === 'profile' && (
+            <ProfileSection currentUser={currentUser} onUpdateUser={handleUpdateUser} />
+          )}
+
+          {activeNav !== 'vendor_mgmt' && activeNav !== 'reports' && activeNav !== 'profile' && (
+            <div className="card-panel" style={{ textAlign: 'center', padding: '60px 20px' }}>
+              <h2 style={{ fontSize: '20px', color: '#ff5500', marginBottom: '10px' }}>
+                {activeNav.toUpperCase().replace('_', ' ')}
+              </h2>
+              <p style={{ color: '#64748b' }}>
+                Select <strong>Vendor Management</strong>, <strong>Report</strong>, or <strong>My Profile</strong> from sidebar.
+              </p>
+            </div>
+          )}
+        </main>
+      </div>
 
       {/* Modals Orchestration */}
       {modalState === 'edit' && selectedVendor && (

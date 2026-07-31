@@ -112,50 +112,99 @@ body {
   font-size: 14px;
 }
 
-/* Secondary Navigation Bar - Simple Orange Theme (ONLY 2 BUTTONS) */
-.top-nav {
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7eb;
+/* Layout Body (Sidebar + Content) */
+.crm-body {
   display: flex;
-  justify-content: center;
-  gap: 16px;
-  padding: 0 20px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  flex: 1;
+  min-height: calc(100vh - 60px);
 }
 
-.nav-item {
+/* Left Sidebar Navigation */
+.sidebar {
+  width: 250px;
+  background: #ffffff;
+  border-right: 1px solid #e2e8f0;
+  padding: 24px 14px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.03);
+  flex-shrink: 0;
+}
+
+.sidebar-section-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #94a3b8;
+  letter-spacing: 0.8px;
+  margin-bottom: 12px;
+  padding-left: 10px;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sidebar-nav-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
-  color: #4b5563;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  color: #475569;
   font-weight: 700;
-  font-size: 14px;
+  font-size: 13.5px;
   cursor: pointer;
-  border-bottom: 3px solid transparent;
   transition: all 0.2s ease;
-  border-radius: 4px 4px 0 0;
+  text-align: left;
 }
 
-.nav-item:hover {
+.nav-item-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sidebar-nav-item .nav-icon {
+  color: #64748b;
+  transition: color 0.2s ease;
+}
+
+.sidebar-nav-item:hover {
   color: var(--lts-orange);
   background-color: var(--lts-orange-light);
 }
 
-.nav-item.active {
+.sidebar-nav-item:hover .nav-icon {
   color: var(--lts-orange);
-  border-bottom-color: var(--lts-orange);
+}
+
+.sidebar-nav-item.active {
+  color: var(--lts-orange);
   background-color: var(--lts-orange-light);
+  border-color: rgba(255, 85, 0, 0.2);
+}
+
+.sidebar-nav-item.active .nav-icon {
+  color: var(--lts-orange);
+}
+
+.active-chevron {
+  color: var(--lts-orange);
 }
 
 /* Main Content Area */
 .main-content {
   flex: 1;
-  padding: 20px 24px;
-  max-width: 1600px;
-  margin: 0 auto;
-  width: 100%;
+  padding: 24px;
+  width: calc(100% - 250px);
+  overflow-x: auto;
 }
+
 
 /* Card Container */
 .card-panel {
@@ -860,4 +909,91 @@ textarea.form-control {
   color: #94a3b8;
   margin-top: 22px;
 }
+
+/* Simple Profile Section Styles */
+.simple-profile-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 0;
+  width: 100%;
+}
+
+.profile-toast-alert {
+  background: #dcfce7;
+  border: 1px solid #86efac;
+  color: #15803d;
+  padding: 12px 18px;
+  border-radius: 6px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  width: 100%;
+  max-width: 480px;
+  animation: fadeIn 0.3s ease;
+}
+
+.simple-profile-card {
+  max-width: 480px;
+  width: 100%;
+  padding: 32px 28px;
+  border-radius: 10px;
+  border-top: 4px solid var(--lts-orange);
+}
+
+.simple-profile-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.simple-avatar-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ff5500, #ff8844);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  box-shadow: 0 6px 16px rgba(255, 85, 0, 0.25);
+  border: 3px solid #ffffff;
+}
+
+.simple-profile-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.simple-profile-subtitle {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.simple-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.input-label-icon {
+  color: var(--lts-orange);
+  margin-right: 4px;
+}
+
+.simple-profile-actions {
+  margin-top: 10px;
+}
+
+
 
