@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { User, Mail, Phone, CheckCircle, Save } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { User, Mail, Phone, CheckCircle, Save, Camera, Trash2 } from 'lucide-react';
 
 export default function ProfileSection({ currentUser, onUpdateUser }) {
+  const fileInputRef = useRef(null);
+  const [photoUrl, setPhotoUrl] = useState(currentUser?.photoUrl || '');
   const [formData, setFormData] = useState({
     name: currentUser?.name || 'Shivam',
     email: currentUser?.email || 'shivam.lts@localtradestreet.com',
@@ -15,12 +17,41 @@ export default function ProfileSection({ currentUser, onUpdateUser }) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Handle Photo File Selection
+  const handlePhotoSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        alert('Please select a valid image file (PNG, JPG, JPEG, WEBP).');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setPhotoUrl(event.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Remove Custom Photo
+  const handleRemovePhoto = () => {
+    setPhotoUrl('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Save Profile
   const handleSaveProfile = (e) => {
     e.preventDefault();
+    const updatedUser = {
+      ...formData,
+      photoUrl: photoUrl
+    };
     if (onUpdateUser) {
-      onUpdateUser(formData);
+      onUpdateUser(updatedUser);
     }
-    setNotification('Profile details updated successfully!');
+    setNotification('Profile details & photo updated successfully!');
     setTimeout(() => setNotification(''), 4000);
   };
 
@@ -34,13 +65,59 @@ export default function ProfileSection({ currentUser, onUpdateUser }) {
         </div>
       )}
 
-      {/* Simple Profile Card */}
+      {/* Profile Card */}
       <div className="card-panel simple-profile-card">
         <div className="simple-profile-header">
-          <div className="simple-avatar-circle">
-            {formData.name ? formData.name.charAt(0).toUpperCase() : 'U'}
+          {/* Avatar / Photo Upload Container */}
+          <div className="avatar-upload-wrapper">
+            <div
+              className="simple-avatar-circle photo-clickable"
+              onClick={() => fileInputRef.current?.click()}
+              title="Click to change profile photo"
+            >
+              {photoUrl ? (
+                <img src={photoUrl} alt="Profile" className="profile-img-preview" />
+              ) : (
+                <span>{formData.name ? formData.name.charAt(0).toUpperCase() : 'U'}</span>
+              )}
+              
+              {/* Camera Icon Overlay */}
+              <div className="avatar-camera-badge">
+                <Camera size={14} />
+              </div>
+            </div>
+
+            {/* Hidden File Input */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              style={{ display: 'none' }}
+              onChange={handlePhotoSelect}
+            />
+
+            {/* Photo Action Links */}
+            <div className="photo-actions-row">
+              <button
+                type="button"
+                className="btn-link-action"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Camera size={13} /> Change Photo
+              </button>
+              {photoUrl && (
+                <button
+                  type="button"
+                  className="btn-link-action btn-link-danger"
+                  onClick={handleRemovePhoto}
+                >
+                  <Trash2 size={13} /> Remove
+                </button>
+              )}
+            </div>
           </div>
-          <h2 className="simple-profile-title">{formData.name}</h2>
+
+          <h2 className="simple-profile-title" style={{ marginTop: '10px' }}>{formData.name}</h2>
           <p className="simple-profile-subtitle">User Profile</p>
         </div>
 

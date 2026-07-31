@@ -986,14 +986,91 @@ textarea.form-control {
   gap: 18px;
 }
 
-.input-label-icon {
-  color: var(--lts-orange);
-  margin-right: 4px;
+.avatar-upload-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.simple-profile-actions {
-  margin-top: 10px;
+.photo-clickable {
+  position: relative;
+  cursor: pointer;
+  overflow: visible;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+
+.photo-clickable:hover {
+  transform: scale(1.04);
+  box-shadow: 0 8px 20px rgba(255, 85, 0, 0.35);
+}
+
+.profile-img-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatar-camera-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: var(--lts-orange);
+  color: #ffffff;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.photo-actions-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.btn-link-action {
+  background: transparent;
+  border: none;
+  color: var(--lts-orange);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s ease;
+}
+
+.btn-link-action:hover {
+  background-color: var(--lts-orange-light);
+}
+
+.btn-link-danger {
+  color: #dc2626;
+}
+
+.btn-link-danger:hover {
+  background-color: #fee2e2;
+}
+
+/* Header Avatar Image */
+.header-avatar-img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--lts-orange);
+}
+
 
 
 

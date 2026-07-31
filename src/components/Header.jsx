@@ -32,7 +32,11 @@ export default function Header({ currentUser, onLogout, onOpenProfile }) {
             title="View My Profile"
           >
             <span>{userName}</span>
-            <div className="user-avatar">{userAvatar}</div>
+            {currentUser?.photoUrl ? (
+              <img src={currentUser.photoUrl} alt={userName} className="header-avatar-img" />
+            ) : (
+              <div className="user-avatar">{userAvatar}</div>
+            )}
           </div>
           {onLogout && (
             <button
