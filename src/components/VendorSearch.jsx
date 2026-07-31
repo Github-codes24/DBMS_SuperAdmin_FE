@@ -18,44 +18,33 @@ export default function VendorSearch({
 }) {
   const [phoneSearch, setPhoneSearch] = useState('');
   const [codeSearch, setCodeSearch] = useState('');
-  const [hasSearched, setHasSearched] = useState(false);
-  const [filteredVendors, setFilteredVendors] = useState([]);
+
+  const termPhone = phoneSearch.trim().toLowerCase();
+  const termCode = codeSearch.trim().toLowerCase();
+
+  const filteredVendors = vendors.filter((v) => {
+    const matchPhone = termPhone
+      ? (v.phone && v.phone.toLowerCase().includes(termPhone)) ||
+        (v.alternatePhone && v.alternatePhone.toLowerCase().includes(termPhone)) ||
+        (v.whatsappNo && v.whatsappNo.toLowerCase().includes(termPhone))
+      : true;
+
+    const matchCode = termCode
+      ? v.vendorCode && v.vendorCode.toLowerCase().includes(termCode)
+      : true;
+
+    return matchPhone && matchCode;
+  });
 
   const handleSearch = (e) => {
     if (e) e.preventDefault();
-    setHasSearched(true);
-
-    const termPhone = phoneSearch.trim().toLowerCase();
-    const termCode = codeSearch.trim().toLowerCase();
-
-    if (!termPhone && !termCode) {
-      setFilteredVendors([]);
-      return;
-    }
-
-    const results = vendors.filter((v) => {
-      const matchPhone = termPhone
-        ? (v.phone && v.phone.toLowerCase().includes(termPhone)) ||
-          (v.alternatePhone && v.alternatePhone.toLowerCase().includes(termPhone)) ||
-          (v.whatsappNo && v.whatsappNo.toLowerCase().includes(termPhone))
-        : true;
-
-      const matchCode = termCode
-        ? v.vendorCode && v.vendorCode.toLowerCase().includes(termCode)
-        : true;
-
-      return matchPhone && matchCode;
-    });
-
-    setFilteredVendors(results);
   };
 
   const handleResetSearch = () => {
     setPhoneSearch('');
     setCodeSearch('');
-    setHasSearched(false);
-    setFilteredVendors([]);
   };
+
 
   return (
     <div className="card-panel">
@@ -158,15 +147,8 @@ export default function VendorSearch({
             </tr>
           </thead>
           <tbody>
-            {!hasSearched ? (
-              /* Before searching: show empty state message per image 1 */
-              <tr>
-                <td colSpan="9" className="no-data-row">
-                  No data available in table
-                </td>
-              </tr>
-            ) : filteredVendors.length === 0 ? (
-              /* Searched but no results */
+            {filteredVendors.length === 0 ? (
+              /* No matching results */
               <tr>
                 <td colSpan="9" className="no-data-row">
                   No vendor found matching your search criteria.
