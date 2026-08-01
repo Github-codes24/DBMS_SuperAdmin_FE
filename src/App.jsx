@@ -78,6 +78,14 @@ function App() {
         }
       />
       <Route
+        path="/data-management"
+        element={
+          <ProtectedRoute>
+            <Dashboard initialTab="data-management" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/audit-logs"
         element={
           <ProtectedRoute>

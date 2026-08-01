@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Search, Download, Lock, FileSpreadsheet, FileText, Upload, X, Check, FileDown, UserPlus, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, Download, Lock, FileSpreadsheet, FileText, Upload, X, Check, FileDown, UserPlus, Plus, ChevronUp, ChevronDown, Building2, MapPin, Eye, Phone, Mail } from 'lucide-react';
 
 function VendorDatabase({ compact = false }) {
   const [vendors, setVendors] = useState([
@@ -8,91 +8,136 @@ function VendorDatabase({ compact = false }) {
       transNo: 'TRX90101',
       id: 'VEN001',
       name: 'ABC Pvt Ltd',
-      category: 'Grocery',
+      ownerName: 'Rajesh Patel',
+      category: 'Grocery & FMCG',
       verificationDateTime: '2026-07-30 10:30 AM',
       contactNo: '+91 98920 11223',
+      email: 'contact@abcpvtltd.com',
+      gstNo: '27AAAAA0000A1Z5',
+      address: 'Shop No. 12, Commercial Complex, MG Road',
+      pincode: '400001',
       status: 'Active',
       state: 'Maharashtra',
       city: 'Mumbai',
+      mappedCustomers: 520,
     },
     {
       srNo: '02',
       transNo: 'TRX90102',
       id: 'VEN002',
       name: 'Metro Supplies',
-      category: 'Medical',
+      ownerName: 'Sanjay Deshmukh',
+      category: 'Medical & Pharma',
       verificationDateTime: '2026-07-30 02:15 PM',
       contactNo: '+91 98771 22334',
+      email: 'sales@metrosupplies.in',
+      gstNo: '07BBBBB1111B2Z6',
+      address: 'Plot 45, MIDC Industrial Area',
+      pincode: '110001',
       status: 'Pending',
       state: 'Delhi',
       city: 'New Delhi',
+      mappedCustomers: 340,
     },
     {
       srNo: '03',
       transNo: 'TRX90103',
       id: 'VEN003',
       name: 'Global Electronics',
-      category: 'Electronics',
+      ownerName: 'Vikram Sharma',
+      category: 'Electronics & IT',
       verificationDateTime: '2026-07-31 09:45 AM',
       contactNo: '+91 98882 33445',
+      email: 'info@globalelectronics.com',
+      gstNo: '29CCCCC2222C3Z7',
+      address: '2nd Floor, IT Tech Park, Electronic City',
+      pincode: '560100',
       status: 'Active',
       state: 'Karnataka',
       city: 'Bengaluru',
+      mappedCustomers: 890,
     },
     {
       srNo: '04',
       transNo: 'TRX90104',
       id: 'VEN004',
       name: 'Apex Hardware',
-      category: 'Hardware',
+      ownerName: 'Amit Patel',
+      category: 'Hardware & Tools',
       verificationDateTime: '2026-07-31 11:20 AM',
       contactNo: '+91 98993 44556',
+      email: 'apex@hardwaretools.in',
+      gstNo: '24DDDDD3333D4Z8',
+      address: 'CG Road, Navrangpura',
+      pincode: '380001',
       status: 'Active',
       state: 'Gujarat',
       city: 'Ahmedabad',
+      mappedCustomers: 650,
     },
     {
       srNo: '05',
       transNo: 'TRX90105',
       id: 'VEN005',
       name: 'Royal Furnishings',
+      ownerName: 'Kavita Rathore',
       category: 'Home Products',
       verificationDateTime: '2026-07-31 01:10 PM',
       contactNo: '+91 98114 55667',
+      email: 'contact@royalfurnishings.in',
+      gstNo: '08EEEEE4444E5Z9',
+      address: 'MI Road, Near Panch Batti',
+      pincode: '302001',
       status: 'Pending',
       state: 'Rajasthan',
       city: 'Jaipur',
+      mappedCustomers: 410,
     },
     {
       srNo: '06',
       transNo: 'TRX90106',
       id: 'VEN006',
       name: 'Zenith Electricals',
+      ownerName: 'Priya Joshi',
       category: 'Electronics',
       verificationDateTime: '2026-07-31 03:30 PM',
       contactNo: '+91 98220 12345',
+      email: 'zenith@electricals.com',
+      gstNo: '27FFFFF5555F6Z0',
+      address: 'FC Road, Deccan Gymkhana',
+      pincode: '411004',
       status: 'Active',
       state: 'Maharashtra',
       city: 'Pune',
+      mappedCustomers: 720,
     },
     {
       srNo: '07',
       transNo: 'TRX90107',
       id: 'VEN007',
       name: 'Sunrise Food Products',
+      ownerName: 'Hitesh Shah',
       category: 'Grocery',
       verificationDateTime: '2026-07-31 04:15 PM',
       contactNo: '+91 98331 23456',
+      email: 'sunrise@foodproducts.in',
+      gstNo: '24GGGGG6666G7Z1',
+      address: 'Ring Road, Textile Market Area',
+      pincode: '395002',
       status: 'Pending',
       state: 'Gujarat',
       city: 'Surat',
+      mappedCustomers: 290,
     },
   ]);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedState, setSelectedState] = useState('All');
+  const [selectedCity, setSelectedCity] = useState('All');
   const [toastMsg, setToastMsg] = useState('');
+  const [selectedVendorDetail, setSelectedVendorDetail] = useState(null);
 
-  // Manual Scroll Ref & Control (No Automatic Timer)
+  // Manual Scroll Ref & Control
   const manualScrollRef = useRef(null);
   const handleManualScroll = (direction) => {
     if (manualScrollRef.current) {
@@ -108,9 +153,14 @@ function VendorDatabase({ compact = false }) {
     transNo: '',
     id: '',
     name: '',
+    ownerName: '',
     category: '',
     verificationDateTime: new Date().toISOString().slice(0, 10) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     contactNo: '',
+    email: '',
+    gstNo: '',
+    address: '',
+    pincode: '',
     state: '',
     city: '',
     status: 'Active',
@@ -132,17 +182,23 @@ function VendorDatabase({ compact = false }) {
   const normalizedRole = userRole.toLowerCase();
   const hasAccessPermission = normalizedRole === 'super admin' || normalizedRole === 'admin';
 
+  // Filter Logic
   const filteredVendors = vendors.filter((ven) => {
-    return (
+    const matchesSearch =
       (ven.srNo && ven.srNo.includes(searchTerm)) ||
       (ven.transNo && ven.transNo.toLowerCase().includes(searchTerm.toLowerCase())) ||
       ven.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (ven.ownerName && ven.ownerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
       ven.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       ven.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (ven.verificationDateTime && ven.verificationDateTime.toLowerCase().includes(searchTerm.toLowerCase())) ||
       ven.state.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ven.city.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+      ven.city.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesState = selectedState === 'All' || ven.state.toLowerCase() === selectedState.toLowerCase();
+    const matchesCity = selectedCity === 'All' || ven.city.toLowerCase() === selectedCity.toLowerCase();
+
+    return matchesSearch && matchesState && matchesCity;
   });
 
   // Submit Add Vendor Form
@@ -536,15 +592,27 @@ function VendorDatabase({ compact = false }) {
                   <tr key={ven.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="py-3 px-3 font-bold text-slate-800">{ven.srNo || String(idx + 1).padStart(2, '0')}</td>
                     <td className="py-3 px-3 font-bold text-[#f26522] font-mono text-[11px]">{ven.transNo || ven.id}</td>
-                    <td className="py-3 px-3 font-semibold text-slate-900">{ven.name}</td>
+                    
+                    {/* Clickable Vendor Shop Name ⭐ */}
+                    <td className="py-3 px-3">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedVendorDetail(ven)}
+                        className="text-[#f26522] hover:text-[#e05411] font-black text-xs hover:underline flex items-center gap-1.5 cursor-pointer bg-orange-50/70 px-2 py-1 rounded-lg border border-orange-200/60 shadow-2xs"
+                      >
+                        <Building2 size={13} className="shrink-0 text-[#f26522]" />
+                        <span>{ven.name}</span>
+                      </button>
+                    </td>
+
                     <td className="py-3 px-3 text-slate-700 font-semibold">{ven.category}</td>
                     <td className="py-3 px-3 text-slate-600 text-[11px] font-medium">{ven.verificationDateTime || '-'}</td>
                     <td className="py-3 px-3 text-slate-600 font-medium">{ven.state}</td>
                     <td className="py-3 px-3 text-slate-600 font-medium">{ven.city}</td>
                     <td className="py-3 px-3">
                       <span
-                        className={`font-semibold text-xs ${
-                          ven.status === 'Active' ? 'text-emerald-600' : 'text-amber-600'
+                        className={`font-bold text-xs px-2.5 py-0.5 rounded-full border ${
+                          ven.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200'
                         }`}
                       >
                         {ven.status}
@@ -860,6 +928,147 @@ function VendorDatabase({ compact = false }) {
                     <span>Import {previewData.length} Vendors</span>
                   </>
                 )}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* VENDOR FULL INFORMATION MODAL ⭐ */}
+      {selectedVendorDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden flex flex-col">
+            
+            {/* Modal Header */}
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#f26522] text-white flex items-center justify-center font-bold shadow-md">
+                  <Building2 size={20} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-black tracking-tight">{selectedVendorDetail.name}</h3>
+                    <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40 uppercase">
+                      {selectedVendorDetail.status || 'Active'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-300 font-mono mt-0.5">
+                    Vendor ID: {selectedVendorDetail.id} • Trans #: {selectedVendorDetail.transNo || 'TRX90101'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedVendorDetail(null)}
+                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto custom-scrollbar text-left text-xs">
+              
+              {/* Business & Owner Info Card */}
+              <div className="bg-orange-50/50 border border-orange-200/80 rounded-2xl p-4 space-y-2.5">
+                <h4 className="text-[11px] font-black uppercase text-[#f26522] tracking-wider flex items-center gap-1.5">
+                  <Building2 size={13} />
+                  <span>Business & Owner Profile</span>
+                </h4>
+                <div className="grid grid-cols-2 gap-3 text-slate-800 font-medium">
+                  <div>
+                    <span className="text-[10px] text-slate-500 block font-bold">Shop / Company Name</span>
+                    <span className="font-extrabold text-slate-900 text-sm">{selectedVendorDetail.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block font-bold">Owner / Contact Person</span>
+                    <span className="font-extrabold text-slate-900">{selectedVendorDetail.ownerName || 'Rajesh Patel'}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block font-bold">Category / Business Type</span>
+                    <span className="font-extrabold text-[#f26522]">{selectedVendorDetail.category}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block font-bold">GSTIN / Tax Registration</span>
+                    <span className="font-mono font-bold text-slate-800">{selectedVendorDetail.gstNo || '27AAAAA0000A1Z5'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Location & Address Section */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2.5">
+                <h4 className="text-[11px] font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
+                  <MapPin size={13} className="text-[#f26522]" />
+                  <span>Location & Address Details</span>
+                </h4>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <span className="text-[10px] text-slate-500 block font-bold">State</span>
+                    <span className="font-extrabold text-slate-900">{selectedVendorDetail.state}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block font-bold">City</span>
+                    <span className="font-extrabold text-slate-900">{selectedVendorDetail.city}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 block font-bold">Pincode Area</span>
+                    <span className="font-mono font-black text-[#f26522]">{selectedVendorDetail.pincode || '440001'}</span>
+                  </div>
+                  <div className="col-span-3">
+                    <span className="text-[10px] text-slate-500 block font-bold">Complete Shop Address</span>
+                    <span className="font-bold text-slate-800">
+                      {selectedVendorDetail.address || 'Shop No. 12, Main Commercial Complex, MG Road'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-1">
+                  <span className="text-[10px] text-slate-500 block font-bold">Vendor Contact Number</span>
+                  <div className="flex items-center gap-1.5 font-extrabold text-slate-900">
+                    <Phone size={13} className="text-[#f26522]" />
+                    <span>{selectedVendorDetail.contactNo || '+91 98920 11223'}</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-1">
+                  <span className="text-[10px] text-slate-500 block font-bold">Vendor Email Address</span>
+                  <div className="flex items-center gap-1.5 font-extrabold text-slate-900 truncate">
+                    <Mail size={13} className="text-[#f26522]" />
+                    <span className="truncate">{selectedVendorDetail.email || 'contact@vendor.com'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Verification & Operations Banner */}
+              <div className="bg-slate-900 text-white rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Verification Date & Time</div>
+                  <div className="text-xs font-bold text-slate-200 mt-0.5">
+                    {selectedVendorDetail.verificationDateTime || '2026-07-30 10:30 AM'}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Mapped Customers</div>
+                  <div className="text-sm font-black text-[#f26522] mt-0.5">
+                    {selectedVendorDetail.mappedCustomers || 520} Customers
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-400">LTS Verified Enterprise Vendor Profile</span>
+              <button
+                onClick={() => setSelectedVendorDetail(null)}
+                className="px-5 py-2 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer shadow-2xs"
+              >
+                Close Profile
               </button>
             </div>
 

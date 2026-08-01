@@ -62,15 +62,16 @@ function Login() {
         {/* Login Card */}
         <div className="w-full max-w-[430px] bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl border border-orange-100 p-8 sm:p-10 flex flex-col items-center">
           
-          {/* Official LTS Logo Header */}
+          {/* Official LTS Logo Header matching user photo */}
           <div
-            className="flex items-center gap-2.5 mb-6 cursor-pointer group"
+            className="flex items-center gap-2 mb-6 cursor-pointer group hover:scale-105 transition-transform"
             onClick={() => navigate("/")}
           >
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#f26522] to-[#e05411] text-white flex items-center justify-center font-black text-xl shadow-md shadow-orange-500/25 group-hover:scale-105 transition-transform">
-              <span>LT$</span>
+            <div className="flex items-center font-black text-2xl tracking-tight leading-none">
+              <span className="text-[#f26522]">LT</span>
+              <span className="text-[#f26522] font-black">$</span>
             </div>
-            <div className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-1">
+            <div className="text-xl sm:text-2xl font-extrabold tracking-tight flex items-center gap-1 leading-none">
               <span className="text-[#f26522]">Local</span>
               <span className="text-slate-900 font-black">Trade</span>
               <span className="text-[#f26522]">Street</span>

@@ -1,12 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { Search, Settings, UserX, UserCheck, Key, X, Check, UserPlus, Plus, ChevronUp, ChevronDown, Upload, FileSpreadsheet, FileDown } from 'lucide-react';
+import { Search, Settings, UserX, UserCheck, Key, X, Check, UserPlus, Plus, ChevronUp, ChevronDown, Upload, FileSpreadsheet, FileDown, Phone, Mail, Globe } from 'lucide-react';
 
 function TelecallerManagement({ compact = false }) {
   const [telecallers, setTelecallers] = useState([
-    { id: 'TC014', name: 'Amit Verma', customers: 128, status: 'Active', area: 'North Region', email: 'amit.verma@lts.com' },
-    { id: 'TC021', name: 'Neha Joshi', customers: 94, status: 'Active', area: 'West Region', email: 'neha.joshi@lts.com' },
-    { id: 'TC031', name: 'Ravi Singh', customers: 0, status: 'Disabled', area: 'East Region', email: 'ravi.singh@lts.com' },
-    { id: 'TC042', name: 'Priya Patel', customers: 112, status: 'Active', area: 'South Region', email: 'priya.patel@lts.com' },
+    { id: 'TC014', name: 'Amit Verma', mobile: '+91 98765 43210', email: 'amit.verma@lts.com', customers: 128, status: 'Active', area: 'North Region' },
+    { id: 'TC021', name: 'Neha Joshi', mobile: '+91 97654 32109', email: 'neha.joshi@lts.com', customers: 94, status: 'Active', area: 'West Region' },
+    { id: 'TC031', name: 'Ravi Singh', mobile: '+91 98123 45678', email: 'ravi.singh@lts.com', customers: 0, status: 'Disabled', area: 'East Region' },
+    { id: 'TC042', name: 'Priya Patel', mobile: '+91 94321 09876', email: 'priya.patel@lts.com', customers: 112, status: 'Active', area: 'South Region' },
   ]);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,6 +25,7 @@ function TelecallerManagement({ compact = false }) {
   const [newTc, setNewTc] = useState({
     id: '',
     name: '',
+    mobile: '',
     email: '',
     area: '',
     password: '',
@@ -34,9 +35,11 @@ function TelecallerManagement({ compact = false }) {
   const [newPassword, setNewPassword] = useState('');
   const [updatedStatus, setUpdatedStatus] = useState('Active');
   const [updatedArea, setUpdatedArea] = useState('');
+  const [updatedMobile, setUpdatedMobile] = useState('');
+  const [updatedEmail, setUpdatedEmail] = useState('');
   const [toastMsg, setToastMsg] = useState('');
 
-  // Manual Scroll Ref & Control (Same as Customer Database)
+  // Manual Scroll Ref & Control
   const manualScrollRef = useRef(null);
   const handleManualScroll = (direction) => {
     if (manualScrollRef.current) {
@@ -46,10 +49,13 @@ function TelecallerManagement({ compact = false }) {
   };
 
   const filteredTelecallers = telecallers.filter((tc) => {
+    const search = searchTerm.toLowerCase();
     return (
-      tc.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tc.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      tc.area.toLowerCase().includes(searchTerm.toLowerCase())
+      tc.name.toLowerCase().includes(search) ||
+      tc.id.toLowerCase().includes(search) ||
+      (tc.mobile && tc.mobile.includes(searchTerm)) ||
+      (tc.email && tc.email.toLowerCase().includes(search)) ||
+      tc.area.toLowerCase().includes(search)
     );
   });
 
@@ -57,6 +63,8 @@ function TelecallerManagement({ compact = false }) {
     setSelectedTc(tc);
     setUpdatedStatus(tc.status);
     setUpdatedArea(tc.area);
+    setUpdatedMobile(tc.mobile || '');
+    setUpdatedEmail(tc.email || '');
     setNewPassword('');
     setIsManageModalOpen(true);
   };
@@ -68,7 +76,7 @@ function TelecallerManagement({ compact = false }) {
     setTelecallers((prev) =>
       prev.map((t) =>
         t.id === selectedTc.id
-          ? { ...t, status: updatedStatus, area: updatedArea }
+          ? { ...t, status: updatedStatus, area: updatedArea, mobile: updatedMobile, email: updatedEmail }
           : t
       )
     );
@@ -80,8 +88,8 @@ function TelecallerManagement({ compact = false }) {
 
   const handleAddTcSubmit = (e) => {
     e.preventDefault();
-    if (!newTc.name || !newTc.email) {
-      alert('Please fill in Telecaller Name and Email');
+    if (!newTc.name || !newTc.email || !newTc.mobile) {
+      alert('Please fill in Telecaller Name, Mobile Number, and Email Address.');
       return;
     }
 
@@ -89,6 +97,7 @@ function TelecallerManagement({ compact = false }) {
     const telecallerToAdd = {
       id: formattedId,
       name: newTc.name,
+      mobile: newTc.mobile,
       email: newTc.email,
       area: newTc.area || 'Central Region',
       customers: 0,
@@ -97,7 +106,7 @@ function TelecallerManagement({ compact = false }) {
 
     setTelecallers([telecallerToAdd, ...telecallers]);
     setIsAddModalOpen(false);
-    setNewTc({ id: '', name: '', email: '', area: '', password: '', status: 'Active' });
+    setNewTc({ id: '', name: '', mobile: '', email: '', area: '', password: '', status: 'Active' });
 
     setToastMsg(`New Telecaller "${telecallerToAdd.name}" (${telecallerToAdd.id}) added successfully!`);
     setTimeout(() => setToastMsg(''), 4000);
@@ -105,10 +114,10 @@ function TelecallerManagement({ compact = false }) {
 
   // Download Sample Telecaller CSV Import Template
   const handleDownloadSampleTemplate = () => {
-    const sampleHeaders = ['Telecaller ID', 'Full Name', 'Email Address', 'Assigned Region', 'Status'];
+    const sampleHeaders = ['Telecaller ID', 'Full Name', 'Mobile Number', 'Email Address', 'Assigned Region', 'Status'];
     const sampleRows = [
-      ['TC051', 'Rajesh Sharma', 'rajesh.sharma@lts.com', 'North Region', 'Active'],
-      ['TC052', 'Pooja Verma', 'pooja.verma@lts.com', 'West Region', 'Active'],
+      ['TC051', 'Rajesh Sharma', '+91 98765 12345', 'rajesh.sharma@lts.com', 'North Region', 'Active'],
+      ['TC052', 'Pooja Verma', '+91 98765 67890', 'pooja.verma@lts.com', 'West Region', 'Active'],
     ];
 
     const csvContent =
@@ -140,18 +149,19 @@ function TelecallerManagement({ compact = false }) {
           parsed.push({
             id: cols[0] || `TC0${telecallers.length + i}0`,
             name: cols[1] || 'New Telecaller',
-            email: cols[2] || 'telecaller@lts.com',
-            area: cols[3] || 'Central Region',
+            mobile: cols[2] || '+91 98765 00000',
+            email: cols[3] || 'telecaller@lts.com',
+            area: cols[4] || 'Central Region',
             customers: 0,
-            status: cols[4] || 'Active',
+            status: cols[5] || 'Active',
           });
         }
       }
 
       if (parsed.length === 0) {
         setPreviewData([
-          { id: 'TC055', name: 'Manish Malhotra', email: 'manish.m@lts.com', area: 'North Region', customers: 0, status: 'Active' },
-          { id: 'TC056', name: 'Swati Kulkarni', email: 'swati.k@lts.com', area: 'West Region', customers: 0, status: 'Active' },
+          { id: 'TC055', name: 'Manish Malhotra', mobile: '+91 98765 11111', email: 'manish.m@lts.com', area: 'North Region', customers: 0, status: 'Active' },
+          { id: 'TC056', name: 'Swati Kulkarni', mobile: '+91 98765 22222', email: 'swati.k@lts.com', area: 'West Region', customers: 0, status: 'Active' },
         ]);
       } else {
         setPreviewData(parsed);
@@ -179,16 +189,21 @@ function TelecallerManagement({ compact = false }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
+    <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-slate-200/80 p-5 shadow-2xs space-y-4 animate-in fade-in duration-200">
       <div>
         {/* Title Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-base font-bold text-slate-900 tracking-tight">
-              Telecaller Management
-            </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Manage accounts, regions, status & customer assignments
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-black text-slate-900 tracking-tight">
+                Telecaller Management
+              </h2>
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-orange-100 text-[#f26522] border border-orange-200">
+                {telecallers.length} Active Accounts
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Manage telecaller profiles, mobile numbers, email addresses, assigned regions & status
             </p>
           </div>
 
@@ -196,16 +211,16 @@ function TelecallerManagement({ compact = false }) {
             {/* Add Telecaller Button */}
             <button
               onClick={() => setIsAddModalOpen(true)}
-              className="px-3.5 py-1.5 bg-[#f26522] hover:bg-[#e05411] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 w-fit"
+              className="px-4 py-2 bg-gradient-to-r from-[#f26522] to-[#e05411] hover:from-[#e05411] hover:to-[#c84302] text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-orange-500/20 cursor-pointer active:scale-95 flex items-center justify-center gap-1.5 shrink-0"
             >
-              <UserPlus size={14} />
+              <UserPlus size={15} />
               <span>+ Add Telecaller</span>
             </button>
 
             {/* Import (Excel/CSV) Button */}
             <button
               onClick={() => setIsUploadModalOpen(true)}
-              className="px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-[#f26522] border border-orange-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-3.5 py-2 bg-orange-50 hover:bg-orange-100 text-[#f26522] border border-orange-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
               title="Import Excel or CSV File"
             >
               <Upload size={14} />
@@ -216,31 +231,34 @@ function TelecallerManagement({ compact = false }) {
 
         {/* Search Bar */}
         <div className="relative mb-4">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search telecaller / ID / area..."
+            placeholder="Search by name, ID, mobile number, email, region..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522] text-slate-700 placeholder:text-slate-400"
+            className="w-full pl-10 pr-4 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522] text-slate-800 font-semibold placeholder:text-slate-400 transition-all"
           />
         </div>
 
         {/* Notification Toast */}
         {toastMsg && (
-          <div className="mb-3 px-3 py-2 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl flex items-center gap-1.5 animate-in fade-in">
-            <Check size={14} />
-            <span>{toastMsg}</span>
+          <div className="mb-3 px-4 py-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-xl flex items-center gap-2 animate-in fade-in shadow-2xs">
+            <Check size={15} className="text-emerald-600 shrink-0" />
+            <span className="font-bold">{toastMsg}</span>
           </div>
         )}
 
-        {/* MANUAL SLIDING CONTROL BAR (Same as Customer Database) */}
-        <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 mb-2 text-xs">
-          <span className="text-[11px] font-bold text-slate-600">Manual Slide / Scroll View</span>
-          <div className="flex items-center gap-1">
+        {/* MANUAL SLIDING CONTROL BAR */}
+        <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 mb-3 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-black text-slate-700">Manual Slide Controls</span>
+            <span className="text-[10px] text-slate-400 font-medium">Scroll table view vertically</span>
+          </div>
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => handleManualScroll('up')}
-              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2"
+              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 active:scale-95 shadow-2xs"
               title="Slide Up"
             >
               <ChevronUp size={13} />
@@ -248,7 +266,7 @@ function TelecallerManagement({ compact = false }) {
             </button>
             <button
               onClick={() => handleManualScroll('down')}
-              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2"
+              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 active:scale-95 shadow-2xs"
               title="Slide Down"
             >
               <ChevronDown size={13} />
@@ -257,41 +275,89 @@ function TelecallerManagement({ compact = false }) {
           </div>
         </div>
 
-        {/* Table View matching mock image with manual sliding */}
+        {/* Table View with Mobile Number & Email Columns */}
         <div
           ref={manualScrollRef}
-          className="max-h-[300px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar"
+          className="max-h-[360px] overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200/80 mb-4 scroll-smooth custom-scrollbar"
         >
-          <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs z-10">
-              <tr className="border-b border-slate-100 bg-slate-50/50 text-[10px] font-bold uppercase text-slate-400 tracking-wider">
-                <th className="py-2.5 px-3">ID</th>
-                <th className="py-2.5 px-3">NAME</th>
-                <th className="py-2.5 px-3">CUSTOMERS</th>
-                <th className="py-2.5 px-3">STATUS</th>
-                <th className="py-2.5 px-3">ACTION</th>
+          <table className="w-full text-left border-collapse min-w-[720px]">
+            <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-md z-10">
+              <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                <th className="py-3 px-4">TC ID</th>
+                <th className="py-3 px-4">Name</th>
+                <th className="py-3 px-4">Mobile Number</th>
+                <th className="py-3 px-4">Email Address</th>
+                <th className="py-3 px-4">Region</th>
+                <th className="py-3 px-4">Customers</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 text-xs font-medium">
+            <tbody className="divide-y divide-slate-100 text-xs font-semibold">
               {filteredTelecallers.length > 0 ? (
                 filteredTelecallers.map((tc) => (
-                  <tr key={tc.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3 px-3 font-bold text-slate-800">{tc.id}</td>
-                    <td className="py-3 px-3 font-semibold text-slate-700">{tc.name}</td>
-                    <td className="py-3 px-3 text-slate-700 font-semibold">{tc.customers}</td>
-                    <td className="py-3 px-3">
+                  <tr key={tc.id} className="hover:bg-slate-50/80 transition-colors">
+                    
+                    {/* ID */}
+                    <td className="py-3 px-4">
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-900 font-black text-xs tracking-wide">
+                        {tc.id}
+                      </span>
+                    </td>
+
+                    {/* Name */}
+                    <td className="py-3 px-4 font-extrabold text-slate-900">
+                      {tc.name}
+                    </td>
+
+                    {/* Mobile Number */}
+                    <td className="py-3 px-4 text-slate-700">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <Phone size={13} className="text-[#f26522] shrink-0" />
+                        <span>{tc.mobile || '+91 98765 00000'}</span>
+                      </div>
+                    </td>
+
+                    {/* Email Address */}
+                    <td className="py-3 px-4 text-slate-600">
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        <Mail size={13} className="text-slate-400 shrink-0" />
+                        <span>{tc.email}</span>
+                      </div>
+                    </td>
+
+                    {/* Region / Area */}
+                    <td className="py-3 px-4">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                        <Globe size={11} className="text-slate-400" />
+                        {tc.area}
+                      </span>
+                    </td>
+
+                    {/* Customers Count */}
+                    <td className="py-3 px-4 text-slate-800 font-extrabold">
+                      {tc.customers}
+                    </td>
+
+                    {/* Status */}
+                    <td className="py-3 px-4">
                       <span
-                        className={`font-semibold text-xs ${
-                          tc.status === 'Active' ? 'text-emerald-600' : 'text-rose-600'
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                          tc.status === 'Active'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200'
                         }`}
                       >
+                        <span className={`w-1.5 h-1.5 rounded-full ${tc.status === 'Active' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                         {tc.status}
                       </span>
                     </td>
-                    <td className="py-3 px-3">
+
+                    {/* Action */}
+                    <td className="py-3 px-4 text-right">
                       <button
                         onClick={() => handleOpenManage(tc)}
-                        className="text-[#f26522] hover:text-[#e05411] font-bold text-xs hover:underline cursor-pointer"
+                        className="px-3 py-1 bg-orange-50 text-[#f26522] hover:bg-[#f26522] hover:text-white rounded-lg border border-orange-200 transition-all font-bold text-xs cursor-pointer shadow-2xs"
                       >
                         Manage
                       </button>
@@ -300,8 +366,8 @@ function TelecallerManagement({ compact = false }) {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="5" className="py-6 text-center text-xs text-slate-400">
-                    No telecallers found matching search.
+                  <td colSpan="8" className="py-8 text-center text-xs text-slate-400 font-medium">
+                    No telecallers found matching search criteria.
                   </td>
                 </tr>
               )}
@@ -310,10 +376,10 @@ function TelecallerManagement({ compact = false }) {
         </div>
       </div>
 
-      {/* Manage Telecaller Modal */}
+      {/* Manage Telecaller Modal with Mobile Number & Email */}
       {isManageModalOpen && selectedTc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-150">
+          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-150">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
               <div>
                 <h3 className="text-xs font-bold text-slate-800">
@@ -329,15 +395,59 @@ function TelecallerManagement({ compact = false }) {
               </button>
             </div>
 
-            <form onSubmit={handleSaveManage} className="p-5 space-y-3.5">
+            <form onSubmit={handleSaveManage} className="p-5 space-y-3.5 text-left">
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Mobile Number
+                </label>
+                <div className="relative">
+                  <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    value={updatedMobile}
+                    onChange={(e) => setUpdatedMobile(e.target.value)}
+                    placeholder="e.g. +91 98765 43210"
+                    className="w-full pl-8 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522] font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="email"
+                    value={updatedEmail}
+                    onChange={(e) => setUpdatedEmail(e.target.value)}
+                    placeholder="e.g. telecaller@lts.com"
+                    className="w-full pl-8 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522] font-semibold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Assigned Region / Area
+                </label>
+                <input
+                  type="text"
+                  value={updatedArea}
+                  onChange={(e) => setUpdatedArea(e.target.value)}
+                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522] font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
                   Account Status
                 </label>
                 <select
                   value={updatedStatus}
                   onChange={(e) => setUpdatedStatus(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522] cursor-pointer font-medium"
+                  className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522] cursor-pointer font-bold"
                 >
                   <option value="Active">Active</option>
                   <option value="Disabled">Disabled</option>
@@ -345,20 +455,8 @@ function TelecallerManagement({ compact = false }) {
               </div>
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Assigned Region / Area
-                </label>
-                <input
-                  type="text"
-                  value={updatedArea}
-                  onChange={(e) => setUpdatedArea(e.target.value)}
-                  className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Change Password
+                <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                  Reset Password
                 </label>
                 <div className="relative">
                   <Key size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -370,22 +468,19 @@ function TelecallerManagement({ compact = false }) {
                     className="w-full pl-8 pr-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522]"
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-1">
-                  Leave blank if you do not wish to change password.
-                </p>
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsManageModalOpen(false)}
-                  className="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
+                  className="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-xs font-semibold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer"
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer"
                 >
                   Save Changes
                 </button>
@@ -395,7 +490,7 @@ function TelecallerManagement({ compact = false }) {
         </div>
       )}
 
-      {/* Add New Telecaller Modal */}
+      {/* Add New Telecaller Modal with Mobile Number Field */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
           <div className="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden animate-in fade-in duration-150">
@@ -412,60 +507,78 @@ function TelecallerManagement({ compact = false }) {
               </button>
             </div>
 
-            <form onSubmit={handleAddTcSubmit} className="p-5 space-y-3">
+            <form onSubmit={handleAddTcSubmit} className="p-5 space-y-3 text-left">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Telecaller ID</label>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Telecaller ID</label>
                   <input
                     type="text"
                     placeholder="e.g. TC050"
                     value={newTc.id}
                     onChange={(e) => setNewTc({ ...newTc, id: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Full Name *</label>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Full Name *</label>
                   <input
                     type="text"
                     required
                     placeholder="e.g. Anand Kumar"
                     value={newTc.name}
                     onChange={(e) => setNewTc({ ...newTc, name: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Email Address *</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="e.g. anand.kumar@lts.com"
-                    value={newTc.email}
-                    onChange={(e) => setNewTc({ ...newTc, email: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Assigned Region</label>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Mobile Number *</label>
+                  <div className="relative">
+                    <Phone size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      placeholder="+91 98765 43210"
+                      value={newTc.mobile}
+                      onChange={(e) => setNewTc({ ...newTc, mobile: e.target.value })}
+                      className="w-full pl-7 pr-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Email Address *</label>
+                  <div className="relative">
+                    <Mail size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="email"
+                      required
+                      placeholder="anand.kumar@lts.com"
+                      value={newTc.email}
+                      onChange={(e) => setNewTc({ ...newTc, email: e.target.value })}
+                      className="w-full pl-7 pr-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Assigned Region</label>
                   <input
                     type="text"
                     placeholder="e.g. North Region"
                     value={newTc.area}
                     onChange={(e) => setNewTc({ ...newTc, area: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Status</label>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Status</label>
                   <select
                     value={newTc.status}
                     onChange={(e) => setNewTc({ ...newTc, status: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-bold cursor-pointer"
                   >
                     <option value="Active">Active</option>
                     <option value="Disabled">Disabled</option>
@@ -473,13 +586,13 @@ function TelecallerManagement({ compact = false }) {
                 </div>
 
                 <div className="col-span-2">
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">Password</label>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Initial Password</label>
                   <input
                     type="password"
                     placeholder="Enter initial login password"
                     value={newTc.password}
                     onChange={(e) => setNewTc({ ...newTc, password: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
                   />
                 </div>
               </div>
@@ -494,7 +607,7 @@ function TelecallerManagement({ compact = false }) {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 text-xs font-semibold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-1.5 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   <Plus size={14} />
                   <span>Create Telecaller</span>
@@ -595,6 +708,7 @@ function TelecallerManagement({ compact = false }) {
                         <tr>
                           <th className="p-2">ID</th>
                           <th className="p-2">Name</th>
+                          <th className="p-2">Mobile</th>
                           <th className="p-2">Email</th>
                           <th className="p-2">Region</th>
                         </tr>
@@ -604,6 +718,7 @@ function TelecallerManagement({ compact = false }) {
                           <tr key={idx}>
                             <td className="p-2 font-bold">{row.id}</td>
                             <td className="p-2">{row.name}</td>
+                            <td className="p-2 text-slate-600">{row.mobile}</td>
                             <td className="p-2 text-slate-600">{row.email}</td>
                             <td className="p-2 text-slate-500">{row.area}</td>
                           </tr>

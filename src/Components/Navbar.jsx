@@ -123,50 +123,48 @@ function Navbar() {
   }, []);
 
   return (
-    <header className="w-full font-sans sticky top-0 z-40 shadow-sm">
+    <header className="w-full sticky top-0 z-40 shadow-sm border-b border-orange-500/20">
       
       {/* Main Navbar with Gradient & Glassmorphism */}
-      <div className="w-full bg-gradient-to-r from-[#d95316] via-[#f26522] to-[#fa7c3e] text-white px-4 md:px-8 py-3 flex items-center justify-between shadow-md">
+      <div className="w-full bg-gradient-to-r from-[#c84302] via-[#f26522] to-[#fa7c3e] text-white px-4 md:px-8 py-2.5 flex items-center justify-between shadow-lg shadow-orange-500/10 backdrop-blur-md">
         
-        {/* Left Side: Professional Enterprise Brand Logo & Title */}
+        {/* Left Side: Official LTS Brand Logo matching user photo */}
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate('/dashboard')}>
-          <div className="relative">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-[#f26522] border border-white/30 flex items-center justify-center font-black text-xl shadow-lg group-hover:scale-105 transition-all">
-              <span className="bg-gradient-to-r from-amber-200 via-orange-300 to-amber-100 bg-clip-text text-transparent font-black">LT$</span>
+          <div className="bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-white/60 shadow-md flex items-center gap-2 group-hover:scale-105 group-hover:shadow-lg transition-all duration-200">
+            <div className="flex items-center font-black text-xl tracking-tight leading-none">
+              <span className="text-[#f26522]">LT</span>
+              <span className="text-[#f26522] font-black">$</span>
             </div>
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-[#d95316] animate-pulse" />
+            <div className="text-sm md:text-base font-extrabold tracking-tight flex items-center gap-1 leading-none">
+              <span className="text-[#f26522]">Local</span>
+              <span className="text-slate-900 font-black">Trade</span>
+              <span className="text-[#f26522]">Street</span>
+            </div>
           </div>
 
-          <div>
-            <div className="flex items-center gap-2 text-lg md:text-xl font-black tracking-tight">
-              <span className="text-white font-extrabold tracking-wider">LOCAL TRADE STREET</span>
-              <span className="text-[10px] font-black text-slate-900 bg-amber-300 px-2 py-0.5 rounded-md shadow-2xs tracking-widest uppercase">
-                ENTERPRISE DMS
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-[11px] font-medium text-orange-100/90 tracking-wide hidden sm:flex">
-              <span>Super Admin Master Control & Real-time Operations Portal</span>
-              <span>•</span>
-              <span className="text-amber-200 font-bold">v4.2 Live</span>
-            </div>
+          <div className="hidden lg:flex items-center gap-2">
+            <span className="text-[10px] font-black text-slate-900 bg-amber-300 px-2.5 py-1 rounded-lg shadow-xs tracking-wider uppercase flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+              SUPER ADMIN DBMS
+            </span>
           </div>
         </div>
 
         {/* Right Side: Financial Year, Notifications & Profile */}
-        <div className="flex items-center gap-3 md:gap-4">
+        <div className="flex items-center gap-2.5 md:gap-4">
           
           {/* Financial Year Selector Pill */}
           <div className="relative">
-            <div className="flex items-center gap-1.5 bg-black/15 backdrop-blur-xs border border-white/20 rounded-xl px-3 py-1.5 text-xs text-white">
+            <div className="flex items-center gap-1.5 bg-black/20 hover:bg-black/30 backdrop-blur-md border border-white/20 rounded-xl px-3 py-1.5 text-xs text-white transition-all">
               <Calendar size={13} className="text-orange-200" />
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
-                className="bg-transparent text-white font-medium focus:outline-none cursor-pointer appearance-none pr-5 text-xs"
+                className="bg-transparent text-white font-semibold focus:outline-none cursor-pointer appearance-none pr-5 text-xs tracking-tight"
               >
-                <option value="2026-2027" className="text-slate-800">FY 2026-2027</option>
-                <option value="2025-2026" className="text-slate-800">FY 2025-2026</option>
-                <option value="2024-2025" className="text-slate-800">FY 2024-2025</option>
+                <option value="2026-2027" className="text-slate-800 font-semibold">FY 2026-2027</option>
+                <option value="2025-2026" className="text-slate-800 font-semibold">FY 2025-2026</option>
+                <option value="2024-2025" className="text-slate-800 font-semibold">FY 2024-2025</option>
               </select>
               <ChevronDown 
                 size={13} 
@@ -180,7 +178,7 @@ function Navbar() {
             <button
               type="button"
               onClick={() => setIsNotificationOpen(!isNotificationOpen)}
-              className="relative p-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 transition-all cursor-pointer text-white"
+              className="relative p-2 rounded-xl bg-white/15 hover:bg-white/25 active:scale-95 border border-white/20 transition-all cursor-pointer text-white shadow-xs"
               title="Notifications"
             >
               <Bell size={17} />
@@ -189,26 +187,26 @@ function Navbar() {
             </button>
 
             {isNotificationOpen && (
-              <div className="absolute right-0 mt-3 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200/80 py-3 z-50 text-slate-800 animate-in fade-in zoom-in duration-150">
-                <div className="px-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+              <div className="absolute right-0 mt-3 w-80 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/80 py-3 z-50 text-slate-800 animate-in fade-in zoom-in duration-150">
+                <div className="px-4 pb-2.5 border-b border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-xs text-slate-800">Notifications</span>
-                    <span className="bg-orange-100 text-[#f26522] text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    <span className="font-bold text-xs text-slate-900">Notifications</span>
+                    <span className="bg-orange-100 text-[#f26522] text-[10px] font-bold px-2 py-0.5 rounded-full border border-orange-200">
                       2 New
                     </span>
                   </div>
                   <button 
                     onClick={() => setIsNotificationOpen(false)}
-                    className="text-slate-400 hover:text-slate-600"
+                    className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100 transition-colors"
                   >
                     <X size={14} />
                   </button>
                 </div>
 
-                <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto custom-scrollbar">
                   {notifications.map((n) => (
-                    <div key={n.id} className={`p-3 text-xs hover:bg-slate-50 transition-colors ${n.unread ? 'bg-orange-50/40' : ''}`}>
-                      <div className="flex items-center justify-between font-semibold text-slate-800">
+                    <div key={n.id} className={`p-3 text-xs hover:bg-slate-50 transition-colors ${n.unread ? 'bg-orange-50/50 font-medium' : ''}`}>
+                      <div className="flex items-center justify-between font-bold text-slate-800">
                         <span>{n.title}</span>
                         <span className="text-[10px] text-slate-400 font-normal">{n.time}</span>
                       </div>
@@ -218,9 +216,9 @@ function Navbar() {
                 </div>
 
                 <div className="pt-2 px-4 border-t border-slate-100 text-center">
-                  <span className="text-[11px] font-bold text-[#f26522] hover:underline cursor-pointer">
+                  <button className="text-[11px] font-bold text-[#f26522] hover:text-[#e05411] hover:underline cursor-pointer">
                     Mark all as read
-                  </span>
+                  </button>
                 </div>
               </div>
             )}
@@ -231,40 +229,40 @@ function Navbar() {
             <button
               type="button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center gap-2.5 p-1.5 rounded-xl bg-black/10 hover:bg-black/20 border border-white/20 transition-all cursor-pointer focus:outline-none"
+              className="flex items-center gap-2.5 p-1 rounded-xl bg-black/15 hover:bg-black/25 active:scale-95 border border-white/20 transition-all cursor-pointer focus:outline-none"
             >
               <div className="relative">
                 <img
                   src={profileForm.avatar}
                   alt="Profile"
-                  className="w-8 h-8 rounded-lg object-cover border border-white/60 shadow-xs"
+                  className="w-8 h-8 rounded-lg object-cover border border-white/80 shadow-xs"
                 />
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#f26522]" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-400 rounded-full border-2 border-[#f26522]" />
               </div>
 
               <div className="text-left hidden md:block pr-1">
                 <div className="text-xs font-bold text-white capitalize leading-tight">
                   {profileForm.name}
                 </div>
-                <div className="text-[10px] text-orange-100/80 font-semibold leading-tight">
-                  Super Admin
+                <div className="text-[10px] text-orange-100/90 font-semibold leading-tight flex items-center gap-1">
+                  <span>Super Admin</span>
                 </div>
               </div>
 
-              <ChevronDown size={14} className="text-orange-200 hidden sm:block" />
+              <ChevronDown size={14} className="text-orange-200 hidden sm:block mr-1" />
             </button>
 
             {/* Profile Dropdown */}
             {isDropdownOpen && (
-              <div className="absolute right-0 mt-3 w-60 bg-white rounded-2xl shadow-2xl border border-slate-200/80 py-2 z-50 text-slate-800 animate-in fade-in zoom-in duration-150">
+              <div className="absolute right-0 mt-3 w-64 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/90 py-2.5 z-50 text-slate-800 animate-in fade-in zoom-in duration-150">
                 
-                <div className="px-4 py-2.5 bg-slate-50/70 border-b border-slate-100">
-                  <div className="text-xs font-bold text-slate-800 capitalize">{profileForm.name}</div>
-                  <div className="text-[11px] text-slate-500 truncate">{profileForm.email}</div>
-                  <div className="mt-1">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700">
+                <div className="px-4 py-3 bg-slate-50/80 border-b border-slate-100">
+                  <div className="text-xs font-extrabold text-slate-900 capitalize">{profileForm.name}</div>
+                  <div className="text-[11px] text-slate-500 truncate font-medium">{profileForm.email}</div>
+                  <div className="mt-2">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
                       <ShieldCheck size={11} />
-                      Super Admin Master Access
+                      Master Control Privilege
                     </span>
                   </div>
                 </div>
@@ -273,7 +271,7 @@ function Navbar() {
                   <button
                     type="button"
                     onClick={() => handleOpenModal('profile')}
-                    className="w-full flex items-center gap-3 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-orange-50 hover:text-[#f26522] transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-orange-50 hover:text-[#f26522] transition-colors text-left cursor-pointer"
                   >
                     <UserCircle size={16} className="text-slate-400" />
                     <span>My Profile</span>
@@ -282,7 +280,7 @@ function Navbar() {
                   <button
                     type="button"
                     onClick={() => handleOpenModal('settings')}
-                    className="w-full flex items-center gap-3 px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-orange-50 hover:text-[#f26522] transition-colors text-left cursor-pointer"
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-orange-50 hover:text-[#f26522] transition-colors text-left cursor-pointer"
                   >
                     <Settings size={16} className="text-slate-400" />
                     <span>Account Settings</span>
@@ -297,7 +295,7 @@ function Navbar() {
                     setIsDropdownOpen(false);
                     handleLogout();
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors text-left cursor-pointer"
+                  className="w-full flex items-center gap-3 px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors text-left cursor-pointer"
                 >
                   <LogOut size={16} />
                   <span>Logout Super Admin</span>
