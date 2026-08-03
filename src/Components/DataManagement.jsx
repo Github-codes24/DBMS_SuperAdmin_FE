@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Search, MapPin, Building2, Filter, Database, Check, ChevronUp, ChevronDown, Download, FileSpreadsheet, FileText, X, Plus, Phone, Mail, Eye, ShieldCheck, Tag } from 'lucide-react';
 
 function DataManagement({ compact = false }) {
-  // Master Vendor & Shop Database per Vendor Code, City & State
+  // Master Vendor & Shop Database per Vendor Code, State & City
   const [masterVendorList, setMasterVendorList] = useState([
     {
       id: 'VEN001',
@@ -125,11 +125,11 @@ function DataManagement({ compact = false }) {
     },
   ]);
 
-  // Filter States: Vendor Code, City, State & Vendor Name Search ⭐
+  // Filter States: Vendor Code, State, City & Vendor Name Search ⭐
   const [vendorSearch, setVendorSearch] = useState('');
   const [vendorCodeFilter, setVendorCodeFilter] = useState('');
-  const [selectedCity, setSelectedCity] = useState('All');
   const [selectedState, setSelectedState] = useState('All');
+  const [selectedCity, setSelectedCity] = useState('All');
 
   // Selected Vendor Detail Modal State
   const [selectedVendorDetail, setSelectedVendorDetail] = useState(null);
@@ -139,8 +139,8 @@ function DataManagement({ compact = false }) {
   const exportDropdownRef = useRef(null);
   const manualScrollRef = useRef(null);
 
-  const cityList = ['All', 'Nagpur', 'Pune', 'Mumbai', 'Delhi', 'Hyderabad', 'Ahmedabad'];
   const stateList = ['All', 'Maharashtra', 'Delhi', 'Gujarat', 'Telangana'];
+  const cityList = ['All', 'Nagpur', 'Pune', 'Mumbai', 'Delhi', 'Hyderabad', 'Ahmedabad'];
 
   // Check if any filter or search is active ⭐
   const hasActiveFilter = Boolean(
@@ -173,8 +173,8 @@ function DataManagement({ compact = false }) {
 
   // Export CSV Report
   const handleExportCSV = () => {
-    const headers = ['Sr. No.', 'Vendor Code', 'Shop Name', 'Owner Name', 'Category', 'Contact No', 'Email', 'City', 'State', 'Pincode', 'GSTIN', 'Status'];
-    const rows = filteredVendors.map((v, idx) => [idx + 1, v.id, v.name, v.ownerName, v.category, v.contactNo, v.email, v.city, v.state, v.pincode, v.gstNo, v.status]);
+    const headers = ['Sr. No.', 'Vendor Code', 'Shop Name', 'Owner Name', 'Category', 'Contact No', 'Email', 'State', 'City', 'Pincode', 'GSTIN', 'Status'];
+    const rows = filteredVendors.map((v, idx) => [idx + 1, v.id, v.name, v.ownerName, v.category, v.contactNo, v.email, v.state, v.city, v.pincode, v.gstNo, v.status]);
 
     const csvContent =
       'data:text/csv;charset=utf-8,' +
@@ -213,7 +213,7 @@ function DataManagement({ compact = false }) {
           <div class="header">
             <div>
               <h1 class="title">LTS - Local Trade Street</h1>
-              <div style="font-size: 11px; color: #64748b;">Vendor Directory by Vendor Code, City & State</div>
+              <div style="font-size: 11px; color: #64748b;">Vendor Directory by Vendor Code, State & City</div>
             </div>
             <div style="font-size: 11px; color: #64748b;">Total Vendors: ${filteredVendors.length}</div>
           </div>
@@ -225,7 +225,7 @@ function DataManagement({ compact = false }) {
                 <th>Shop Name</th>
                 <th>Owner Name</th>
                 <th>Contact</th>
-                <th>City & State</th>
+                <th>State & City</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -239,7 +239,7 @@ function DataManagement({ compact = false }) {
                   <td><strong>${v.name}</strong></td>
                   <td>${v.ownerName}</td>
                   <td>${v.contactNo}</td>
-                  <td>${v.city}, ${v.state}</td>
+                  <td>${v.state}, ${v.city}</td>
                   <td>${v.status}</td>
                 </tr>
               `
@@ -268,7 +268,7 @@ function DataManagement({ compact = false }) {
             <span>Data Management - Vendor Code Lookup System</span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Search vendors by Vendor Code (e.g. VEN001, VEN002), City & State (e.g. Maharashtra). Click any Shop Name to view complete vendor details.
+            Search vendors by Vendor Code (e.g. VEN001, VEN002), State & City (e.g. Maharashtra). Click any Shop Name to view complete vendor details.
           </p>
         </div>
 
@@ -312,14 +312,14 @@ function DataManagement({ compact = false }) {
         <div className="flex items-center justify-between">
           <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
             <Filter size={14} className="text-[#f26522]" />
-            <span>Search Vendors by Vendor Code, City & State</span>
+            <span>Search Vendors by Vendor Code, State & City</span>
           </span>
           <button
             onClick={() => {
               setVendorSearch('');
               setVendorCodeFilter('');
-              setSelectedCity('All');
               setSelectedState('All');
+              setSelectedCity('All');
             }}
             className="text-[11px] font-bold text-[#f26522] hover:underline cursor-pointer"
           >
@@ -352,18 +352,6 @@ function DataManagement({ compact = false }) {
             />
           </div>
 
-          {/* Select City Dropdown ⭐ */}
-          <div>
-            <select
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-bold text-slate-700 cursor-pointer"
-            >
-              <option value="All">City: All Cities</option>
-              {cityList.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-
           {/* Select State Dropdown (e.g. Maharashtra) ⭐ */}
           <div>
             <select
@@ -373,6 +361,18 @@ function DataManagement({ compact = false }) {
             >
               <option value="All">State: All States</option>
               {stateList.filter(s => s !== 'All').map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+
+          {/* Select City Dropdown ⭐ */}
+          <div>
+            <select
+              value={selectedCity}
+              onChange={(e) => setSelectedCity(e.target.value)}
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-bold text-slate-700 cursor-pointer"
+            >
+              <option value="All">City: All Cities</option>
+              {cityList.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>
@@ -467,7 +467,7 @@ function DataManagement({ compact = false }) {
                         <td className="py-3 px-4 font-bold text-slate-800">
                           <div className="flex items-center gap-1">
                             <MapPin size={12} className="text-[#f26522] shrink-0" />
-                            <span>{v.city}, {v.state}</span>
+                            <span>{v.state}, {v.city}</span>
                           </div>
                         </td>
                         <td className="py-3 px-4 font-mono text-slate-700 font-bold">{v.contactNo}</td>
