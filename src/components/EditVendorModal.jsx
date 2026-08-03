@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Upload, CheckSquare, Square } from 'lucide-react';
+import { X, Upload, CheckSquare, Square, User, Image as ImageIcon, Phone, Tags, Save, CheckCircle } from 'lucide-react';
 
 export default function EditVendorModal({ vendor, onClose, onSave }) {
   const [activeTab, setActiveTab] = useState('personal');
@@ -46,38 +46,39 @@ export default function EditVendorModal({ vendor, onClose, onSave }) {
         </div>
 
         {/* Body */}
-        <div className="modal-body">
-          {/* Tabs Header */}
-          <div className="modal-tabs">
+        <div className="modal-body" style={{ display: 'flex', padding: 0, minHeight: '500px', flex: 1, overflow: 'hidden' }}>
+          {/* Sidebar Tabs Header */}
+          <div className="modal-sidebar-tabs">
             <button
-              className={`modal-tab-item ${activeTab === 'personal' ? 'active' : ''}`}
+              className={`modal-side-tab ${activeTab === 'personal' ? 'active' : ''}`}
               onClick={() => setActiveTab('personal')}
             >
-              Vendor Personal Info
+              <User size={18} /> Vendor Personal Info
             </button>
             <button
-              className={`modal-tab-item ${activeTab === 'images' ? 'active' : ''}`}
+              className={`modal-side-tab ${activeTab === 'images' ? 'active' : ''}`}
               onClick={() => setActiveTab('images')}
             >
-              Upload Images
+              <ImageIcon size={18} /> Upload Images
             </button>
             <button
-              className={`modal-tab-item ${activeTab === 'contact' ? 'active' : ''}`}
+              className={`modal-side-tab ${activeTab === 'contact' ? 'active' : ''}`}
               onClick={() => setActiveTab('contact')}
             >
-              Vendor Contact & Payment Info
+              <Phone size={18} /> Contact & Payment Info
             </button>
             <button
-              className={`modal-tab-item ${activeTab === 'category' ? 'active' : ''}`}
+              className={`modal-side-tab ${activeTab === 'category' ? 'active' : ''}`}
               onClick={() => setActiveTab('category')}
             >
-              Vendor Category Details
+              <Tags size={18} /> Vendor Category Details
             </button>
           </div>
 
-          {/* Tab 1: Personal Info */}
-          {activeTab === 'personal' && (
-            <div className="form-grid-3">
+          <div className="modal-tab-content" style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
+            {/* Tab 1: Personal Info */}
+            {activeTab === 'personal' && (
+              <div className="form-grid-3">
               <div className="form-group">
                 <label>Vendor Code</label>
                 <input
@@ -480,20 +481,18 @@ export default function EditVendorModal({ vendor, onClose, onSave }) {
                   rows={3}
                 />
               </div>
-            </div>
-          )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Footer Buttons */}
         <div className="modal-footer">
-          <button className="btn-red" onClick={onClose}>
-            Close
+          <button className="btn-blue" onClick={() => handleSave(false)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Save size={16} /> Save
           </button>
-          <button className="btn-blue" onClick={() => handleSave(false)}>
-            Save
-          </button>
-          <button className="btn-green" onClick={() => handleSave(true)}>
-            Save & Followup
+          <button className="btn-green" onClick={() => handleSave(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <CheckCircle size={16} /> Save & Followup
           </button>
         </div>
       </div>

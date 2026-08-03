@@ -38,16 +38,6 @@ export default function Header({ currentUser, onLogout, onOpenProfile }) {
               <div className="user-avatar">{userAvatar}</div>
             )}
           </div>
-          {onLogout && (
-            <button
-              onClick={onLogout}
-              className="icon-action-btn"
-              style={{ marginLeft: '6px', color: '#dc2626' }}
-              title="Logout Telecaller Session"
-            >
-              <LogOut size={16} />
-            </button>
-          )}
         </div>
       </div>
     </header>

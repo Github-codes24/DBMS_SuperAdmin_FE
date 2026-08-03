@@ -118,7 +118,7 @@ export default function App() {
       {/* Main Layout Body (Sidebar + Content) */}
       <div className="crm-body">
         {/* Sidebar Navigation */}
-        <Sidebar activeNav={activeNav} setActiveNav={setActiveNav} />
+        <Sidebar activeNav={activeNav} setActiveNav={setActiveNav} onLogout={handleLogout} />
 
         {/* Main Content Area */}
         <main className="main-content">
