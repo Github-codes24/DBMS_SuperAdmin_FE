@@ -1,11 +1,13 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 
 function ProtectedRoute({ children }) {
-  const isLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
+  const { isAuthenticated } = useSelector((state) => state.auth);
+  const hasToken = !!localStorage.getItem('accessToken');
   const location = useLocation();
 
-  if (!isLoggedIn) {
+  if (!isAuthenticated && !hasToken) {
     return (
       <Navigate 
         to="/" 

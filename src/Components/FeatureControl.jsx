@@ -1,60 +1,82 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { 
+  fetchAdminUsers, 
+  fetchAdminFeatures, 
+  updateAdminFeatures, 
+  toggleLocalFeature 
+} from '../redux/slices/featureControlSlice';
 import { SlidersHorizontal, Check, RefreshCw, UserCheck } from 'lucide-react';
 
 function FeatureControl({ compact = false }) {
-  const adminUsers = [
-    { id: 'ADM001', name: 'Rahul Sharma', role: 'Admin' },
-    { id: 'ADM002', name: 'Neha Singh', role: 'Admin' },
-    { id: 'ADM003', name: 'Vikram Mehta', role: 'Admin' },
-  ];
+  const dispatch = useDispatch();
+  const { adminUsers: apiAdmins, selectedAdminFeatures, loading, isSaving } = useSelector((state) => state.featureControl);
 
   const [selectedAdminId, setSelectedAdminId] = useState('ADM001');
-
-  const [featuresState, setFeaturesState] = useState({
-    ADM001: [
-      { id: 'cust_mgmt', name: 'Customer Management', enabled: true },
-      { id: 'ven_mgmt', name: 'Vendor Management', enabled: true },
-      { id: 'reports', name: 'Reports', enabled: false },
-      { id: 'export_data', name: 'Export Data', enabled: true },
-      { id: 'bulk_upload', name: 'Bulk Upload', enabled: false },
-      { id: 'telecaller_assign', name: 'Telecaller Assignment', enabled: true },
-    ],
-    ADM002: [
-      { id: 'cust_mgmt', name: 'Customer Management', enabled: true },
-      { id: 'ven_mgmt', name: 'Vendor Management', enabled: false },
-      { id: 'reports', name: 'Reports', enabled: true },
-      { id: 'export_data', name: 'Export Data', enabled: true },
-      { id: 'bulk_upload', name: 'Bulk Upload', enabled: true },
-      { id: 'telecaller_assign', name: 'Telecaller Assignment', enabled: false },
-    ],
-    ADM003: [
-      { id: 'cust_mgmt', name: 'Customer Management', enabled: false },
-      { id: 'ven_mgmt', name: 'Vendor Management', enabled: true },
-      { id: 'reports', name: 'Reports', enabled: false },
-      { id: 'export_data', name: 'Export Data', enabled: false },
-      { id: 'bulk_upload', name: 'Bulk Upload', enabled: false },
-      { id: 'telecaller_assign', name: 'Telecaller Assignment', enabled: false },
-    ],
-  });
-
   const [savedMessage, setSavedMessage] = useState(false);
 
-  const selectedAdmin = adminUsers.find((u) => u.id === selectedAdminId) || adminUsers[0];
-  const currentFeatures = featuresState[selectedAdminId] || [];
+  useEffect(() => {
+    dispatch(fetchAdminUsers());
+  }, [dispatch]);
+
+  // Sync selectedAdminId to the first admin when the list resolves
+  useEffect(() => {
+    if (Array.isArray(apiAdmins) && apiAdmins.length > 0 && selectedAdminId === 'ADM001' && !apiAdmins.some(a => a?.user?.userId === 'ADM001')) {
+      setSelectedAdminId(apiAdmins[0]?.user?.userId);
+    }
+  }, [apiAdmins, selectedAdminId]);
+
+  useEffect(() => {
+    if (selectedAdminId) {
+      dispatch(fetchAdminFeatures(selectedAdminId));
+    }
+  }, [selectedAdminId, dispatch]);
+
+  // Map backend admin users to match legacy selector UI
+  const adminUsers = Array.isArray(apiAdmins) ? apiAdmins.map((adm) => ({
+    id: adm?.user?.userId,
+    name: adm?.user?.fullName,
+    role: adm?.user?.role === 'ADMIN' ? 'Admin' : 'Telecaller'
+  })) : [];
+
+  const selectedAdmin = adminUsers.find((u) => u.id === selectedAdminId) || { id: selectedAdminId, name: 'Loading...' };
+
+  const featureList = [
+    { id: 'customerManagement', name: 'Customer Management' },
+    { id: 'vendorManagement', name: 'Vendor Management' },
+    { id: 'reports', name: 'Reports' },
+    { id: 'exportData', name: 'Export Data' },
+    { id: 'bulkUpload', name: 'Bulk Upload' },
+    { id: 'telecallerAssignment', name: 'Telecaller Assignment' },
+  ];
+
+  const currentFeatures = featureList.map((f) => ({
+    id: f.id,
+    name: f.name,
+    enabled: Boolean(selectedAdminFeatures[f.id])
+  }));
 
   const handleToggle = (featureId) => {
-    setFeaturesState((prev) => ({
-      ...prev,
-      [selectedAdminId]: prev[selectedAdminId].map((f) =>
-        f.id === featureId ? { ...f, enabled: !f.enabled } : f
-      ),
-    }));
+    dispatch(toggleLocalFeature(featureId));
   };
 
   const handleApplyChanges = () => {
-    setSavedMessage(true);
-    setTimeout(() => setSavedMessage(false), 3000);
+    dispatch(updateAdminFeatures({ userId: selectedAdminId, features: selectedAdminFeatures }))
+      .unwrap()
+      .then(() => {
+        setSavedMessage(true);
+        setTimeout(() => setSavedMessage(false), 3000);
+      });
   };
+
+  if (loading && (!Array.isArray(apiAdmins) || apiAdmins.length === 0)) {
+    return (
+      <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-slate-200/80 p-5 shadow-2xs flex flex-col items-center justify-center min-h-[300px] font-sans">
+        <div className="w-8 h-8 border-4 border-[#f26522] border-t-transparent rounded-full animate-spin mb-3" />
+        <p className="text-xs font-bold text-slate-500">Loading admin feature settings...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white/90 backdrop-blur-md rounded-2xl border border-slate-200/80 p-5 shadow-2xs flex flex-col justify-between h-full space-y-4 animate-in fade-in duration-200">
@@ -153,10 +175,11 @@ function FeatureControl({ compact = false }) {
         <button
           type="button"
           onClick={handleApplyChanges}
-          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-2xs active:scale-95 cursor-pointer flex items-center gap-1.5"
+          disabled={isSaving}
+          className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl transition-all shadow-2xs active:scale-95 cursor-pointer flex items-center gap-1.5"
         >
-          <RefreshCw size={13} />
-          <span>Apply Feature Settings</span>
+          <RefreshCw size={13} className={isSaving ? "animate-spin" : ""} />
+          <span>{isSaving ? "Applying..." : "Apply Feature Settings"}</span>
         </button>
       </div>
     </div>

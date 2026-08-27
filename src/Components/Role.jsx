@@ -1,4 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { 
+  fetchRoles, 
+  fetchRolePermissions, 
+  updateRolePermissions, 
+  grantAllPermissions, 
+  createRole,
+  toggleLocalPermission,
+  toggleLocalResourceAll,
+  revokeLocalAll
+} from "../redux/slices/roleSlice";
 import { 
   ShieldCheck, 
   Shield, 
@@ -18,29 +29,54 @@ import {
 } from "lucide-react";
 
 const Role = () => {
-  const [roles, setRoles] = useState([
-    {
-      id: "super_admin",
-      label: "Super Admin",
-      description: "Full system control with master access to all modules, system settings, and role permissions.",
-      userCount: 1,
-      badgeColor: "bg-purple-100 text-purple-700 border-purple-200"
-    },
-    {
-      id: "admin",
-      label: "Admin",
-      description: "Administrator role managing day-to-day operations and team activities.",
-      userCount: 2,
-      badgeColor: "bg-blue-100 text-blue-700 border-blue-200"
-    },
-    {
-      id: "telecaller",
-      label: "Telecaller",
-      description: "Front-line agent handling customer interactions, queries, and call logs.",
-      userCount: 4,
-      badgeColor: "bg-amber-100 text-amber-700 border-amber-200"
+  const [activeRole, setActiveRole] = useState("super_admin");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [notification, setNotification] = useState(null);
+  const [isAddRoleModalOpen, setIsAddRoleModalOpen] = useState(false);
+  const [newRoleData, setNewRoleData] = useState({ label: "", description: "", cloneFrom: "" });
+  const [isSaving, setIsSaving] = useState(false);
+
+  const dispatch = useDispatch();
+  const { roles: apiRoles, activePermissions, loading, permissionsLoading } = useSelector((state) => state.role);
+
+  useEffect(() => {
+    dispatch(fetchRoles());
+  }, [dispatch]);
+
+  // Set first role as active when roles list loads
+  useEffect(() => {
+    if (apiRoles.length > 0 && activeRole === "super_admin" && !apiRoles.some(r => r.roleId === "super_admin")) {
+      setActiveRole(apiRoles[0].roleId);
     }
-  ]);
+  }, [apiRoles, activeRole]);
+
+  useEffect(() => {
+    if (activeRole) {
+      dispatch(fetchRolePermissions(activeRole));
+    }
+  }, [activeRole, dispatch]);
+
+  const showNotification = (msg, type = "success") => {
+    setNotification({ msg, type });
+    setTimeout(() => setNotification(null), 3500);
+  };
+
+  const getBadgeColor = (title) => {
+    const t = title.toLowerCase();
+    if (t.includes('super')) return "bg-purple-100 text-purple-700 border-[#f26522]/20";
+    if (t.includes('admin')) return "bg-blue-100 text-blue-700 border-[#f26522]/20";
+    if (t.includes('telecaller')) return "bg-amber-100 text-[#f26522] border-[#f26522]/20";
+    return "bg-slate-100 text-slate-700 border-slate-200";
+  };
+
+  // Map backend roles to match component interface
+  const roles = apiRoles.map((r) => ({
+    id: r.roleId,
+    label: r.title,
+    description: r.description || "Custom system role.",
+    userCount: r.activePrivilegesCount ?? 0,
+    badgeColor: getBadgeColor(r.title)
+  }));
 
   const resources = [
     { key: "Customers", label: "Customer Database", description: "Manage customer profiles, history, and status." },
@@ -58,47 +94,7 @@ const Role = () => {
     { key: "delete", label: "Delete Access" }
   ];
 
-  const defaultPermissions = {
-    super_admin: {
-      Customers: { view: true, edit: true, export: true, delete: true },
-      Vendors: { view: true, edit: true, export: true, delete: true },
-      Queries: { view: true, edit: true, export: true, delete: true },
-      Reports: { view: true, edit: true, export: true, delete: true },
-      AuditLogs: { view: true, edit: true, export: true, delete: true },
-      UserManagement: { view: true, edit: true, export: true, delete: true }
-    },
-    admin: {
-      Customers: { view: true, edit: true, export: true, delete: false },
-      Vendors: { view: true, edit: true, export: true, delete: false },
-      Queries: { view: true, edit: true, export: true, delete: true },
-      Reports: { view: true, edit: true, export: true, delete: false },
-      AuditLogs: { view: true, edit: false, export: true, delete: false },
-      UserManagement: { view: true, edit: true, export: false, delete: false }
-    },
-    telecaller: {
-      Customers: { view: true, edit: true, export: false, delete: false },
-      Vendors: { view: false, edit: false, export: false, delete: false },
-      Queries: { view: true, edit: true, export: false, delete: false },
-      Reports: { view: false, edit: false, export: false, delete: false },
-      AuditLogs: { view: false, edit: false, export: false, delete: false },
-      UserManagement: { view: false, edit: false, export: false, delete: false }
-    }
-  };
-
-  const [activeRole, setActiveRole] = useState("super_admin");
-  const [permissions, setPermissions] = useState(defaultPermissions);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [notification, setNotification] = useState(null);
-  const [isAddRoleModalOpen, setIsAddRoleModalOpen] = useState(false);
-  const [newRoleData, setNewRoleData] = useState({ label: "", description: "", cloneFrom: "telecaller" });
-
-  const showNotification = (msg, type = "success") => {
-    setNotification({ msg, type });
-    setTimeout(() => setNotification(null), 3500);
-  };
-
-  // Ensure current active role has permission object
-  const currentRolePerms = permissions[activeRole] || {
+  const currentRolePerms = activePermissions || {
     Customers: { view: false, edit: false, export: false, delete: false },
     Vendors: { view: false, edit: false, export: false, delete: false },
     Queries: { view: false, edit: false, export: false, delete: false },
@@ -108,113 +104,78 @@ const Role = () => {
   };
 
   const handleToggle = (resourceKey, actionKey) => {
-    setPermissions((prev) => ({
-      ...prev,
-      [activeRole]: {
-        ...prev[activeRole],
-        [resourceKey]: {
-          ...prev[activeRole]?.[resourceKey],
-          [actionKey]: !prev[activeRole]?.[resourceKey]?.[actionKey]
-        }
-      }
-    }));
+    dispatch(toggleLocalPermission({ resourceKey, actionKey }));
   };
 
   const handleToggleResourceAll = (resourceKey) => {
     const resourceObj = currentRolePerms[resourceKey] || {};
     const allChecked = actions.every((act) => resourceObj[act.key]);
-    
-    const updatedActions = {};
-    actions.forEach((act) => {
-      updatedActions[act.key] = !allChecked;
-    });
-
-    setPermissions((prev) => ({
-      ...prev,
-      [activeRole]: {
-        ...prev[activeRole],
-        [resourceKey]: updatedActions
-      }
-    }));
+    dispatch(toggleLocalResourceAll({ resourceKey, value: !allChecked }));
   };
 
   const handleGrantAll = () => {
-    const granted = {};
-    resources.forEach((res) => {
-      granted[res.key] = { view: true, edit: true, export: true, delete: true };
-    });
-    setPermissions((prev) => ({
-      ...prev,
-      [activeRole]: granted
-    }));
+    dispatch(grantAllPermissions(activeRole));
     showNotification(`Granted all permissions to ${roles.find(r => r.id === activeRole)?.label || activeRole}!`, "info");
   };
 
   const handleRevokeAll = () => {
-    const revoked = {};
-    resources.forEach((res) => {
-      revoked[res.key] = { view: false, edit: false, export: false, delete: false };
-    });
-    setPermissions((prev) => ({
-      ...prev,
-      [activeRole]: revoked
-    }));
-    showNotification(`Revoked all permissions for ${roles.find(r => r.id === activeRole)?.label || activeRole}!`, "warning");
+    dispatch(revokeLocalAll());
+    showNotification(`Revoked all permissions locally. Click 'Save Changes' to update the system.`, "warning");
   };
 
   const handleResetToDefault = () => {
-    if (defaultPermissions[activeRole]) {
-      setPermissions((prev) => ({
-        ...prev,
-        [activeRole]: defaultPermissions[activeRole]
-      }));
-    } else {
-      const resetPerms = {};
-      resources.forEach((res) => {
-        resetPerms[res.key] = { view: false, edit: false, export: false, delete: false };
-      });
-      setPermissions((prev) => ({
-        ...prev,
-        [activeRole]: resetPerms
-      }));
-    }
-    showNotification(`Reset permissions for ${roles.find(r => r.id === activeRole)?.label || activeRole} to defaults.`);
+    dispatch(fetchRolePermissions(activeRole));
+    showNotification(`Reset permissions to system defaults.`);
   };
 
   const handleSave = () => {
-    const currentRoleLabel = roles.find((r) => r.id === activeRole)?.label || activeRole;
-    showNotification(`Permissions saved successfully for ${currentRoleLabel}!`);
+    if (isSaving) return;
+    setIsSaving(true);
+
+    const resourceKeyToModuleKey = {
+      Customers: "CUSTOMER_DATABASE",
+      Vendors: "VENDOR_DATABASE",
+      Queries: "CUSTOMER_VENDOR_QUERIES",
+      Reports: "ANALYTICS_REPORTS",
+      AuditLogs: "SYSTEM_AUDIT_LOGS",
+      UserManagement: "USER_MANAGEMENT"
+    };
+
+    const permissionsPayload = Object.keys(currentRolePerms).map((resKey) => {
+      const moduleKey = resourceKeyToModuleKey[resKey];
+      const actionsObj = currentRolePerms[resKey];
+      return {
+        moduleKey,
+        fullAccess: actionsObj.view && actionsObj.edit && actionsObj.export && actionsObj.delete,
+        viewAccess: actionsObj.view,
+        editAccess: actionsObj.edit,
+        exportAccess: actionsObj.export,
+        deleteAccess: actionsObj.delete
+      };
+    });
+
+    dispatch(updateRolePermissions({ roleId: activeRole, permissions: permissionsPayload }))
+      .unwrap()
+      .finally(() => {
+        setIsSaving(false);
+      });
   };
 
   const handleCreateRole = (e) => {
     e.preventDefault();
     if (!newRoleData.label.trim()) return;
 
-    const id = newRoleData.label.toLowerCase().replace(/\s+/g, "_");
-    if (roles.some((r) => r.id === id)) {
-      showNotification("A role with this name already exists!", "warning");
-      return;
-    }
-
-    const clonedPermissions = JSON.parse(JSON.stringify(permissions[newRoleData.cloneFrom] || defaultPermissions.telecaller));
-
-    const newRoleObj = {
-      id,
-      label: newRoleData.label.trim(),
+    dispatch(createRole({
+      title: newRoleData.label.trim(),
       description: newRoleData.description.trim() || "Custom user role.",
-      userCount: 0,
-      badgeColor: "bg-slate-100 text-slate-700 border-slate-200"
-    };
-
-    setRoles([...roles, newRoleObj]);
-    setPermissions((prev) => ({
-      ...prev,
-      [id]: clonedPermissions
-    }));
-    setActiveRole(id);
-    setIsAddRoleModalOpen(false);
-    setNewRoleData({ label: "", description: "", cloneFrom: "telecaller" });
-    showNotification(`Role '${newRoleObj.label}' created successfully!`);
+      cloneFromRole: newRoleData.cloneFrom
+    })).unwrap().then((response) => {
+      setIsAddRoleModalOpen(false);
+      if (response?.role?.roleId) {
+        setActiveRole(response.role.roleId);
+      }
+      setNewRoleData({ label: "", description: "", cloneFrom: "" });
+    });
   };
 
   const filteredResources = resources.filter((res) =>
@@ -222,7 +183,7 @@ const Role = () => {
     res.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const activeRoleObj = roles.find((r) => r.id === activeRole) || roles[0];
+  const activeRoleObj = roles.find((r) => r.id === activeRole) || { label: "Loading..." };
 
   // Calculate enabled count stats
   const totalPossible = resources.length * actions.length;
@@ -234,6 +195,15 @@ const Role = () => {
       }
     });
   });
+
+  if (loading && apiRoles.length === 0) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center p-12 min-h-[400px]">
+        <div className="w-10 h-10 border-4 border-[#f26522] border-t-transparent rounded-full animate-spin mb-4" />
+        <p className="text-sm font-bold text-slate-600 font-sans">Loading system roles and permissions...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 font-sans text-slate-800 pb-8">
@@ -299,10 +269,11 @@ const Role = () => {
           <button
             type="button"
             onClick={handleSave}
-            className="flex items-center gap-2 px-5 py-2.5 bg-[#f26522] hover:bg-[#d95516] text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer active:scale-98"
+            disabled={isSaving}
+            className="flex items-center gap-2 px-5 py-2.5 bg-[#f26522] hover:bg-[#d95516] disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer active:scale-98"
           >
             <Save size={16} />
-            <span>Save Permissions</span>
+            <span>{isSaving ? "Saving..." : "Save Permissions"}</span>
           </button>
         </div>
       </div>
@@ -517,9 +488,10 @@ const Role = () => {
             <button
               type="button"
               onClick={handleSave}
-              className="px-4 py-2 bg-[#f26522] hover:bg-[#d95516] text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
+              disabled={isSaving}
+              className="px-4 py-2 bg-[#f26522] hover:bg-[#d95516] disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
             >
-              Save Changes
+              {isSaving ? "Saving Changes..." : "Save Changes"}
             </button>
           </div>
         </div>

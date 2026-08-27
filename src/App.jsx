@@ -1,4 +1,9 @@
+import React, { useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { fetchMyProfile } from "./redux/slices/authSlice";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 import Login from "./Pages/Login";
 import Forgot from "./Pages/Forgot";
@@ -11,7 +16,17 @@ import Dashboard from "./Components/Dashboard";
 import ProtectedRoute from "./Components/ProtectedRoute";
 
 function App() {
+  const dispatch = useDispatch();
+
+  useEffect(() => {
+    if (localStorage.getItem("accessToken")) {
+      dispatch(fetchMyProfile());
+    }
+  }, [dispatch]);
+
   return (
+    <>
+      <ToastContainer position="top-right" autoClose={3000} />
     <Routes>
       {/* Public Auth Routes */}
       <Route path="/" element={<Login />} />
@@ -113,6 +128,7 @@ function App() {
       {/* Wildcard redirect to Login */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }
 

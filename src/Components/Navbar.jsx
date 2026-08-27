@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { logoutAdmin } from '../redux/slices/authSlice';
 import { 
   ChevronDown, 
   UserCircle, 
@@ -27,6 +29,7 @@ import {
 
 function Navbar() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [selectedYear, setSelectedYear] = useState('2026-2027');
@@ -39,8 +42,10 @@ function Navbar() {
   const dropdownRef = useRef(null);
   const notificationRef = useRef(null);
 
-  const initialEmail = localStorage.getItem('userEmail') || 'superadmin@lts.com';
-  const initialName = localStorage.getItem('userName') || 'Rahul Sharma';
+  const { user } = useSelector((state) => state.auth);
+
+  const initialEmail = user?.email || localStorage.getItem('userEmail') || 'superadmin@lts.com';
+  const initialName = user?.fullName || localStorage.getItem('userName') || 'Rahul Sharma';
 
   // Profile Form State
   const [profileForm, setProfileForm] = useState({
@@ -49,8 +54,20 @@ function Navbar() {
     phone: '+91 98765 43210',
     designation: 'Senior Super Admin & Chief Data Officer',
     jurisdiction: 'All India Master Operations',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
+    avatar: user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=150',
   });
+
+  // Sync profile form when user profile is updated in Redux store
+  useEffect(() => {
+    if (user) {
+      setProfileForm((prev) => ({
+        ...prev,
+        name: user.fullName || prev.name,
+        email: user.email || prev.email,
+        avatar: user.avatar || prev.avatar,
+      }));
+    }
+  }, [user]);
 
   // Settings Form State
   const [settingsForm, setSettingsForm] = useState({
@@ -69,9 +86,11 @@ function Navbar() {
   ];
 
   const handleLogout = () => {
-    localStorage.removeItem('isLoggedIn');
-    localStorage.removeItem('userEmail');
-    navigate('/', { replace: true });
+    dispatch(logoutAdmin())
+      .unwrap()
+      .finally(() => {
+        navigate('/', { replace: true });
+      });
   };
 
   // Open Modal Helper
