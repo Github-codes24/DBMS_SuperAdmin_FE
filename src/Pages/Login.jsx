@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { loginAdmin } from "../redux/slices/authSlice";
 import { Eye, EyeOff, AlertCircle, Lock, Mail, ShieldCheck, ArrowRight, CheckCircle2 } from "lucide-react";
 import homeImg from "../assets/home.png";
 
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -13,30 +16,34 @@ function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [role, setRole] = useState("Super Admin");
   const [noticeMessage, setNoticeMessage] = useState(location.state?.message || "");
-  const [isLoading, setIsLoading] = useState(false);
+
+  const { loading, error } = useSelector((state) => state.auth);
+  const isLoading = loading;
 
   useEffect(() => {
-    if (localStorage.getItem("isLoggedIn") === "true") {
+    if (localStorage.getItem("accessToken")) {
       navigate("/dashboard", { replace: true });
     }
   }, [navigate]);
 
+  useEffect(() => {
+    if (error) {
+      setNoticeMessage(error);
+    }
+  }, [error]);
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!email || !password) return;
-    
-    setIsLoading(true);
 
-    setTimeout(() => {
-      // Save authentication state strictly as Super Admin
-      localStorage.setItem("isLoggedIn", "true");
-      localStorage.setItem("userEmail", email);
-      localStorage.setItem("userRole", "Super Admin");
-
-      setIsLoading(false);
-      // Redirect to dashboard
-      navigate("/dashboard", { replace: true });
-    }, 500);
+    dispatch(loginAdmin({ email, password }))
+      .unwrap()
+      .then(() => {
+        navigate("/dashboard", { replace: true });
+      })
+      .catch((err) => {
+        setNoticeMessage(err);
+      });
   };
 
   return (

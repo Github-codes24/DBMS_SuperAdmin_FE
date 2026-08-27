@@ -1,4 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchUsers, createUser, updateUser, deleteUser } from '../redux/slices/userSlice';
 import { 
   Plus, 
   Search, 
@@ -19,59 +21,26 @@ import {
 } from 'lucide-react';
 
 function UserManagement() {
-  // Initial Mock Users List with Admin ID and Telecaller ID
-  const [users, setUsers] = useState([
-    {
-      id: 1,
-      userId: 'ADM001',
-      name: 'Rahul Sharma',
-      email: 'rahul.sharma@lts.com',
-      phone: '+91 98765 43210',
-      role: 'Admin',
-      status: 'Active',
-      createdDate: '2026-01-15',
-    },
-    {
-      id: 2,
-      userId: 'TC014',
-      name: 'Amit Verma',
-      email: 'amit.verma@lts.com',
-      phone: '+91 97654 32109',
-      role: 'Telecaller',
-      status: 'Active',
-      createdDate: '2026-02-10',
-    },
-    {
-      id: 3,
-      userId: 'TC021',
-      name: 'Neha Joshi',
-      email: 'neha.joshi@lts.com',
-      phone: '+91 98123 45678',
-      role: 'Telecaller',
-      status: 'Active',
-      createdDate: '2026-02-01',
-    },
-    {
-      id: 4,
-      userId: 'ADM002',
-      name: 'Neha Singh',
-      email: 'neha.singh@lts.com',
-      phone: '+91 94321 09876',
-      role: 'Admin',
-      status: 'Active',
-      createdDate: '2026-04-01',
-    },
-    {
-      id: 5,
-      userId: 'TC031',
-      name: 'Ravi Singh',
-      email: 'ravi.singh@lts.com',
-      phone: '+91 96543 21098',
-      role: 'Telecaller',
-      status: 'Inactive',
-      createdDate: '2026-03-05',
-    },
-  ]);
+  const dispatch = useDispatch();
+  const { users: apiUsers, loading, error } = useSelector((state) => state.user);
+
+  useEffect(() => {
+    dispatch(fetchUsers());
+  }, [dispatch]);
+
+  // Dynamically map API users to match legacy table column schema
+  const users = apiUsers.map((u) => ({
+    id: u._id || u.id,
+    _id: u._id,
+    userId: u.userId,
+    name: u.fullName || '',
+    email: u.email || '',
+    phone: u.phone || '',
+    role: u.role === 'ADMIN' ? 'Admin' : 'Telecaller',
+    status: u.status === 'ACTIVE' ? 'Active' : 'Inactive',
+    createdDate: u.createdAt ? u.createdAt.split('T')[0] : '',
+    target: u.target ?? 0
+  }));
 
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -120,7 +89,7 @@ function UserManagement() {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
-  // Generate formatted ID (ADMxxx or TCxxx)
+  // Generate formatted ID (ADMxxx or TCxxx) - legacy fallback
   const generateNextId = (role) => {
     const prefix = role === 'Admin' ? 'ADM' : 'TC';
     const count = users.filter((u) => u.role === role).length + 1;
@@ -132,7 +101,7 @@ function UserManagement() {
     setEditingUser(null);
     const initialRole = 'Telecaller';
     setFormData({
-      userId: generateNextId(initialRole),
+      userId: 'Auto-Generated',
       name: '',
       email: '',
       phone: '',
@@ -148,7 +117,7 @@ function UserManagement() {
     setFormData((prev) => ({
       ...prev,
       role: newRole,
-      userId: editingUser ? prev.userId : generateNextId(newRole),
+      userId: 'Auto-Generated',
     }));
   };
 
@@ -175,7 +144,7 @@ function UserManagement() {
     setIsPasswordModalOpen(true);
   };
 
-  // Save Password Change
+  // Save Password Change (simulation fallback)
   const handleSavePassword = (e) => {
     e.preventDefault();
     if (!newPassword || newPassword !== confirmPassword) {
@@ -193,46 +162,59 @@ function UserManagement() {
     e.preventDefault();
     if (!formData.name || !formData.email) return;
 
+    const roleApiValue = formData.role === 'Admin' ? 'ADMIN' : 'TELECALLER';
+    const statusApiValue = formData.status === 'Active' ? 'ACTIVE' : 'INACTIVE';
+
     if (editingUser) {
       // Update
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === editingUser.id ? { ...u, ...formData } : u
-        )
-      );
-      setToastMsg(`User ${formData.name} updated successfully!`);
+      const payload = {
+        fullName: formData.name,
+        status: statusApiValue,
+        target: editingUser.target ?? 0,
+      };
+      dispatch(updateUser({ id: editingUser._id || editingUser.id, payload }))
+        .unwrap()
+        .then(() => {
+          setIsModalOpen(false);
+        });
     } else {
       // Add
-      const newUser = {
-        id: Date.now(),
-        ...formData,
-        userId: formData.userId || generateNextId(formData.role),
-        createdDate: new Date().toISOString().split('T')[0],
+      const payload = {
+        fullName: formData.name,
+        email: formData.email,
+        phone: formData.phone || '',
+        password: formData.password,
+        role: roleApiValue,
+        status: statusApiValue,
+        target: 0
       };
-      setUsers((prev) => [newUser, ...prev]);
-      setToastMsg(`Created new ${formData.role} ID ${newUser.userId} successfully!`);
+      dispatch(createUser(payload))
+        .unwrap()
+        .then(() => {
+          setIsModalOpen(false);
+        });
     }
-
-    setTimeout(() => setToastMsg(''), 3500);
-    setIsModalOpen(false);
   };
 
   // Delete User
   const handleDeleteUser = (id) => {
-    if (window.confirm('Are you sure you want to delete this user ID?')) {
-      setUsers((prev) => prev.filter((u) => u.id !== id));
+    if (window.confirm('Are you sure you want to delete this user?')) {
+      dispatch(deleteUser(id));
     }
   };
 
   // Toggle Status
   const handleToggleStatus = (id) => {
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === id
-          ? { ...u, status: u.status === 'Active' ? 'Inactive' : 'Active' }
-          : u
-      )
-    );
+    const userObj = users.find((u) => u.id === id);
+    if (!userObj) return;
+
+    const newStatus = userObj.status === 'Active' ? 'INACTIVE' : 'ACTIVE';
+    const payload = {
+      fullName: userObj.name,
+      status: newStatus,
+      target: userObj.target ?? 0
+    };
+    dispatch(updateUser({ id, payload }));
   };
 
   return (
