@@ -5,16 +5,19 @@ import {
   Pencil,
   ShoppingCart,
   Share,
-  RotateCcw
+  RotateCcw,
+  Eye
 } from 'lucide-react';
 
 export default function VendorSearch({
   vendors,
   onOpenEdit,
+  onOpenView,
   onOpenPaymentOrder,
   onSendPackageDetails,
   onOpenPaymentHistory,
-  onOpenAddVendor
+  onOpenAddVendor,
+  onRefresh
 }) {
   const [phoneSearch, setPhoneSearch] = useState('');
   const [codeSearch, setCodeSearch] = useState('');
@@ -61,7 +64,10 @@ export default function VendorSearch({
           </button>
           <button
             className="icon-action-btn"
-            onClick={handleResetSearch}
+            onClick={() => {
+              handleResetSearch();
+              if (onRefresh) onRefresh();
+            }}
             title="Refresh Search"
           >
             <RefreshCw size={18} />
@@ -143,7 +149,7 @@ export default function VendorSearch({
                   <span className="sort-icon">▲</span>
                 </div>
               </th>
-              <th style={{ textAlignment: 'center' }}>Actions</th>
+              <th style={{ textAlign: 'center' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -181,7 +187,20 @@ export default function VendorSearch({
 
                   {/* Actions Column with custom styled hover tooltips */}
                   <td>
-                    <div className="actions-cell">
+                    <div className="actions-cell" style={{ justifyContent: 'center' }}>
+                      {/* Action: View Details Button */}
+                      <div className="tooltip-wrapper">
+                        <button
+                          className="action-btn-icon"
+                          onClick={() => onOpenView(vendor)}
+                        >
+                          <Eye size={15} />
+                        </button>
+                        <div className="tooltip-box">
+                          Click here to view vendor details
+                        </div>
+                      </div>
+
                       {/* Action a: Edit Button */}
                       <div className="tooltip-wrapper">
                         <button

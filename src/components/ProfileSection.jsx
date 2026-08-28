@@ -1,9 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { User, Mail, Phone, CheckCircle, Save, Camera, Trash2 } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { User, Mail, Phone, CheckCircle, Save, Camera, Trash2, Shield, Calendar, Clock, Activity } from 'lucide-react';
 
 export default function ProfileSection({ currentUser, onUpdateUser }) {
   const fileInputRef = useRef(null);
-  const [photoUrl, setPhotoUrl] = useState(currentUser?.photoUrl || '');
+  const { loading } = useSelector((state) => state.auth);
+
+  const [photoUrl, setPhotoUrl] = useState(currentUser?.profileImage || currentUser?.photoUrl || '');
   const [formData, setFormData] = useState({
     name: currentUser?.name || 'Shivam',
     email: currentUser?.email || 'shivam.lts@localtradestreet.com',
@@ -11,6 +14,18 @@ export default function ProfileSection({ currentUser, onUpdateUser }) {
   });
 
   const [notification, setNotification] = useState('');
+
+  // Sync component state when currentUser is loaded/updated from the backend
+  useEffect(() => {
+    if (currentUser) {
+      setFormData({
+        name: currentUser.name || '',
+        email: currentUser.email || '',
+        phone: currentUser.phone || ''
+      });
+      setPhotoUrl(currentUser.profileImage || currentUser.photoUrl || '');
+    }
+  }, [currentUser]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -118,7 +133,7 @@ export default function ProfileSection({ currentUser, onUpdateUser }) {
           </div>
 
           <h2 className="simple-profile-title" style={{ marginTop: '10px' }}>{formData.name}</h2>
-          <p className="simple-profile-subtitle">User Profile</p>
+          <p className="simple-profile-subtitle">{currentUser?.role || 'TELECALLER'}</p>
         </div>
 
         <form onSubmit={handleSaveProfile} className="simple-profile-form">
@@ -168,11 +183,63 @@ export default function ProfileSection({ currentUser, onUpdateUser }) {
           </div>
 
           <div className="simple-profile-actions">
-            <button type="submit" className="btn-orange" style={{ width: '100%', justifyContent: 'center' }}>
-              <Save size={16} /> Save Profile
+            <button 
+              type="submit" 
+              className="btn-orange" 
+              style={{ width: '100%', justifyContent: 'center' }}
+              disabled={loading}
+            >
+              <Save size={16} /> {loading ? 'Saving Profile...' : 'Save Profile'}
             </button>
           </div>
         </form>
+
+        {/* Read-Only Account Details */}
+        <div className="profile-additional-details" style={{ marginTop: '28px', paddingTop: '20px', borderTop: '1px solid #e2e8f0' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: '700', color: '#1e293b', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Shield size={16} className="text-orange" style={{ color: 'var(--lts-orange)' }} /> Account Information
+          </h3>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 12px', fontSize: '12px' }}>
+            <div>
+              <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                Employee ID
+              </span>
+              <strong style={{ color: '#334155' }}>{currentUser?.employeeId || 'TC001'}</strong>
+            </div>
+            <div>
+              <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                Status
+              </span>
+              <span style={{ 
+                display: 'inline-block', 
+                padding: '2px 8px', 
+                borderRadius: '12px', 
+                fontSize: '10px', 
+                fontWeight: '700',
+                background: (currentUser?.status || 'ACTIVE') === 'ACTIVE' ? '#dcfce7' : '#fee2e2',
+                color: (currentUser?.status || 'ACTIVE') === 'ACTIVE' ? '#15803d' : '#991b1b',
+              }}>
+                {currentUser?.status || 'ACTIVE'}
+              </span>
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                <Clock size={12} /> Last Login
+              </span>
+              <strong style={{ color: '#334155' }}>
+                {currentUser?.lastLogin ? new Date(currentUser.lastLogin).toLocaleString() : 'N/A'}
+              </strong>
+            </div>
+            <div style={{ gridColumn: 'span 2' }}>
+              <span style={{ color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                <Calendar size={12} /> Joined On
+              </span>
+              <strong style={{ color: '#334155' }}>
+                {currentUser?.createdAt ? new Date(currentUser.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}
+              </strong>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

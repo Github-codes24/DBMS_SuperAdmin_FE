@@ -1,37 +1,238 @@
-import React, { useState } from 'react';
-import { X, Upload, CheckSquare, Square, User, Image as ImageIcon, Phone, Tags, Save, CheckCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { X, Upload, CheckSquare, Square, User, Image as ImageIcon, Phone, Tags, Save, CheckCircle, Trash2 } from 'lucide-react';
 
-export default function EditVendorModal({ vendor, onClose, onSave }) {
+const resolveImageUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+    return url;
+  }
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+  const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  const cleanPath = url.startsWith('/') ? url : `/${url}`;
+  return `${cleanBase}${cleanPath}`;
+};
+
+export default function EditVendorModal({ vendor, isViewOnly = false, onClose, onSave }) {
+  const token = useSelector((state) => state.auth.token);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
   const [formData, setFormData] = useState({ ...vendor });
   const [uploadedImages, setUploadedImages] = useState(vendor.images || []);
+
+  useEffect(() => {
+    setFormData({ ...vendor });
+    setUploadedImages(vendor.images || []);
+  }, [vendor]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = (shouldFollowUp = false) => {
-    onSave({ ...formData, images: uploadedImages }, shouldFollowUp);
-  };
+  const handleSave = async (shouldFollowUp = false) => {
+    setSubmitting(true);
+    setError(null);
 
-  const handleImageUpload = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const newImg = {
-        id: Date.now(),
-        url: URL.createObjectURL(file),
-        isPrimary: uploadedImages.length === 0,
-        name: file.name
+    const activeToken = token || localStorage.getItem('lts_telecaller_token');
+
+    // Construct personal info payload based on form data
+    const payload = {
+      companyName: formData.company,
+      contactPerson: formData.vendorName,
+      phone: formData.phone,
+      whatsapp: formData.whatsappNo || formData.phone,
+      email: formData.email,
+      state: formData.state,
+      city: formData.city,
+      locality: formData.locality,
+      isPaidVendor: formData.paid === 'Yes',
+      fullAddress: formData.address
+    };
+
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const headers = {
+        'Content-Type': 'application/json'
       };
-      setUploadedImages([...uploadedImages, newImg]);
+      if (activeToken) {
+        headers['Authorization'] = `Bearer ${activeToken}`;
+      }
+
+      // If mock token or offline demo, bypass API and save locally
+      if (!activeToken || activeToken === 'mock-token') {
+        onSave({ ...formData, images: uploadedImages }, shouldFollowUp);
+        return;
+      }
+
+      const response = await fetch(`${baseUrl}/api/telecaller/vendors/${vendor.id}/personal`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify(payload)
+      });
+
+      const resData = await response.json();
+      if (!response.ok || !resData.success) {
+        throw new Error(resData.message || 'Failed to update vendor personal details');
+      }
+
+      onSave({ ...formData, images: uploadedImages }, shouldFollowUp);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to update vendor personal details');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const togglePrimaryImage = (id) => {
-    setUploadedImages((prev) =>
-      prev.map((img) => ({ ...img, isPrimary: img.id === id }))
-    );
+  const handleImageUpload = async (e) => {
+    if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0];
+      
+      const activeToken = token || localStorage.getItem('lts_telecaller_token');
+      
+      // If mock token or offline demo, fallback to local URL
+      if (!activeToken || activeToken === 'mock-token') {
+        const newImg = {
+          id: Date.now(),
+          url: URL.createObjectURL(file),
+          isPrimary: uploadedImages.length === 0,
+          name: file.name
+        };
+        setUploadedImages([...uploadedImages, newImg]);
+        return;
+      }
+
+      setUploadingImage(true);
+      setError(null);
+
+      const formDataToSend = new FormData();
+      formDataToSend.append('images', file);
+
+      try {
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+        const headers = {
+          'Authorization': `Bearer ${activeToken}`
+        };
+
+        const response = await fetch(`${baseUrl}/api/telecaller/vendors/${vendor.id}/images`, {
+          method: 'POST',
+          headers,
+          body: formDataToSend
+        });
+
+        const resData = await response.json();
+        if (!response.ok || !resData.success) {
+          throw new Error(resData.message || 'Failed to upload image');
+        }
+
+        const uploadedResult = resData.data;
+        const uploadedData = Array.isArray(uploadedResult) ? uploadedResult[0] : uploadedResult;
+
+        const rawUrl = uploadedData?.url || uploadedData?.image || (typeof uploadedData === 'string' ? uploadedData : '');
+        const newImg = {
+          id: uploadedData?._id || Date.now(),
+          url: resolveImageUrl(rawUrl) || URL.createObjectURL(file),
+          isPrimary: uploadedData?.isPrimary || uploadedImages.length === 0,
+          name: uploadedData?.name || file.name
+        };
+
+        setUploadedImages((prev) => [...prev, newImg]);
+      } catch (err) {
+        console.error(err);
+        setError(err.message || 'Failed to upload image');
+      } finally {
+        setUploadingImage(false);
+      }
+    }
+  };
+
+  const togglePrimaryImage = async (id) => {
+    if (isViewOnly || submitting || uploadingImage) return;
+
+    const activeToken = token || localStorage.getItem('lts_telecaller_token');
+
+    // If mock token or offline demo, fallback to local toggle
+    if (!activeToken || activeToken === 'mock-token') {
+      setUploadedImages((prev) =>
+        prev.map((img) => ({ ...img, isPrimary: img.id === id }))
+      );
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const headers = {
+        'Authorization': `Bearer ${activeToken}`
+      };
+
+      const response = await fetch(`${baseUrl}/api/telecaller/vendors/${vendor.id}/images/${id}/primary`, {
+        method: 'PATCH',
+        headers
+      });
+
+      const resData = await response.json();
+      if (!response.ok || !resData.success) {
+        throw new Error(resData.message || 'Failed to update primary image');
+      }
+
+      setUploadedImages((prev) =>
+        prev.map((img) => ({ ...img, isPrimary: img.id === id }))
+      );
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to update primary image');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteImage = async (imageId) => {
+    if (isViewOnly || submitting || uploadingImage) return;
+
+    if (!window.confirm("Are you sure you want to delete this image?")) {
+      return;
+    }
+
+    const activeToken = token || localStorage.getItem('lts_telecaller_token');
+
+    // If mock token or offline demo, fallback to local delete
+    if (!activeToken || activeToken === 'mock-token') {
+      setUploadedImages((prev) => prev.filter((img) => img.id !== imageId));
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+      const headers = {
+        'Authorization': `Bearer ${activeToken}`
+      };
+
+      const response = await fetch(`${baseUrl}/api/telecaller/vendors/${vendor.id}/images/${imageId}`, {
+        method: 'DELETE',
+        headers
+      });
+
+      const resData = await response.json();
+      if (!response.ok || !resData.success) {
+        throw new Error(resData.message || 'Failed to delete image');
+      }
+
+      setUploadedImages((prev) => prev.filter((img) => img.id !== imageId));
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Failed to delete image');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -39,14 +240,14 @@ export default function EditVendorModal({ vendor, onClose, onSave }) {
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="modal-header">
-          <h3>Edit Vendor</h3>
+          <h3>{isViewOnly ? 'View Vendor Details' : 'Edit Vendor'}</h3>
           <button className="modal-close-btn" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
 
         {/* Body */}
-        <div className="modal-body" style={{ display: 'flex', padding: 0, minHeight: '500px', flex: 1, overflow: 'hidden' }}>
+        <div className="modal-body" style={{ display: 'flex', padding: 0, height: '500px', maxHeight: 'calc(90vh - 130px)', flex: 1, overflow: 'hidden' }}>
           {/* Sidebar Tabs Header */}
           <div className="modal-sidebar-tabs">
             <button
@@ -76,8 +277,23 @@ export default function EditVendorModal({ vendor, onClose, onSave }) {
           </div>
 
           <div className="modal-tab-content" style={{ flex: 1, padding: '24px', overflowY: 'auto' }}>
-            {/* Tab 1: Personal Info */}
-            {activeTab === 'personal' && (
+            {error && (
+              <div className="error-alert" style={{
+                backgroundColor: '#fee2e2',
+                border: '1px solid #fca5a5',
+                color: '#b91c1c',
+                padding: '10px 14px',
+                borderRadius: '6px',
+                marginBottom: '15px',
+                fontSize: '14px',
+                fontWeight: '500'
+              }}>
+                {error}
+              </div>
+            )}
+            <fieldset disabled={isViewOnly || submitting} style={{ border: 'none', padding: 0, margin: 0, minWidth: 0, display: 'contents' }}>
+              {/* Tab 1: Personal Info */}
+              {activeTab === 'personal' && (
               <div className="form-grid-3">
               <div className="form-group">
                 <label>Vendor Code</label>
@@ -235,15 +451,27 @@ export default function EditVendorModal({ vendor, onClose, onSave }) {
                     style={{ display: 'none' }}
                     accept="image/*"
                   />
-                  <label htmlFor="vendorImgInput" className="form-control" style={{ cursor: 'pointer', flex: 1, display: 'flex', alignItems: 'center' }}>
-                    Choose Files
+                  <label 
+                    htmlFor={isViewOnly || uploadingImage ? undefined : "vendorImgInput"} 
+                    className="form-control" 
+                    style={{ 
+                      cursor: (isViewOnly || uploadingImage) ? 'not-allowed' : 'pointer', 
+                      pointerEvents: (isViewOnly || uploadingImage) ? 'none' : 'auto', 
+                      flex: 1, 
+                      display: 'flex', 
+                      alignItems: 'center',
+                      opacity: (isViewOnly || uploadingImage) ? 0.6 : 1
+                    }}
+                  >
+                    {uploadingImage ? 'Uploading image...' : 'Choose Files'}
                   </label>
                   <button
                     className="btn-green"
                     onClick={() => document.getElementById('vendorImgInput').click()}
                     style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                    disabled={isViewOnly || uploadingImage}
                   >
-                    <Upload size={14} /> Upload
+                    <Upload size={14} /> {uploadingImage ? 'Uploading...' : 'Upload'}
                   </button>
                 </div>
               </div>
@@ -257,8 +485,35 @@ export default function EditVendorModal({ vendor, onClose, onSave }) {
                   <p style={{ color: '#64748b', fontStyle: 'italic' }}>No vendor images uploaded yet.</p>
                 ) : (
                   uploadedImages.map((img) => (
-                    <div key={img.id} className="image-thumb-box">
+                    <div key={img.id} className="image-thumb-box" style={{ position: 'relative' }}>
                       <img src={img.url} alt={img.name || 'Vendor shop'} />
+                      
+                      {!isViewOnly && (
+                        <button
+                          type="button"
+                          className="image-delete-btn"
+                          style={{
+                            position: 'absolute',
+                            top: '5px',
+                            right: '5px',
+                            backgroundColor: 'rgba(239, 68, 68, 0.9)',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            padding: '4px',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            zIndex: 10
+                          }}
+                          onClick={() => handleDeleteImage(img.id)}
+                          title="Delete this image"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+
                       <div
                         style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '12px' }}
                         onClick={() => togglePrimaryImage(img.id)}
@@ -483,17 +738,26 @@ export default function EditVendorModal({ vendor, onClose, onSave }) {
               </div>
               </div>
             )}
+            </fieldset>
           </div>
         </div>
 
         {/* Footer Buttons */}
         <div className="modal-footer">
-          <button className="btn-blue" onClick={() => handleSave(false)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Save size={16} /> Save
-          </button>
-          <button className="btn-green" onClick={() => handleSave(true)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <CheckCircle size={16} /> Save & Followup
-          </button>
+          {isViewOnly ? (
+            <button className="btn-red" onClick={onClose} disabled={submitting} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              Close
+            </button>
+          ) : (
+            <>
+              <button className="btn-blue" onClick={() => handleSave(false)} disabled={submitting} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Save size={16} /> {submitting ? 'Saving...' : 'Save'}
+              </button>
+              <button className="btn-green" onClick={() => handleSave(true)} disabled={submitting} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle size={16} /> {submitting ? 'Saving...' : 'Save & Followup'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

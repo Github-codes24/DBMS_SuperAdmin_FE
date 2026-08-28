@@ -1,45 +1,96 @@
 import React, { useState } from 'react';
-import { Lock, User, Eye, EyeOff, LogIn, ShieldCheck } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
+import { Lock, User, Eye, EyeOff, LogIn, ShieldCheck, Mail, Phone, UserPlus } from 'lucide-react';
+import { signupTelecaller, loginTelecaller, clearError } from '../redux/slices/authSlice';
 
 export default function LoginPage({ onLogin }) {
-  const [userId, setUserId] = useState('2547');
-  const [password, setPassword] = useState('telecaller@123');
-  const [financialYear, setFinancialYear] = useState('2026-2027');
+  const dispatch = useDispatch();
+  const { loading, error } = useSelector((state) => state.auth);
+
+  // Mode state
+  const [isSignup, setIsSignup] = useState(false);
+
+  // Common Fields
+  const [password, setPassword] = useState('Password@123');
   const [showPassword, setShowPassword] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [financialYear, setFinancialYear] = useState('2026-2027');
+  const [localError, setLocalError] = useState('');
+
+  // Login Fields
+  const [userId, setUserId] = useState('rk@lts.com');
+
+  // Signup Fields
+  const [signupName, setSignupName] = useState('');
+  const [signupEmployeeId, setSignupEmployeeId] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPhone, setSignupPhone] = useState('');
+
+  const toggleMode = () => {
+    setIsSignup(!isSignup);
+    setLocalError('');
+    dispatch(clearError());
+    // Reset passwords to standard placeholder
+    setPassword(isSignup ? 'Password@123' : 'Password@123');
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!userId.trim() || !password.trim()) {
-      setErrorMsg('Please enter both Telecaller ID/Email and Password.');
-      return;
+    setLocalError('');
+
+    if (isSignup) {
+      if (!signupName.trim() || !signupEmployeeId.trim() || !signupEmail.trim() || !signupPhone.trim() || !password.trim()) {
+        setLocalError('All fields are required for registration.');
+        return;
+      }
+
+      dispatch(signupTelecaller({
+        name: signupName,
+        employeeId: signupEmployeeId,
+        email: signupEmail,
+        phone: signupPhone,
+        password: password,
+      }));
+    } else {
+      if (!userId.trim() || !password.trim()) {
+        setLocalError('Please enter both Telecaller ID/Email and Password.');
+        return;
+      }
+
+      dispatch(loginTelecaller({
+        email: userId,
+        password: password,
+      }));
     }
-
-    // Authenticate user
-    const userProfile = {
-      id: userId,
-      name: userId === '2547' || userId.toLowerCase().includes('shivam') ? 'Shivam Sharma' : `Telecaller (${userId})`,
-      role: 'CRM Telecaller Executive',
-      financialYear: financialYear,
-      avatar: 'S'
-    };
-
-    onLogin(userProfile);
   };
 
   const handleQuickDemoLogin = (demoId) => {
-    setUserId(demoId);
-    setPassword('telecaller@123');
-    setErrorMsg('');
-    const userProfile = {
-      id: demoId,
-      name: demoId === '2547' ? 'Shivam Sharma' : 'Anjali Verma',
-      role: 'Senior Telecaller Specialist',
-      financialYear: financialYear,
-      avatar: demoId === '2547' ? 'S' : 'A'
-    };
-    onLogin(userProfile);
+    setLocalError('');
+    dispatch(clearError());
+
+    if (demoId === 'rk@lts.com') {
+      setUserId('rk@lts.com');
+      setPassword('Password@123');
+      dispatch(loginTelecaller({
+        email: 'rk@lts.com',
+        password: 'Password@123',
+      }));
+    } else {
+      setUserId(demoId);
+      setPassword('telecaller@123');
+      const userProfile = {
+        id: demoId,
+        name: demoId === '2547' ? 'Shivam Sharma' : 'Anjali Verma',
+        role: 'Senior Telecaller Specialist',
+        financialYear: financialYear,
+        avatar: demoId === '2547' ? 'S' : 'A'
+      };
+      if (onLogin) {
+        onLogin(userProfile);
+      }
+    }
   };
+
+  const displayedError = localError || error;
 
   return (
     <div className="login-wrapper">
@@ -48,27 +99,99 @@ export default function LoginPage({ onLogin }) {
         <div className="login-logo-header">
           <img src="/lts-logo.svg" alt="Local Trade Street" className="login-logo-img" />
           <h2 className="login-title">CRM Telecaller Portal</h2>
-          <p className="login-subtitle">Sign in to manage vendors and dispatch package details</p>
+          <p className="login-subtitle">
+            {isSignup
+              ? 'Register new Telecaller executive account'
+              : 'Sign in to manage vendors and dispatch package details'}
+          </p>
         </div>
 
-        {errorMsg && <div className="login-error-alert">{errorMsg}</div>}
+        {displayedError && <div className="login-error-alert">{displayedError}</div>}
 
         <form onSubmit={handleSubmit} className="login-form">
-          {/* Telecaller ID */}
-          <div className="form-group">
-            <label>Telecaller ID / Email / Mobile</label>
-            <div className="input-with-icon">
-              <User size={16} className="field-icon" />
-              <input
-                type="text"
-                className="form-control field-has-icon"
-                placeholder="Enter Telecaller ID (e.g. 2547)"
-                value={userId}
-                onChange={(e) => setUserId(e.target.value)}
-                required
-              />
+          {isSignup ? (
+            <>
+              {/* Full Name */}
+              <div className="form-group">
+                <label>Full Name</label>
+                <div className="input-with-icon">
+                  <User size={16} className="field-icon" />
+                  <input
+                    type="text"
+                    className="form-control field-has-icon"
+                    placeholder="Enter Full Name (e.g. Rohit Kumar)"
+                    value={signupName}
+                    onChange={(e) => setSignupName(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Employee ID */}
+              <div className="form-group">
+                <label>Employee ID</label>
+                <div className="input-with-icon">
+                  <ShieldCheck size={16} className="field-icon" />
+                  <input
+                    type="text"
+                    className="form-control field-has-icon"
+                    placeholder="Enter Employee ID (e.g. TC002)"
+                    value={signupEmployeeId}
+                    onChange={(e) => setSignupEmployeeId(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Email */}
+              <div className="form-group">
+                <label>Email Address</label>
+                <div className="input-with-icon">
+                  <Mail size={16} className="field-icon" />
+                  <input
+                    type="email"
+                    className="form-control field-has-icon"
+                    placeholder="Enter Email (e.g. rk@lts.com)"
+                    value={signupEmail}
+                    onChange={(e) => setSignupEmail(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Phone */}
+              <div className="form-group">
+                <label>Phone Number</label>
+                <div className="input-with-icon">
+                  <Phone size={16} className="field-icon" />
+                  <input
+                    type="tel"
+                    className="form-control field-has-icon"
+                    placeholder="Enter 10-digit Mobile (e.g. 9876543212)"
+                    value={signupPhone}
+                    onChange={(e) => setSignupPhone(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Telecaller ID */
+            <div className="form-group">
+              <label>Telecaller ID / Email / Mobile</label>
+              <div className="input-with-icon">
+                <User size={16} className="field-icon" />
+                <input
+                  type="text"
+                  className="form-control field-has-icon"
+                  placeholder="Enter Telecaller ID (e.g. 2547)"
+                  value={userId}
+                  onChange={(e) => setUserId(e.target.value)}
+                  required
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Password */}
           <div className="form-group">
@@ -87,54 +210,95 @@ export default function LoginPage({ onLogin }) {
                 type="button"
                 className="toggle-password-btn"
                 onClick={() => setShowPassword(!showPassword)}
-                title={showPassword ? "Hide Password" : "Show Password"}
+                title={showPassword ? 'Hide Password' : 'Show Password'}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
 
-          {/* Financial Year Selection */}
-          <div className="form-group">
-            <label>Financial Year Session</label>
-            <select
-              className="form-control"
-              value={financialYear}
-              onChange={(e) => setFinancialYear(e.target.value)}
-            >
-              <option value="2026-2027">FY 2026-2027 (Active)</option>
-              <option value="2025-2026">FY 2025-2026</option>
-            </select>
-          </div>
+          {/* Financial Year Selection (only for login or display purpose) */}
+          {!isSignup && (
+            <div className="form-group">
+              <label>Financial Year Session</label>
+              <select
+                className="form-control"
+                value={financialYear}
+                onChange={(e) => setFinancialYear(e.target.value)}
+              >
+                <option value="2026-2027">FY 2026-2027 (Active)</option>
+                <option value="2025-2026">FY 2025-2026</option>
+              </select>
+            </div>
+          )}
 
-          {/* Login Button */}
-          <button type="submit" className="btn-login-submit">
-            <LogIn size={18} /> Sign In to CRM
+          {/* Submit Button */}
+          <button type="submit" className="btn-login-submit" disabled={loading}>
+            {isSignup ? (
+              <>
+                <UserPlus size={18} /> {loading ? 'Registering...' : 'Register as Telecaller'}
+              </>
+            ) : (
+              <>
+                <LogIn size={18} /> {loading ? 'Signing In...' : 'Sign In to CRM'}
+              </>
+            )}
           </button>
         </form>
 
-        {/* Quick Demo Accounts */}
-        <div className="login-demo-box">
-          <div className="demo-box-header">
-            <ShieldCheck size={14} /> Quick Demo Access:
-          </div>
-          <div className="demo-btns-grid">
-            <button
-              type="button"
-              className="btn-demo-account"
-              onClick={() => handleQuickDemoLogin('2547')}
-            >
-              <strong>Shivam</strong> (ID: 2547)
-            </button>
-            <button
-              type="button"
-              className="btn-demo-account"
-              onClick={() => handleQuickDemoLogin('1802')}
-            >
-              <strong>Anjali</strong> (ID: 1802)
-            </button>
-          </div>
+        {/* Toggle between Sign In / Sign Up */}
+        <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '13px' }}>
+          <span style={{ color: '#64748b' }}>
+            {isSignup ? 'Already have an account? ' : "Don't have an account? "}
+          </span>
+          <button
+            type="button"
+            onClick={toggleMode}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: 'var(--lts-orange)',
+              fontWeight: '700',
+              cursor: 'pointer',
+              padding: '0 4px',
+              textDecoration: 'underline',
+            }}
+          >
+            {isSignup ? 'Sign In' : 'Sign Up'}
+          </button>
         </div>
+
+        {/* Quick Demo Accounts */}
+        {!isSignup && (
+          <div className="login-demo-box">
+            <div className="demo-box-header">
+              <ShieldCheck size={14} /> Quick Demo Access:
+            </div>
+            <div className="demo-btns-grid">
+              <button
+                type="button"
+                className="btn-demo-account"
+                onClick={() => handleQuickDemoLogin('rk@lts.com')}
+              >
+                <strong>Rohit</strong> (rk@lts.com)
+              </button>
+              <button
+                type="button"
+                className="btn-demo-account"
+                onClick={() => handleQuickDemoLogin('2547')}
+              >
+                <strong>Shivam</strong> (ID: 2547)
+              </button>
+              <button
+                type="button"
+                className="btn-demo-account"
+                onClick={() => handleQuickDemoLogin('1802')}
+              >
+                <strong>Anjali</strong> (ID: 1802)
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Footer info */}
         <div className="login-footer-text">
@@ -144,3 +308,4 @@ export default function LoginPage({ onLogin }) {
     </div>
   );
 }
+
