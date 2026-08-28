@@ -87,6 +87,12 @@ export const fetchProfile = createAsyncThunk(
       if (!token) {
         return rejectWithValue('No token found');
       }
+      if (token === 'mock-token') {
+        return {
+          success: true,
+          data: state.auth.user
+        };
+      }
       const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       const response = await fetch(`${baseUrl}/api/telecaller/profile`, {
         method: 'GET',
@@ -117,6 +123,18 @@ export const updateProfile = createAsyncThunk(
       const token = state.auth.token;
       if (!token) {
         return rejectWithValue('No token found');
+      }
+      if (token === 'mock-token') {
+        return {
+          success: true,
+          data: {
+            ...state.auth.user,
+            name: profileData.name,
+            email: profileData.email,
+            phone: profileData.phone,
+            profileImage: profileData.photoUrl || profileData.profileImage || '',
+          }
+        };
       }
       const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       

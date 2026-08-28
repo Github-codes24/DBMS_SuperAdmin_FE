@@ -49,6 +49,7 @@ export default function EditVendorModal({ vendor, isViewOnly = false, onClose, o
       city: formData.city,
       locality: formData.locality,
       isPaidVendor: formData.paid === 'Yes',
+      address: formData.address,
       fullAddress: formData.address
     };
 

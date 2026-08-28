@@ -2,6 +2,17 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { User, Mail, Phone, CheckCircle, Save, Camera, Trash2, Shield, Calendar, Clock, Activity } from 'lucide-react';
 
+const resolveImageUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
+    return url;
+  }
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+  const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+  const cleanPath = url.startsWith('/') ? url : `/${url}`;
+  return `${cleanBase}${cleanPath}`;
+};
+
 export default function ProfileSection({ currentUser, onUpdateUser }) {
   const fileInputRef = useRef(null);
   const { loading } = useSelector((state) => state.auth);
@@ -32,19 +43,69 @@ export default function ProfileSection({ currentUser, onUpdateUser }) {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Helper to compress image file using HTML5 canvas
+  const compressImage = (file, maxWidth, maxHeight, quality) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Adjust dimensions keeping aspect ratio
+          if (width > height) {
+            if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+          } else {
+            if (height > maxHeight) {
+              width = Math.round((width * maxHeight) / height);
+              height = maxHeight;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Convert to base64 jpeg with compression quality parameter
+          const compressedBase64 = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressedBase64);
+        };
+        img.onerror = (err) => reject(err);
+      };
+      reader.onerror = (err) => reject(err);
+    });
+  };
+
   // Handle Photo File Selection
-  const handlePhotoSelect = (e) => {
+  const handlePhotoSelect = async (e) => {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
         alert('Please select a valid image file (PNG, JPG, JPEG, WEBP).');
         return;
       }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setPhotoUrl(event.target.result);
-      };
-      reader.readAsDataURL(file);
+      try {
+        // Compress avatar image to 180x180 JPEG at 0.75 quality (creates ~10-15KB payload)
+        const compressedBase64 = await compressImage(file, 180, 180, 0.75);
+        setPhotoUrl(compressedBase64);
+      } catch (err) {
+        console.error('Failed to compress avatar image:', err);
+        // Fallback to reading file normally
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          setPhotoUrl(event.target.result);
+        };
+        reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -91,7 +152,7 @@ export default function ProfileSection({ currentUser, onUpdateUser }) {
               title="Click to change profile photo"
             >
               {photoUrl ? (
-                <img src={photoUrl} alt="Profile" className="profile-img-preview" />
+                <img src={resolveImageUrl(photoUrl)} alt="Profile" className="profile-img-preview" />
               ) : (
                 <span>{formData.name ? formData.name.charAt(0).toUpperCase() : 'U'}</span>
               )}
