@@ -54,7 +54,7 @@ export const fetchMyProfile = createAsyncThunk(
   'auth/fetchMyProfile',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get('/auth/mc');
+      const response = await api.get('/auth/me');
       const user = response.data;
 
       localStorage.setItem('user', JSON.stringify(user));
@@ -123,6 +123,14 @@ const authSlice = createSlice({
       state.isAuthenticated = false;
       state.tokenExpired = false;
       state.error = null;
+    },
+    updateTokens: (state, action) => {
+      state.accessToken = action.payload.accessToken;
+      if (action.payload.refreshToken) {
+        state.refreshToken = action.payload.refreshToken;
+      }
+      state.isAuthenticated = true;
+      state.tokenExpired = false;
     },
   },
   extraReducers: (builder) => {
@@ -193,5 +201,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError, clearTokenExpired, resetAuth } = authSlice.actions;
+export const { clearError, clearTokenExpired, resetAuth, updateTokens } = authSlice.actions;
 export default authSlice.reducer;

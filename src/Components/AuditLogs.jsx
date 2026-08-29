@@ -1,14 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { toast } from 'react-toastify';
+import api from '../services/api';
+import { fetchAuditLogs } from '../redux/slices/auditLogsSlice';
 import { Search, Download, Lock, FileSpreadsheet, FileText, Check, ChevronUp, ChevronDown } from 'lucide-react';
 
 function AuditLogs({ compact = false }) {
-  const [logs, setLogs] = useState([
-    { id: 1, time: '10:21', user: 'ADM001', action: 'Updated Customer', record: 'CUST1023', details: 'Changed primary contact number' },
-    { id: 2, time: '10:31', user: 'ADM002', action: 'Updated Vendor', record: 'VEN0092', details: 'Approved category status to Active' },
-    { id: 3, time: '10:35', user: 'SUPER', action: 'Disabled Admin', record: 'ADM003', details: 'Revoked system permissions' },
-    { id: 4, time: '11:05', user: 'ADM001', action: 'Exported CSV', record: 'CUST_LIST', details: 'Exported active customer list' },
-    { id: 5, time: '11:42', user: 'SUPER', action: 'Changed Password', record: 'TC031', details: 'Password reset performed by Super Admin' },
-  ]);
+  const dispatch = useDispatch();
+  const { logs: apiLogs = [], loading } = useSelector((state) => state.auditLogs || {});
 
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMsg, setToastMsg] = useState('');
@@ -27,120 +26,70 @@ function AuditLogs({ compact = false }) {
   const normalizedRole = userRole.toLowerCase();
   const hasExportPermission = normalizedRole === 'super admin' || normalizedRole === 'admin';
 
-  const filteredLogs = logs.filter((log) => {
-    return (
-      log.time.includes(searchTerm) ||
-      log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.record.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  });
+  // Debounced search query dispatch
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      dispatch(fetchAuditLogs(searchTerm));
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [dispatch, searchTerm]);
+
+  const logs = Array.isArray(apiLogs) ? apiLogs.map((log) => ({
+    id: log._id,
+    time: log.time || '',
+    user: log.user || '',
+    action: log.action || '',
+    record: log.record || '',
+    details: log.details || `${log.action} performed on record ${log.record}`
+  })) : [];
+
+  const filteredLogs = logs;
 
   // Handle Export CSV
-  const handleExportLogs = () => {
+  const handleExportLogs = async () => {
     if (!hasExportPermission) {
       alert('Access Denied: Export CSV is allowed for Super Admin and Admin only.');
       return;
     }
 
-    const headers = ['Time', 'User ID', 'Action', 'Record ID', 'Details'];
-    const rows = filteredLogs.map((l) => [l.time, l.user, l.action, l.record, l.details]);
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `LTS_Audit_Logs_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const response = await api.get('/superadmin/audit-logs/export/csv', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `LTS_Audit_Logs_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-    setToastMsg('System audit logs exported to CSV!');
-    setTimeout(() => setToastMsg(''), 3500);
+      setToastMsg('System audit logs exported to CSV!');
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (error) {
+      toast.error('Failed to export audit logs CSV.');
+    }
   };
 
   // Handle Export PDF Report
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!hasExportPermission) {
       alert('Access Denied: Export PDF is allowed for Super Admin and Admin only.');
       return;
     }
 
-    const printWindow = window.open('', '_blank');
-    const reportHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>LTS System Audit Logs Report</title>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 25px; color: #1e293b; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-b: 2px solid #f26522; padding-bottom: 12px; margin-bottom: 20px; }
-            .title { font-size: 20px; font-weight: 800; color: #f26522; margin: 0; }
-            .subtitle { font-size: 11px; color: #64748b; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 12px; }
-            th { background-color: #f8fafc; color: #475569; text-align: left; padding: 8px 10px; border: 1px solid #e2e8f0; font-size: 10px; text-transform: uppercase; }
-            td { padding: 8px 10px; border: 1px solid #e2e8f0; }
-            tr:nth-child(even) { background-color: #f8fafc; }
-            .footer { margin-top: 30px; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; border-t: 1px solid #e2e8f0; padding-top: 10px; }
-            .code { font-family: monospace; font-weight: bold; background: #f1f5f9; padding: 2px 4px; border-radius: 4px; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <h1 class="title">LTS - Local Trade Street</h1>
-              <div class="subtitle">System Audit & Security Trail Log Report • Total Records: ${filteredLogs.length}</div>
-            </div>
-            <div style="text-align: right; font-size: 11px; color: #64748b;">
-              Generated On: ${new Date().toLocaleString()}<br/>
-              Generated By: ${userRole}
-            </div>
-          </div>
+    try {
+      const response = await api.get('/superadmin/audit-logs/export/pdf', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
 
-          <table>
-            <thead>
-              <tr>
-                <th>Time</th>
-                <th>User ID</th>
-                <th>Action Performed</th>
-                <th>Target Record</th>
-                <th>Event Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredLogs
-                .map(
-                  (l) => `
-                <tr>
-                  <td>${l.time}</td>
-                  <td><strong>${l.user}</strong></td>
-                  <td>${l.action}</td>
-                  <td><span class="code">${l.record}</span></td>
-                  <td>${l.details}</td>
-                </tr>
-              `
-                )
-                .join('')}
-            </tbody>
-          </table>
-
-          <div class="footer">
-            <span>Local Trade Street Management System</span>
-            <span>Security Audit Certificate</span>
-          </div>
-          <script>
-            window.onload = function() { window.print(); }
-          </script>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(reportHtml);
-    printWindow.document.close();
-
-    setToastMsg('Formatted Audit PDF report generated!');
-    setTimeout(() => setToastMsg(''), 3500);
+      setToastMsg('Formatted Audit PDF report generated!');
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (error) {
+      toast.error('Failed to export audit logs PDF.');
+    }
   };
 
   return (

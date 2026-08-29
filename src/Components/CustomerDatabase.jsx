@@ -1,107 +1,18 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { toast } from 'react-toastify';
+import api from '../services/api';
+import { 
+  fetchCustomers, 
+  createCustomer, 
+  updateCustomer, 
+  bulkImportCustomers 
+} from '../redux/slices/customerSlice';
 import { Search, Download, Lock, FileSpreadsheet, FileText, Upload, X, Check, FileDown, UserPlus, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 
 function CustomerDatabase({ compact = false }) {
-  const [customers, setCustomers] = useState([
-    {
-      srNo: '01',
-      id: 'CUST001',
-      name: 'Rahul Sharma',
-      companyName: 'ABC Traders Pvt Ltd',
-      state: 'Maharashtra',
-      city: 'Mumbai',
-      pincode: '400001',
-      regDate: '2026-01-15',
-      status: 'Active',
-      telecaller: 'TC014',
-      email: 'contact@abctraders.com',
-      mobile: '+91 98112 34567',
-    },
-    {
-      srNo: '02',
-      id: 'CUST002',
-      name: 'Priya Verma',
-      companyName: 'XYZ Stores & Logistics',
-      state: 'Delhi',
-      city: 'New Delhi',
-      pincode: '110001',
-      regDate: '2026-02-10',
-      status: 'Active',
-      telecaller: 'TC021',
-      email: 'sales@xyzstores.in',
-      mobile: '+91 98223 45678',
-    },
-    {
-      srNo: '03',
-      id: 'CUST003',
-      name: 'Amit Patel',
-      companyName: 'Metro Retail Mart',
-      state: 'Karnataka',
-      city: 'Bengaluru',
-      pincode: '560001',
-      regDate: '2026-03-05',
-      status: 'Pending',
-      telecaller: 'Unassigned',
-      email: 'info@metroretail.com',
-      mobile: '+91 98334 56789',
-    },
-    {
-      srNo: '04',
-      id: 'CUST004',
-      name: 'Neha Singh',
-      companyName: 'Apex Enterprises',
-      state: 'Gujarat',
-      city: 'Ahmedabad',
-      pincode: '380001',
-      regDate: '2026-04-12',
-      status: 'Active',
-      telecaller: 'TC014',
-      email: 'support@apexent.com',
-      mobile: '+91 98445 67890',
-    },
-    {
-      srNo: '05',
-      id: 'CUST005',
-      name: 'Vikram Mehta',
-      companyName: 'Sunrise Super Mart',
-      state: 'Rajasthan',
-      city: 'Jaipur',
-      pincode: '302001',
-      regDate: '2026-05-20',
-      status: 'Pending',
-      telecaller: 'TC031',
-      email: 'orders@sunrisemart.com',
-      mobile: '+91 98556 78901',
-    },
-    {
-      srNo: '06',
-      id: 'CUST006',
-      name: 'Suresh Raina',
-      companyName: 'Raina Electricals',
-      state: 'Uttar Pradesh',
-      city: 'Lucknow',
-      pincode: '226001',
-      regDate: '2026-06-10',
-      status: 'Active',
-      telecaller: 'TC014',
-      email: 'suresh@raina.in',
-      mobile: '+91 98667 89012',
-    },
-    {
-      srNo: '07',
-      id: 'CUST007',
-      name: 'Kavita Menon',
-      companyName: 'Menon General Stores',
-      state: 'Kerala',
-      city: 'Kochi',
-      pincode: '682001',
-      regDate: '2026-07-02',
-      status: 'Active',
-      telecaller: 'TC021',
-      email: 'kavita@menon.com',
-      mobile: '+91 98778 90123',
-    },
-  ]);
+  const dispatch = useDispatch();
+  const { customers: apiCustomers = [], loading = false, isSaving = false } = useSelector((state) => state.customer || {});
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
@@ -149,6 +60,26 @@ function CustomerDatabase({ compact = false }) {
   const normalizedRole = userRole.toLowerCase();
   const hasAccessPermission = normalizedRole === 'super admin' || normalizedRole === 'admin';
 
+  useEffect(() => {
+    dispatch(fetchCustomers());
+  }, [dispatch]);
+
+  const customers = Array.isArray(apiCustomers) ? apiCustomers.map((cust, idx) => ({
+    _id: cust._id,
+    srNo: cust.srNo || String(idx + 1).padStart(2, '0'),
+    id: cust.customerId,
+    name: cust.name,
+    companyName: cust.companyName,
+    state: cust.state,
+    city: cust.city,
+    pincode: cust.pincode,
+    regDate: cust.registrationDate ? new Date(cust.registrationDate).toISOString().slice(0, 10) : '-',
+    status: cust.status,
+    telecaller: cust.assignedTelecaller || 'Unassigned',
+    email: cust.email || '-',
+    mobile: cust.mobile || '-',
+  })) : [];
+
   const filteredCustomers = customers.filter((cust) => {
     const matchesSearch =
       cust.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -170,158 +101,91 @@ function CustomerDatabase({ compact = false }) {
       return;
     }
 
-    const formattedSrNo = newCustomer.srNo || String(customers.length + 1).padStart(2, '0');
-    const formattedId = newCustomer.id || `CUST${String(customers.length + 1).padStart(3, '0')}`;
-
-    const customerToAdd = {
-      ...newCustomer,
-      srNo: formattedSrNo,
-      id: formattedId,
-    };
-
-    setCustomers([customerToAdd, ...customers]);
-    setIsAddModalOpen(false);
-    setNewCustomer({
-      srNo: '',
-      id: '',
-      name: '',
-      companyName: '',
-      state: '',
-      city: '',
-      pincode: '',
-      regDate: new Date().toISOString().slice(0, 10),
-      status: 'Active',
-      telecaller: 'TC014',
-      email: '',
-      mobile: '',
+    dispatch(createCustomer({
+      name: newCustomer.name,
+      companyName: newCustomer.companyName,
+      state: newCustomer.state,
+      city: newCustomer.city,
+      pincode: newCustomer.pincode,
+      status: newCustomer.status,
+      assignedTelecaller: newCustomer.telecaller
+    })).unwrap().then((res) => {
+      setIsAddModalOpen(false);
+      setNewCustomer({
+        srNo: '',
+        id: '',
+        name: '',
+        companyName: '',
+        state: '',
+        city: '',
+        pincode: '',
+        regDate: new Date().toISOString().slice(0, 10),
+        status: 'Active',
+        telecaller: 'TC014',
+        email: '',
+        mobile: '',
+      });
+      setToastMsg(`Customer "${res.customer?.name || newCustomer.name}" added successfully!`);
+      setTimeout(() => setToastMsg(''), 4000);
     });
+  };
 
-    setToastMsg(`Customer "${customerToAdd.name}" added successfully!`);
-    setTimeout(() => setToastMsg(''), 4000);
+  const handleToggleStatus = (cust) => {
+    if (!hasAccessPermission) return;
+    const newStatus = cust.status === 'Active' ? 'Pending' : 'Active';
+    dispatch(updateCustomer({
+      customerId: cust._id || cust.id,
+      updateData: { status: newStatus }
+    })).unwrap().then(() => {
+      setToastMsg(`Status for "${cust.name}" toggled successfully!`);
+      setTimeout(() => setToastMsg(''), 4000);
+    });
   };
 
   // Handle Export CSV
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!hasAccessPermission) {
       alert('Access Denied: Export CSV is allowed for Super Admin and Admin only.');
       return;
     }
 
-    const headers = ['Sr. No.', 'ID', 'Name', 'Company Name', 'State', 'City', 'Pincode', 'Registration Date', 'Status', 'Telecaller'];
-    const rows = filteredCustomers.map((c) => [
-      c.srNo || c.id,
-      c.id,
-      c.name,
-      c.companyName || '-',
-      c.state || '-',
-      c.city || '-',
-      c.pincode || '-',
-      c.regDate || '-',
-      c.status,
-      c.telecaller,
-    ]);
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `LTS_Customer_Database_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const response = await api.get('/superadmin/customers/export/csv', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `LTS_Customer_Database_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-    setToastMsg('Customer CSV exported successfully!');
-    setTimeout(() => setToastMsg(''), 3500);
+      setToastMsg('Customer CSV exported successfully!');
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (error) {
+      toast.error('Failed to export CSV file.');
+    }
   };
 
   // Handle Export PDF Report
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!hasAccessPermission) {
       alert('Access Denied: Export PDF is allowed for Super Admin and Admin only.');
       return;
     }
 
-    const printWindow = window.open('', '_blank');
-    const reportHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>LTS Customer Database Report</title>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 25px; color: #1e293b; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-b: 2px solid #f26522; padding-bottom: 12px; margin-bottom: 20px; }
-            .title { font-size: 20px; font-weight: 800; color: #f26522; margin: 0; }
-            .subtitle { font-size: 11px; color: #64748b; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
-            th { background-color: #f8fafc; color: #475569; text-align: left; padding: 8px; border: 1px solid #e2e8f0; font-size: 9px; text-transform: uppercase; }
-            td { padding: 8px; border: 1px solid #e2e8f0; }
-            tr:nth-child(even) { background-color: #f8fafc; }
-            .footer { margin-top: 30px; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; border-t: 1px solid #e2e8f0; padding-top: 10px; }
-            .badge { display: inline-block; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 4px; background: #ecfdf5; color: #047857; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <h1 class="title">LTS - Local Trade Street</h1>
-              <div class="subtitle">Official Customer Master Directory Report • Total Records: ${filteredCustomers.length}</div>
-            </div>
-            <div style="text-align: right; font-size: 11px; color: #64748b;">
-              Generated On: ${new Date().toLocaleString()}<br/>
-              Generated By: ${userRole}
-            </div>
-          </div>
+    try {
+      const response = await api.get('/superadmin/customers/export/pdf', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
 
-          <table>
-            <thead>
-              <tr>
-                <th>Sr No</th>
-                <th>Name</th>
-                <th>Company Name</th>
-                <th>State</th>
-                <th>City</th>
-                <th>Pincode</th>
-                <th>Reg. Date</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredCustomers
-                .map(
-                  (c) => `
-                <tr>
-                  <td><strong>${c.srNo || c.id}</strong></td>
-                  <td>${c.name}</td>
-                  <td><strong>${c.companyName || '-'}</strong></td>
-                  <td>${c.state || '-'}</td>
-                  <td>${c.city || '-'}</td>
-                  <td>${c.pincode || '-'}</td>
-                  <td>${c.regDate || '-'}</td>
-                  <td><span class="badge">${c.status}</span></td>
-                </tr>
-              `
-                )
-                .join('')}
-            </tbody>
-          </table>
-
-          <div class="footer">
-            <span>Local Trade Street Management System</span>
-            <span>Confidential Customer Master Report</span>
-          </div>
-          <script>
-            window.onload = function() { window.print(); }
-          </script>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(reportHtml);
-    printWindow.document.close();
-
-    setToastMsg('Formatted Customer PDF report generated!');
-    setTimeout(() => setToastMsg(''), 3500);
+      setToastMsg('Formatted Customer PDF report generated!');
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (error) {
+      toast.error('Failed to export PDF file.');
+    }
   };
 
   // Download Sample CSV Import Template
@@ -388,19 +252,21 @@ function CustomerDatabase({ compact = false }) {
 
   // Submit Bulk Import
   const handleExecuteImport = () => {
-    if (previewData.length === 0) return;
+    if (!uploadedFile) return;
     setIsImporting(true);
 
-    setTimeout(() => {
-      setCustomers((prev) => [...previewData, ...prev]);
-      setIsImporting(false);
-      setIsUploadModalOpen(false);
-      setUploadedFile(null);
-      setPreviewData([]);
-
-      setToastMsg(`Successfully imported ${previewData.length} customer records!`);
-      setTimeout(() => setToastMsg(''), 4000);
-    }, 800);
+    dispatch(bulkImportCustomers(uploadedFile))
+      .unwrap()
+      .then((res) => {
+        setIsUploadModalOpen(false);
+        setUploadedFile(null);
+        setPreviewData([]);
+        setToastMsg(res.message || 'Import completed successfully');
+        setTimeout(() => setToastMsg(''), 4000);
+      })
+      .finally(() => {
+        setIsImporting(false);
+      });
   };
 
   return (
@@ -552,7 +418,7 @@ function CustomerDatabase({ compact = false }) {
               {filteredCustomers.length > 0 ? (
                 filteredCustomers.map((cust, idx) => (
                   <tr key={cust.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3 px-3 font-bold text-slate-800">{cust.srNo || String(idx + 1).padStart(2, '0')}</td>
+                    <td className="py-3 px-3 font-bold text-slate-800">{String(idx + 1).padStart(2, '0')}</td>
                     <td className="py-3 px-3 font-semibold text-slate-900">{cust.name}</td>
                     <td className="py-3 px-3 font-bold text-[#f26522]">{cust.companyName || '-'}</td>
                     <td className="py-3 px-3 text-slate-600 font-medium">{cust.state || '-'}</td>
@@ -560,13 +426,17 @@ function CustomerDatabase({ compact = false }) {
                     <td className="py-3 px-3 text-slate-500 font-mono text-[11px] font-semibold">{cust.pincode || '-'}</td>
                     <td className="py-3 px-3 text-slate-500 text-[11px]">{cust.regDate || '-'}</td>
                     <td className="py-3 px-3">
-                      <span
-                        className={`font-semibold text-xs ${
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(cust)}
+                        disabled={isSaving}
+                        className={`font-semibold text-xs transition-all hover:scale-105 active:scale-95 cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed ${
                           cust.status === 'Active' ? 'text-emerald-600' : 'text-amber-600'
                         }`}
+                        title="Click to toggle status"
                       >
                         {cust.status}
-                      </span>
+                      </button>
                     </td>
                   </tr>
                 ))

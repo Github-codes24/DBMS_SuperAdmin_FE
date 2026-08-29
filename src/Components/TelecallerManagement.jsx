@@ -1,13 +1,18 @@
-import React, { useState, useRef } from 'react';
-import { Search, Settings, UserX, UserCheck, Key, X, Check, UserPlus, Plus, ChevronUp, ChevronDown, Upload, FileSpreadsheet, FileDown, Phone, Mail, Globe } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { toast } from 'react-toastify';
+import api from '../services/api';
+import {
+  fetchTelecallers,
+  createTelecaller,
+  updateTelecaller,
+  bulkImportTelecallers
+} from '../redux/slices/telecallerSlice';
+import { Search, Settings, UserX, UserCheck, Key, X, Check, UserPlus, Plus, ChevronUp, ChevronDown, Upload, FileSpreadsheet, FileDown, Phone, Mail, Globe, Download, FileText } from 'lucide-react';
 
 function TelecallerManagement({ compact = false }) {
-  const [telecallers, setTelecallers] = useState([
-    { id: 'TC014', name: 'Amit Verma', mobile: '+91 98765 43210', email: 'amit.verma@lts.com', customers: 128, status: 'Active', area: 'North Region' },
-    { id: 'TC021', name: 'Neha Joshi', mobile: '+91 97654 32109', email: 'neha.joshi@lts.com', customers: 94, status: 'Active', area: 'West Region' },
-    { id: 'TC031', name: 'Ravi Singh', mobile: '+91 98123 45678', email: 'ravi.singh@lts.com', customers: 0, status: 'Disabled', area: 'East Region' },
-    { id: 'TC042', name: 'Priya Patel', mobile: '+91 94321 09876', email: 'priya.patel@lts.com', customers: 112, status: 'Active', area: 'South Region' },
-  ]);
+  const dispatch = useDispatch();
+  const { telecallers: apiTelecallers = [], loading = false, isSaving = false } = useSelector((state) => state.telecaller || {});
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTc, setSelectedTc] = useState(null);
@@ -20,6 +25,10 @@ function TelecallerManagement({ compact = false }) {
   const [uploadedFile, setUploadedFile] = useState(null);
   const [previewData, setPreviewData] = useState([]);
   const [isImporting, setIsImporting] = useState(false);
+
+  // Export Dropdown State
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const exportDropdownRef = useRef(null);
   
   // Add Telecaller Form State
   const [newTc, setNewTc] = useState({
@@ -48,6 +57,30 @@ function TelecallerManagement({ compact = false }) {
     }
   };
 
+  useEffect(() => {
+    dispatch(fetchTelecallers());
+    const handleClickOutside = (event) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target)) {
+        setIsExportDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [dispatch]);
+
+  const telecallers = Array.isArray(apiTelecallers) ? apiTelecallers.map((tc, idx) => ({
+    _id: tc._id,
+    id: tc.userId,
+    name: tc.fullName,
+    mobile: tc.mobileNumber,
+    email: tc.email,
+    customers: tc.assignedCustomersCount ?? 0,
+    status: tc.status || 'Active',
+    area: tc.assignedRegion || 'Central Region',
+  })) : [];
+
   const filteredTelecallers = telecallers.filter((tc) => {
     const search = searchTerm.toLowerCase();
     return (
@@ -73,17 +106,24 @@ function TelecallerManagement({ compact = false }) {
     e.preventDefault();
     if (!selectedTc) return;
 
-    setTelecallers((prev) =>
-      prev.map((t) =>
-        t.id === selectedTc.id
-          ? { ...t, status: updatedStatus, area: updatedArea, mobile: updatedMobile, email: updatedEmail }
-          : t
-      )
-    );
+    const updateData = {
+      mobileNumber: updatedMobile,
+      assignedRegion: updatedArea,
+      status: updatedStatus
+    };
 
-    setToastMsg(`Successfully updated settings for ${selectedTc.name} (${selectedTc.id})`);
-    setTimeout(() => setToastMsg(''), 3500);
-    setIsManageModalOpen(false);
+    if (newPassword.trim()) {
+      updateData.password = newPassword;
+    }
+
+    dispatch(updateTelecaller({
+      userId: selectedTc.id,
+      updateData
+    })).unwrap().then((res) => {
+      setToastMsg(res.message || `Successfully updated settings for ${selectedTc.name}`);
+      setTimeout(() => setToastMsg(''), 3500);
+      setIsManageModalOpen(false);
+    });
   };
 
   const handleAddTcSubmit = (e) => {
@@ -93,23 +133,53 @@ function TelecallerManagement({ compact = false }) {
       return;
     }
 
-    const formattedId = newTc.id || `TC0${telecallers.length + 1}0`;
-    const telecallerToAdd = {
-      id: formattedId,
-      name: newTc.name,
-      mobile: newTc.mobile,
+    dispatch(createTelecaller({
+      fullName: newTc.name,
+      mobileNumber: newTc.mobile,
       email: newTc.email,
-      area: newTc.area || 'Central Region',
-      customers: 0,
-      status: newTc.status,
-    };
+      password: newTc.password || 'Telecaller@123',
+      assignedRegion: newTc.area || 'Central Region',
+      status: newTc.status
+    })).unwrap().then((res) => {
+      setIsAddModalOpen(false);
+      setNewTc({ id: '', name: '', mobile: '', email: '', area: '', password: '', status: 'Active' });
+      setToastMsg(`New Telecaller "${res.telecaller?.fullName || newTc.name}" added successfully!`);
+      setTimeout(() => setToastMsg(''), 4000);
+    });
+  };
 
-    setTelecallers([telecallerToAdd, ...telecallers]);
-    setIsAddModalOpen(false);
-    setNewTc({ id: '', name: '', mobile: '', email: '', area: '', password: '', status: 'Active' });
+  // Export CSV
+  const handleExportCSV = async () => {
+    try {
+      const response = await api.get('/superadmin/telecallers/export/csv', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `LTS_Telecallers_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      setToastMsg('Telecaller CSV exported successfully!');
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (error) {
+      toast.error('Failed to export CSV.');
+    }
+  };
 
-    setToastMsg(`New Telecaller "${telecallerToAdd.name}" (${telecallerToAdd.id}) added successfully!`);
-    setTimeout(() => setToastMsg(''), 4000);
+  // Export PDF
+  const handleExportPDF = async () => {
+    try {
+      const response = await api.get('/superadmin/telecallers/export/pdf', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setToastMsg('Formatted Telecaller PDF report generated!');
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (error) {
+      toast.error('Failed to export PDF.');
+    }
   };
 
   // Download Sample Telecaller CSV Import Template
@@ -173,19 +243,21 @@ function TelecallerManagement({ compact = false }) {
 
   // Submit Bulk Import
   const handleExecuteImport = () => {
-    if (previewData.length === 0) return;
+    if (!uploadedFile) return;
     setIsImporting(true);
 
-    setTimeout(() => {
-      setTelecallers((prev) => [...previewData, ...prev]);
-      setIsImporting(false);
-      setIsUploadModalOpen(false);
-      setUploadedFile(null);
-      setPreviewData([]);
-
-      setToastMsg(`Successfully imported ${previewData.length} telecaller accounts!`);
-      setTimeout(() => setToastMsg(''), 4000);
-    }, 800);
+    dispatch(bulkImportTelecallers(uploadedFile))
+      .unwrap()
+      .then((res) => {
+        setIsUploadModalOpen(false);
+        setUploadedFile(null);
+        setPreviewData([]);
+        setToastMsg(res.message || 'Import completed successfully');
+        setTimeout(() => setToastMsg(''), 4000);
+      })
+      .finally(() => {
+        setIsImporting(false);
+      });
   };
 
   return (
@@ -217,7 +289,7 @@ function TelecallerManagement({ compact = false }) {
               <span>+ Add Telecaller</span>
             </button>
 
-            {/* Import (Excel/CSV) Button */}
+             {/* Import (Excel/CSV) Button */}
             <button
               onClick={() => setIsUploadModalOpen(true)}
               className="px-3.5 py-2 bg-orange-50 hover:bg-orange-100 text-[#f26522] border border-orange-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
@@ -226,6 +298,45 @@ function TelecallerManagement({ compact = false }) {
               <Upload size={14} />
               <span>Import (Excel/CSV)</span>
             </button>
+
+            {/* Export Dropdown */}
+            <div className="relative" ref={exportDropdownRef}>
+              <button
+                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1.5"
+                title="Export Telecallers Data"
+              >
+                <Download size={14} />
+                <span>Export Data</span>
+                <ChevronDown size={13} className="ml-0.5 text-slate-300" />
+              </button>
+
+              {isExportDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in duration-150">
+                  <button
+                    onClick={() => {
+                      handleExportCSV();
+                      setIsExportDropdownOpen(false);
+                    }}
+                    className="w-full px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-orange-50 hover:text-[#f26522] flex items-center gap-2 transition-colors cursor-pointer text-left"
+                  >
+                    <FileSpreadsheet size={15} className="text-[#f26522]" />
+                    <span>Export Excel (.csv)</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleExportPDF();
+                      setIsExportDropdownOpen(false);
+                    }}
+                    className="w-full px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-orange-50 hover:text-[#f26522] flex items-center gap-2 transition-colors cursor-pointer text-left"
+                  >
+                    <FileText size={15} className="text-slate-600" />
+                    <span>Export PDF Report</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
