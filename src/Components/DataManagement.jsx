@@ -1,131 +1,18 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { toast } from 'react-toastify';
+import api from '../services/api';
+import {
+  lookupVendors,
+  lookupVendorDetail,
+  clearSelectedVendor
+} from '../redux/slices/dataManagementSlice';
 import { Search, MapPin, Building2, Filter, Database, Check, ChevronUp, ChevronDown, Download, FileSpreadsheet, FileText, X, Plus, Phone, Mail, Eye, ShieldCheck, Tag } from 'lucide-react';
 
 function DataManagement({ compact = false }) {
-  // Master Vendor & Shop Database per Vendor Code, State & City
-  const [masterVendorList, setMasterVendorList] = useState([
-    {
-      id: 'VEN001',
-      transNo: 'TRX90101',
-      name: 'ABC Traders Pvt Ltd',
-      ownerName: 'Rajesh Patel',
-      category: 'Grocery & FMCG Supplies',
-      contactNo: '+91 98920 11223',
-      email: 'contact@abctraders.com',
-      gstNo: '27AAAAA0000A1Z5',
-      address: 'Shop #12, Commercial Hub, Central Ave, Wardha Road',
-      pincode: '440001',
-      city: 'Nagpur',
-      state: 'Maharashtra',
-      verificationDateTime: '2026-07-30 10:30 AM',
-      status: 'Active',
-      mappedCustomers: 520,
-    },
-    {
-      id: 'VEN002',
-      transNo: 'TRX90102',
-      name: 'Metro Supplies & Logistics',
-      ownerName: 'Sanjay Deshmukh',
-      category: 'Medical & Pharma Essentials',
-      contactNo: '+91 98771 22334',
-      email: 'sales@metrosupplies.in',
-      gstNo: '27BBBBB1111B2Z6',
-      address: 'Plot 45, MIDC Industrial Area, Hingna Road',
-      pincode: '440012',
-      city: 'Nagpur',
-      state: 'Maharashtra',
-      verificationDateTime: '2026-07-30 02:15 PM',
-      status: 'Active',
-      mappedCustomers: 420,
-    },
-    {
-      id: 'VEN003',
-      transNo: 'TRX90103',
-      name: 'Priya Supermarket & Stores',
-      ownerName: 'Priya Sharma',
-      category: 'Home Products & Kitchenware',
-      contactNo: '+91 98112 33445',
-      email: 'priya@sharmatech.com',
-      gstNo: '27CCCCC2222C3Z7',
-      address: 'Sector 21, Hinjewadi Phase 1, Near IT Park',
-      pincode: '411057',
-      city: 'Pune',
-      state: 'Maharashtra',
-      verificationDateTime: '2026-07-31 09:45 AM',
-      status: 'Active',
-      mappedCustomers: 820,
-    },
-    {
-      id: 'VEN004',
-      transNo: 'TRX90104',
-      name: 'XYZ Enterprise & Hardware',
-      ownerName: 'Vikram Mehta',
-      category: 'Electronics & Hardware Tools',
-      contactNo: '+91 98334 55667',
-      email: 'contact@xyzent.com',
-      gstNo: '27DDDDD3333D4Z8',
-      address: 'Shop #8, Linking Road, Bandra West',
-      pincode: '400051',
-      city: 'Mumbai',
-      state: 'Maharashtra',
-      verificationDateTime: '2026-07-31 11:20 AM',
-      status: 'Active',
-      mappedCustomers: 1450,
-    },
-    {
-      id: 'VEN005',
-      transNo: 'TRX90105',
-      name: 'Delhi Retail World',
-      ownerName: 'Rajesh Gupta',
-      category: 'Grocery & Fashion Accessories',
-      contactNo: '+91 98556 77889',
-      email: 'info@delhiretail.com',
-      gstNo: '07EEEEE4444E5Z9',
-      address: 'Block A, Connaught Place Main Market',
-      pincode: '110001',
-      city: 'Delhi',
-      state: 'Delhi',
-      verificationDateTime: '2026-07-31 01:10 PM',
-      status: 'Active',
-      mappedCustomers: 910,
-    },
-    {
-      id: 'VEN006',
-      transNo: 'TRX90106',
-      name: 'Hyderabad Tech Mart',
-      ownerName: 'Sunita Reddy',
-      category: 'Electronics & Mobile Accessories',
-      contactNo: '+91 98667 88990',
-      email: 'sunita@techmart.in',
-      gstNo: '36FFFFF5555F6Z0',
-      address: 'HITEC City Phase 2, Madhapur',
-      pincode: '500081',
-      city: 'Hyderabad',
-      state: 'Telangana',
-      verificationDateTime: '2026-07-31 03:30 PM',
-      status: 'Active',
-      mappedCustomers: 1100,
-    },
-    {
-      id: 'VEN007',
-      transNo: 'TRX90107',
-      name: 'Apex Hardware & Tools',
-      ownerName: 'Amit Patel',
-      category: 'Hardware & Construction',
-      contactNo: '+91 98993 44556',
-      email: 'sales@apexhardware.in',
-      gstNo: '24GGGGG6666G7Z1',
-      address: 'CG Road, Navrangpura',
-      pincode: '380001',
-      city: 'Ahmedabad',
-      state: 'Gujarat',
-      verificationDateTime: '2026-07-31 11:20 AM',
-      status: 'Active',
-      mappedCustomers: 650,
-    },
-  ]);
+  const dispatch = useDispatch();
+  const { vendors: apiVendors = [], availableStates = [], availableCities = [], selectedVendor, loading } = useSelector((state) => state.dataManagement || {});
 
-  // Filter States: Vendor Code, State, City & Vendor Name Search ⭐
   const [vendorSearch, setVendorSearch] = useState('');
   const [vendorCodeFilter, setVendorCodeFilter] = useState('');
   const [selectedState, setSelectedState] = useState('All');
@@ -139,8 +26,55 @@ function DataManagement({ compact = false }) {
   const exportDropdownRef = useRef(null);
   const manualScrollRef = useRef(null);
 
-  const stateList = ['All', 'Maharashtra', 'Delhi', 'Gujarat', 'Telangana'];
-  const cityList = ['All', 'Nagpur', 'Pune', 'Mumbai', 'Delhi', 'Hyderabad', 'Ahmedabad'];
+  const stateList = ['All', ...availableStates];
+  const cityList = ['All', ...availableCities];
+
+  // Debounced search / filter query dispatch
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      dispatch(lookupVendors({
+        search: vendorCodeFilter || vendorSearch,
+        state: selectedState,
+        city: selectedCity
+      }));
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [dispatch, vendorCodeFilter, vendorSearch, selectedState, selectedCity]);
+
+  useEffect(() => {
+    if (selectedVendor) {
+      setSelectedVendorDetail(selectedVendor);
+    }
+  }, [selectedVendor]);
+
+  // Clean up selected vendor detail state when modal closes
+  const handleCloseDetail = () => {
+    setSelectedVendorDetail(null);
+    dispatch(clearSelectedVendor());
+  };
+
+  const handleViewDetails = (v) => {
+    dispatch(lookupVendorDetail(v.id));
+  };
+
+  const masterVendorList = Array.isArray(apiVendors) ? apiVendors.map((v, idx) => ({
+    id: v.vendorId || v.vendorCode || '',
+    transNo: v.transNo || '',
+    name: v.vendorName || v.shopVendorName || '',
+    ownerName: v.ownerName || '-',
+    category: v.category || '-',
+    contactNo: v.contactNo || '-',
+    email: v.email || '-',
+    gstNo: v.gstin || '-',
+    address: v.completeAddress || '-',
+    pincode: v.pincode || '-',
+    city: v.city || '-',
+    state: v.state || '-',
+    verificationDateTime: v.verificationDateTime ? new Date(v.verificationDateTime).toLocaleString() : '-',
+    status: v.status || 'Active',
+    mappedCustomers: v.mappedCustomers ?? 0
+  })) : [];
 
   // Check if any filter or search is active ⭐
   const hasActiveFilter = Boolean(
@@ -149,19 +83,8 @@ function DataManagement({ compact = false }) {
     selectedCity !== 'All' ||
     selectedState !== 'All'
   );
-  const filteredVendors = masterVendorList.filter((v) => {
-    const matchesVendorSearch =
-      !vendorSearch ||
-      v.name.toLowerCase().includes(vendorSearch.toLowerCase()) ||
-      v.ownerName.toLowerCase().includes(vendorSearch.toLowerCase()) ||
-      v.category.toLowerCase().includes(vendorSearch.toLowerCase());
 
-    const matchesVendorCode = !vendorCodeFilter || v.id.toLowerCase().includes(vendorCodeFilter.toLowerCase());
-    const matchesCity = selectedCity === 'All' || v.city.toLowerCase() === selectedCity.toLowerCase();
-    const matchesState = selectedState === 'All' || v.state.toLowerCase() === selectedState.toLowerCase();
-
-    return matchesVendorSearch && matchesVendorCode && matchesCity && matchesState;
-  });
+  const filteredVendors = masterVendorList;
 
   // Manual Scroll
   const handleManualScroll = (direction) => {
@@ -172,89 +95,39 @@ function DataManagement({ compact = false }) {
   };
 
   // Export CSV Report
-  const handleExportCSV = () => {
-    const headers = ['Sr. No.', 'Vendor Code', 'Shop Name', 'Owner Name', 'Category', 'Contact No', 'Email', 'State', 'City', 'Pincode', 'GSTIN', 'Status'];
-    const rows = filteredVendors.map((v, idx) => [idx + 1, v.id, v.name, v.ownerName, v.category, v.contactNo, v.email, v.state, v.city, v.pincode, v.gstNo, v.status]);
+  const handleExportCSV = async () => {
+    try {
+      const response = await api.get('/superadmin/data-management/vendors/export/csv', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `LTS_Vendor_Code_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `LTS_Vendor_Code_Report_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setToastMsg('Vendor Code Data exported to CSV successfully!');
-    setTimeout(() => setToastMsg(''), 3500);
+      setToastMsg('Vendor Code Data exported to CSV successfully!');
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (error) {
+      toast.error('Failed to export CSV.');
+    }
   };
 
   // Export PDF Report
-  const handleExportPDF = () => {
-    const printWindow = window.open('', '_blank');
-    const reportHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>LTS Vendor Directory Report</title>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, sans-serif; padding: 25px; color: #1e293b; }
-            .header { border-b: 2px solid #f26522; padding-bottom: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-            .title { font-size: 20px; font-weight: 800; color: #f26522; margin: 0; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
-            th { background-color: #f8fafc; color: #475569; padding: 8px 10px; border: 1px solid #e2e8f0; font-size: 10px; text-transform: uppercase; }
-            td { padding: 8px 10px; border: 1px solid #e2e8f0; }
-            tr:nth-child(even) { background-color: #f8fafc; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <h1 class="title">LTS - Local Trade Street</h1>
-              <div style="font-size: 11px; color: #64748b;">Vendor Directory by Vendor Code, State & City</div>
-            </div>
-            <div style="font-size: 11px; color: #64748b;">Total Vendors: ${filteredVendors.length}</div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Sr. No.</th>
-                <th>Vendor Code</th>
-                <th>Shop Name</th>
-                <th>Owner Name</th>
-                <th>Contact</th>
-                <th>State & City</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredVendors
-                .map(
-                  (v, idx) => `
-                <tr>
-                  <td><strong>${idx + 1}</strong></td>
-                  <td><strong>${v.id}</strong></td>
-                  <td><strong>${v.name}</strong></td>
-                  <td>${v.ownerName}</td>
-                  <td>${v.contactNo}</td>
-                  <td>${v.state}, ${v.city}</td>
-                  <td>${v.status}</td>
-                </tr>
-              `
-                )
-                .join('')}
-            </tbody>
-          </table>
-          <script>window.onload = function() { window.print(); }</script>
-        </body>
-      </html>
-    `;
-    printWindow.document.write(reportHtml);
-    printWindow.document.close();
-    setToastMsg('Vendor Directory PDF report generated!');
-    setTimeout(() => setToastMsg(''), 3500);
+  const handleExportPDF = async () => {
+    try {
+      const response = await api.get('/superadmin/data-management/vendors/export/pdf', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+
+      setToastMsg('Vendor Directory PDF report generated!');
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (error) {
+      toast.error('Failed to export PDF.');
+    }
   };
 
   return (
@@ -443,7 +316,7 @@ function DataManagement({ compact = false }) {
                     filteredVendors.map((v, idx) => (
                       <tr
                         key={v.id}
-                        onClick={() => setSelectedVendorDetail(v)}
+                        onClick={() => handleViewDetails(v)}
                         className="hover:bg-orange-50/40 transition-colors cursor-pointer group"
                       >
                         <td className="py-3 px-4 font-bold text-slate-500">{idx + 1}</td>
@@ -482,7 +355,7 @@ function DataManagement({ compact = false }) {
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedVendorDetail(v);
+                              handleViewDetails(v);
                             }}
                             className="px-3 py-1 bg-orange-50 group-hover:bg-[#f26522] text-[#f26522] group-hover:text-white border border-orange-200 group-hover:border-[#f26522] font-bold text-[11px] rounded-lg transition-all flex items-center gap-1 mx-auto cursor-pointer"
                           >
@@ -551,7 +424,7 @@ function DataManagement({ compact = false }) {
                 </div>
               </div>
               <button
-                onClick={() => setSelectedVendorDetail(null)}
+                onClick={handleCloseDetail}
                 className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X size={18} />
@@ -657,7 +530,7 @@ function DataManagement({ compact = false }) {
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-400">LTS Verified Enterprise Vendor Profile</span>
               <button
-                onClick={() => setSelectedVendorDetail(null)}
+                onClick={handleCloseDetail}
                 className="px-5 py-2 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer shadow-2xs"
               >
                 Close Profile

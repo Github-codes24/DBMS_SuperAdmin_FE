@@ -1,135 +1,20 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { toast } from 'react-toastify';
+import api from '../services/api';
+import {
+  fetchVendors,
+  fetchVendorDetail,
+  createVendor,
+  updateVendor,
+  bulkImportVendors,
+  clearSelectedVendor
+} from '../redux/slices/vendorSlice';
 import { Search, Download, Lock, FileSpreadsheet, FileText, Upload, X, Check, FileDown, UserPlus, Plus, ChevronUp, ChevronDown, Building2, MapPin, Eye, Phone, Mail } from 'lucide-react';
 
 function VendorDatabase({ compact = false }) {
-  const [vendors, setVendors] = useState([
-    {
-      srNo: '01',
-      transNo: 'TRX90101',
-      id: 'VEN001',
-      name: 'ABC Pvt Ltd',
-      ownerName: 'Rajesh Patel',
-      category: 'Grocery & FMCG',
-      verificationDateTime: '2026-07-30 10:30 AM',
-      contactNo: '+91 98920 11223',
-      email: 'contact@abcpvtltd.com',
-      gstNo: '27AAAAA0000A1Z5',
-      address: 'Shop No. 12, Commercial Complex, MG Road',
-      pincode: '400001',
-      status: 'Active',
-      state: 'Maharashtra',
-      city: 'Mumbai',
-      mappedCustomers: 520,
-    },
-    {
-      srNo: '02',
-      transNo: 'TRX90102',
-      id: 'VEN002',
-      name: 'Metro Supplies',
-      ownerName: 'Sanjay Deshmukh',
-      category: 'Medical & Pharma',
-      verificationDateTime: '2026-07-30 02:15 PM',
-      contactNo: '+91 98771 22334',
-      email: 'sales@metrosupplies.in',
-      gstNo: '07BBBBB1111B2Z6',
-      address: 'Plot 45, MIDC Industrial Area',
-      pincode: '110001',
-      status: 'Pending',
-      state: 'Delhi',
-      city: 'New Delhi',
-      mappedCustomers: 340,
-    },
-    {
-      srNo: '03',
-      transNo: 'TRX90103',
-      id: 'VEN003',
-      name: 'Global Electronics',
-      ownerName: 'Vikram Sharma',
-      category: 'Electronics & IT',
-      verificationDateTime: '2026-07-31 09:45 AM',
-      contactNo: '+91 98882 33445',
-      email: 'info@globalelectronics.com',
-      gstNo: '29CCCCC2222C3Z7',
-      address: '2nd Floor, IT Tech Park, Electronic City',
-      pincode: '560100',
-      status: 'Active',
-      state: 'Karnataka',
-      city: 'Bengaluru',
-      mappedCustomers: 890,
-    },
-    {
-      srNo: '04',
-      transNo: 'TRX90104',
-      id: 'VEN004',
-      name: 'Apex Hardware',
-      ownerName: 'Amit Patel',
-      category: 'Hardware & Tools',
-      verificationDateTime: '2026-07-31 11:20 AM',
-      contactNo: '+91 98993 44556',
-      email: 'apex@hardwaretools.in',
-      gstNo: '24DDDDD3333D4Z8',
-      address: 'CG Road, Navrangpura',
-      pincode: '380001',
-      status: 'Active',
-      state: 'Gujarat',
-      city: 'Ahmedabad',
-      mappedCustomers: 650,
-    },
-    {
-      srNo: '05',
-      transNo: 'TRX90105',
-      id: 'VEN005',
-      name: 'Royal Furnishings',
-      ownerName: 'Kavita Rathore',
-      category: 'Home Products',
-      verificationDateTime: '2026-07-31 01:10 PM',
-      contactNo: '+91 98114 55667',
-      email: 'contact@royalfurnishings.in',
-      gstNo: '08EEEEE4444E5Z9',
-      address: 'MI Road, Near Panch Batti',
-      pincode: '302001',
-      status: 'Pending',
-      state: 'Rajasthan',
-      city: 'Jaipur',
-      mappedCustomers: 410,
-    },
-    {
-      srNo: '06',
-      transNo: 'TRX90106',
-      id: 'VEN006',
-      name: 'Zenith Electricals',
-      ownerName: 'Priya Joshi',
-      category: 'Electronics',
-      verificationDateTime: '2026-07-31 03:30 PM',
-      contactNo: '+91 98220 12345',
-      email: 'zenith@electricals.com',
-      gstNo: '27FFFFF5555F6Z0',
-      address: 'FC Road, Deccan Gymkhana',
-      pincode: '411004',
-      status: 'Active',
-      state: 'Maharashtra',
-      city: 'Pune',
-      mappedCustomers: 720,
-    },
-    {
-      srNo: '07',
-      transNo: 'TRX90107',
-      id: 'VEN007',
-      name: 'Sunrise Food Products',
-      ownerName: 'Hitesh Shah',
-      category: 'Grocery',
-      verificationDateTime: '2026-07-31 04:15 PM',
-      contactNo: '+91 98331 23456',
-      email: 'sunrise@foodproducts.in',
-      gstNo: '24GGGGG6666G7Z1',
-      address: 'Ring Road, Textile Market Area',
-      pincode: '395002',
-      status: 'Pending',
-      state: 'Gujarat',
-      city: 'Surat',
-      mappedCustomers: 290,
-    },
-  ]);
+  const dispatch = useDispatch();
+  const { vendors: apiVendors = [], selectedVendor = null, loading = false, isSaving = false } = useSelector((state) => state.vendor || {});
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedState, setSelectedState] = useState('All');
@@ -182,6 +67,30 @@ function VendorDatabase({ compact = false }) {
   const normalizedRole = userRole.toLowerCase();
   const hasAccessPermission = normalizedRole === 'super admin' || normalizedRole === 'admin';
 
+  useEffect(() => {
+    dispatch(fetchVendors());
+  }, [dispatch]);
+
+  const vendors = Array.isArray(apiVendors) ? apiVendors.map((v, idx) => ({
+    _id: v._id,
+    srNo: v.srNo || String(idx + 1).padStart(2, '0'),
+    transNo: v.transNo || `TRX${Math.floor(90000 + Math.random() * 9999)}`,
+    id: v.vendorId,
+    name: v.vendorName,
+    ownerName: v.ownerName || '-',
+    category: v.category,
+    verificationDateTime: v.verificationDateTime ? new Date(v.verificationDateTime).toLocaleString() : '-',
+    contactNo: v.contactNo || '-',
+    email: v.email || '-',
+    gstNo: v.gstin || '-',
+    address: v.completeAddress || '-',
+    pincode: v.pincode || '-',
+    status: v.status,
+    state: v.state || '-',
+    city: v.city || '-',
+    mappedCustomers: v.mappedCustomers ?? 0
+  })) : [];
+
   // Filter Logic
   const filteredVendors = vendors.filter((ven) => {
     const matchesSearch =
@@ -209,157 +118,94 @@ function VendorDatabase({ compact = false }) {
       return;
     }
 
-    const formattedSrNo = newVendor.srNo || String(vendors.length + 1).padStart(2, '0');
-    const formattedTransNo = newVendor.transNo || `TRX${Math.floor(90000 + Math.random() * 9999)}`;
-    const formattedId = newVendor.id || `VEN${String(vendors.length + 1).padStart(3, '0')}`;
-
-    const vendorToAdd = {
-      ...newVendor,
-      srNo: formattedSrNo,
-      transNo: formattedTransNo,
-      id: formattedId,
-    };
-
-    setVendors([vendorToAdd, ...vendors]);
-    setIsAddModalOpen(false);
-    setNewVendor({
-      srNo: '',
-      transNo: '',
-      id: '',
-      name: '',
-      category: '',
-      verificationDateTime: new Date().toISOString().slice(0, 10) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      contactNo: '',
-      state: '',
-      city: '',
-      status: 'Active',
+    dispatch(createVendor({
+      srNo: newVendor.srNo || String(vendors.length + 1).padStart(2, '0'),
+      transNo: newVendor.transNo || `TRX${Math.floor(90000 + Math.random() * 9999)}`,
+      vendorName: newVendor.name,
+      category: newVendor.category,
+      verificationDateTime: new Date().toISOString(),
+      contactNo: newVendor.contactNo,
+      state: newVendor.state,
+      city: newVendor.city,
+      status: newVendor.status
+    })).unwrap().then((res) => {
+      setIsAddModalOpen(false);
+      setNewVendor({
+        srNo: '',
+        transNo: '',
+        id: '',
+        name: '',
+        category: '',
+        verificationDateTime: new Date().toISOString().slice(0, 10) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        contactNo: '',
+        state: '',
+        city: '',
+        status: 'Active',
+      });
+      setToastMsg(`Vendor "${res.vendor?.vendorName || newVendor.name}" added successfully!`);
+      setTimeout(() => setToastMsg(''), 4000);
     });
+  };
 
-    setToastMsg(`Vendor "${vendorToAdd.name}" added successfully!`);
-    setTimeout(() => setToastMsg(''), 4000);
+  const handleToggleStatus = (ven) => {
+    if (!hasAccessPermission) return;
+    const newStatus = ven.status === 'Active' ? 'Pending' : 'Active';
+    dispatch(updateVendor({
+      vendorId: ven._id || ven.id,
+      updateData: { status: newStatus }
+    })).unwrap().then(() => {
+      setToastMsg(`Status for "${ven.name}" toggled successfully!`);
+      setTimeout(() => setToastMsg(''), 4000);
+      if (selectedVendorDetail && selectedVendorDetail.id === ven.id) {
+        setSelectedVendorDetail({ ...selectedVendorDetail, status: newStatus });
+      }
+    });
   };
 
   // Handle Export CSV
-  const handleExportCSV = () => {
+  const handleExportCSV = async () => {
     if (!hasAccessPermission) {
       alert('Access Denied: Export CSV is allowed for Super Admin and Admin only.');
       return;
     }
 
-    const headers = ['Sr No.', 'Trans No.', 'ID', 'Vendor Name', 'Category', 'Contact Verification Date & Time', 'Status', 'State', 'City'];
-    const rows = filteredVendors.map((v, idx) => [
-      v.srNo || String(idx + 1).padStart(2, '0'),
-      v.transNo || v.id,
-      v.id,
-      v.name,
-      v.category,
-      v.verificationDateTime || '-',
-      v.status,
-      v.state,
-      v.city,
-    ]);
-    const csvContent =
-      'data:text/csv;charset=utf-8,' +
-      [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `LTS_Vendor_Database_${new Date().toISOString().slice(0, 10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const response = await api.get('/superadmin/data-management/vendors/export/csv', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `LTS_Vendor_Database_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
 
-    setToastMsg('Vendor database exported to CSV successfully!');
-    setTimeout(() => setToastMsg(''), 3500);
+      setToastMsg('Vendor database exported to CSV successfully!');
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (error) {
+      toast.error('Failed to export CSV file.');
+    }
   };
 
   // Handle Export PDF Report
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     if (!hasAccessPermission) {
       alert('Access Denied: Export PDF is allowed for Super Admin and Admin only.');
       return;
     }
 
-    const printWindow = window.open('', '_blank');
-    const reportHtml = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>LTS Vendor Database Report</title>
-          <style>
-            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 25px; color: #1e293b; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-b: 2px solid #f26522; padding-bottom: 12px; margin-bottom: 20px; }
-            .title { font-size: 20px; font-weight: 800; color: #f26522; margin: 0; }
-            .subtitle { font-size: 11px; color: #64748b; margin-top: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 11px; }
-            th { background-color: #f8fafc; color: #475569; text-align: left; padding: 8px; border: 1px solid #e2e8f0; font-size: 9px; text-transform: uppercase; }
-            td { padding: 8px; border: 1px solid #e2e8f0; }
-            tr:nth-child(even) { background-color: #f8fafc; }
-            .footer { margin-top: 30px; font-size: 10px; color: #94a3b8; display: flex; justify-content: space-between; border-t: 1px solid #e2e8f0; padding-top: 10px; }
-            .badge { display: inline-block; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 4px; background: #ecfdf5; color: #047857; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div>
-              <h1 class="title">LTS - Local Trade Street</h1>
-              <div class="subtitle">Official Vendor Directory & Verification Report • Total Vendors: ${filteredVendors.length}</div>
-            </div>
-            <div style="text-align: right; font-size: 11px; color: #64748b;">
-              Generated On: ${new Date().toLocaleString()}<br/>
-              Generated By: ${userRole}
-            </div>
-          </div>
+    try {
+      const response = await api.get('/superadmin/data-management/vendors/export/pdf', { responseType: 'blob' });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
 
-          <table>
-            <thead>
-              <tr>
-                <th>Sr No</th>
-                <th>Trans No</th>
-                <th>Vendor Name</th>
-                <th>Category</th>
-                <th>Contact Verification Date & Time</th>
-                <th>State</th>
-                <th>City</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${filteredVendors
-                .map(
-                  (v, idx) => `
-                <tr>
-                  <td><strong>${v.srNo || String(idx + 1).padStart(2, '0')}</strong></td>
-                  <td><strong>${v.transNo || v.id}</strong></td>
-                  <td>${v.name}</td>
-                  <td>${v.category}</td>
-                  <td>${v.verificationDateTime || '-'}</td>
-                  <td>${v.state}</td>
-                  <td>${v.city}</td>
-                  <td><span class="badge">${v.status}</span></td>
-                </tr>
-              `
-                )
-                .join('')}
-            </tbody>
-          </table>
-
-          <div class="footer">
-            <span>Local Trade Street Management System</span>
-            <span>Confidential Vendor Directory Report</span>
-          </div>
-          <script>
-            window.onload = function() { window.print(); }
-          </script>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(reportHtml);
-    printWindow.document.close();
-
-    setToastMsg('Formatted Vendor PDF report generated!');
-    setTimeout(() => setToastMsg(''), 3500);
+      setToastMsg('Formatted Vendor PDF report generated!');
+      setTimeout(() => setToastMsg(''), 3500);
+    } catch (error) {
+      toast.error('Failed to export PDF file.');
+    }
   };
 
   // Download Sample Vendor CSV Import Template
@@ -426,19 +272,21 @@ function VendorDatabase({ compact = false }) {
 
   // Submit Bulk Import
   const handleExecuteImport = () => {
-    if (previewData.length === 0) return;
+    if (!uploadedFile) return;
     setIsImporting(true);
 
-    setTimeout(() => {
-      setVendors((prev) => [...previewData, ...prev]);
-      setIsImporting(false);
-      setIsUploadModalOpen(false);
-      setUploadedFile(null);
-      setPreviewData([]);
-
-      setToastMsg(`Successfully imported ${previewData.length} vendor records!`);
-      setTimeout(() => setToastMsg(''), 4000);
-    }, 800);
+    dispatch(bulkImportVendors(uploadedFile))
+      .unwrap()
+      .then((res) => {
+        setIsUploadModalOpen(false);
+        setUploadedFile(null);
+        setPreviewData([]);
+        setToastMsg(res.message || 'Import completed successfully');
+        setTimeout(() => setToastMsg(''), 4000);
+      })
+      .finally(() => {
+        setIsImporting(false);
+      });
   };
 
   return (
@@ -590,7 +438,7 @@ function VendorDatabase({ compact = false }) {
               {filteredVendors.length > 0 ? (
                 filteredVendors.map((ven, idx) => (
                   <tr key={ven.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3 px-3 font-bold text-slate-800">{ven.srNo || String(idx + 1).padStart(2, '0')}</td>
+                    <td className="py-3 px-3 font-bold text-slate-800">{String(idx + 1).padStart(2, '0')}</td>
                     <td className="py-3 px-3 font-bold text-[#f26522] font-mono text-[11px]">{ven.transNo || ven.id}</td>
                     
                     {/* Clickable Vendor Shop Name ⭐ */}
@@ -610,13 +458,17 @@ function VendorDatabase({ compact = false }) {
                     <td className="py-3 px-3 text-slate-600 font-medium">{ven.state}</td>
                     <td className="py-3 px-3 text-slate-600 font-medium">{ven.city}</td>
                     <td className="py-3 px-3">
-                      <span
-                        className={`font-bold text-xs px-2.5 py-0.5 rounded-full border ${
+                      <button
+                        type="button"
+                        onClick={() => handleToggleStatus(ven)}
+                        disabled={isSaving}
+                        className={`font-bold text-xs px-2.5 py-0.5 rounded-full border transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-left cursor-pointer ${
                           ven.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200'
                         }`}
+                        title="Click to toggle status"
                       >
                         {ven.status}
-                      </span>
+                      </button>
                     </td>
                   </tr>
                 ))
