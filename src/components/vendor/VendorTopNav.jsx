@@ -1,4 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { logoutVendor } from '@/redux/slices/authSlice';
 import {
   Search,
   Bell,
@@ -12,11 +14,18 @@ import {
 } from 'lucide-react';
 import { vendorInfo, vendorNotifications, platformInfo } from '@/data/vendorMockData';
 
-export const VendorTopNav = ({ onNotificationClick, onLoginClick, onNavigate }) => {
+export const VendorTopNav = ({ onLoginClick, onNavigate, onLogoutClick }) => {
+  const dispatch = useDispatch();
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
+
   // Fiscal Year Selector State
   const [selectedFY, setSelectedFY] = useState('FY 2026-2027');
   const [fyMenuOpen, setFyMenuOpen] = useState(false);
   const fyDropdownRef = useRef(null);
+
+  // Profile Menu State
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileDropdownRef = useRef(null);
 
   // Notification Drawer State
   const [notifDrawerOpen, setNotifDrawerOpen] = useState(false);
@@ -37,6 +46,9 @@ export const VendorTopNav = ({ onNotificationClick, onLoginClick, onNavigate }) 
     const handleClickOutside = (e) => {
       if (fyDropdownRef.current && !fyDropdownRef.current.contains(e.target)) {
         setFyMenuOpen(false);
+      }
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target)) {
+        setProfileMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -213,22 +225,71 @@ export const VendorTopNav = ({ onNotificationClick, onLoginClick, onNavigate }) 
           <Settings className="w-4 h-4" />
         </button>
 
-        {/* User Profile Pill at Top Right */}
-        <div
-          onClick={onLoginClick}
-          className="bg-orange-600/50 hover:bg-orange-600 p-1 pr-3 rounded-full flex items-center space-x-2 text-white cursor-pointer transition-colors border border-orange-400/40 select-none"
-          title="Click to open Vendor Login"
-        >
-          <img
-            src={vendorInfo.logo}
-            alt={vendorInfo.ownerName}
-            className="w-7 h-7 rounded-full object-cover border border-white/40"
-          />
-          <div className="text-left hidden sm:block">
-            <div className="text-xs font-bold leading-none">{vendorInfo.ownerName}</div>
-            <div className="text-[9px] text-orange-100 opacity-90 leading-none mt-0.5">Vendor Merchant</div>
+        {/* User Profile Pill & Dropdown at Top Right */}
+        <div className="relative" ref={profileDropdownRef}>
+          <div
+            onClick={() => {
+              if (isAuthenticated) {
+                setProfileMenuOpen(!profileMenuOpen);
+              } else if (onLoginClick) {
+                onLoginClick();
+              }
+            }}
+            className="bg-orange-600/50 hover:bg-orange-600 p-1 pr-3 rounded-full flex items-center space-x-2 text-white cursor-pointer transition-colors border border-orange-400/40 select-none"
+            title={isAuthenticated ? "Open Profile Menu" : "Click to open Vendor Login"}
+          >
+            <img
+              src={user?.avatar || vendorInfo.logo}
+              alt={user?.fullName || vendorInfo.ownerName}
+              className="w-7 h-7 rounded-full object-cover border border-white/40"
+            />
+            <div className="text-left hidden sm:block">
+              <div className="text-xs font-bold leading-none">{user?.fullName || user?.ownerName || vendorInfo.ownerName}</div>
+              <div className="text-[9px] text-orange-100 opacity-90 leading-none mt-0.5">
+                {user?.storeName || 'Vendor Merchant'}
+              </div>
+            </div>
+            <ChevronDown className={`w-3 h-3 text-orange-200 transition-transform duration-200 ${profileMenuOpen ? 'rotate-180' : ''}`} />
           </div>
-          <ChevronDown className="w-3 h-3 text-orange-200" />
+
+          {/* Profile Dropdown Menu */}
+          {profileMenuOpen && isAuthenticated && (
+            <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-2xl p-2 text-slate-800 z-50 animate-in fade-in slide-in-from-top-2 duration-150 font-sans">
+              <div className="px-3 py-2 border-b border-slate-100">
+                <p className="text-xs font-bold text-[#172033] truncate">{user?.fullName || vendorInfo.ownerName}</p>
+                <p className="text-[10px] text-[#F97316] font-semibold truncate">{user?.email || vendorInfo.email}</p>
+                <p className="text-[9px] text-slate-400 font-medium truncate mt-0.5">{user?.storeName}</p>
+              </div>
+
+              <div className="py-1 space-y-0.5">
+                <button
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    if (onNavigate) onNavigate('09 Profile & Settings');
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-orange-50 hover:text-[#F97316] flex items-center space-x-2 transition-colors cursor-pointer"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  <span>My Profile & Settings</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    if (onLogoutClick) {
+                      onLogoutClick();
+                    } else {
+                      dispatch(logoutVendor());
+                    }
+                  }}
+                  className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center space-x-2 transition-colors cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Sign Out / Logout</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </nav>
