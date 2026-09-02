@@ -1,25 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { fetchVendorProfile, logoutVendor } from '@/redux/slices/authSlice';
 import { VendorHeader } from './VendorHeader';
 import { VendorCanvasView } from './VendorCanvasView';
 import { VendorLiveView } from './VendorLiveView';
 import { VendorLogin } from './screens/VendorLogin';
 
 export const VendorPanel = () => {
-  // Initial Landing State: unauthenticated (shows exact Vendor Login card first!)
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const dispatch = useDispatch();
+  const { isAuthenticated, token } = useSelector((state) => state.auth);
   const [activeFlowItem, setActiveFlowItem] = useState('02 Vendor Dashboard');
   const [viewMode, setViewMode] = useState('live');
 
-  // Initial Screen: Clean Vendor Login screen matching user screenshot
+  // Application Startup Authentication: Fetch profile if token exists
+  useEffect(() => {
+    if (token) {
+      dispatch(fetchVendorProfile());
+    }
+  }, [dispatch, token]);
+
+  const handleLogout = () => {
+    dispatch(logoutVendor());
+  };
+
+  // Unauthenticated Screen: Vendor Login screen
   if (!isAuthenticated) {
     return (
       <VendorLogin
         onLoginSuccess={() => {
-          setIsAuthenticated(true);
-          setActiveFlowItem('02 Vendor Dashboard');
-        }}
-        onBackToHome={() => {
-          setIsAuthenticated(true);
           setActiveFlowItem('02 Vendor Dashboard');
         }}
       />
@@ -51,7 +59,7 @@ export const VendorPanel = () => {
           <VendorLiveView
             activeFlowItem={activeFlowItem}
             setActiveFlowItem={setActiveFlowItem}
-            onLogout={() => setIsAuthenticated(false)}
+            onLogout={handleLogout}
           />
         )}
       </main>

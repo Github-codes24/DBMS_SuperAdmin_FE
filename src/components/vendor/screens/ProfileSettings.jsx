@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { useSelector } from 'react-redux';
 import {
   User,
   Sliders,
@@ -9,32 +10,32 @@ import {
   Camera,
   Save,
   Shield,
-  Lock,
   CheckCircle2,
-  X,
-  ChevronDown
+  X
 } from 'lucide-react';
 import { vendorInfo } from '@/data/vendorMockData';
 
 export const ProfileSettings = () => {
+  const { user } = useSelector((state) => state.auth);
+
   // Tab State: 'profile' | 'settings'
   const [activeTab, setActiveTab] = useState('profile');
 
-  // Profile Form State (Pre-filled from reference screenshot & vendorInfo)
-  const [fullName, setFullName] = useState(vendorInfo.ownerName || 'Rajesh Kumar');
-  const [email, setEmail] = useState(vendorInfo.email || 'rajesh@lts.com');
-  const [phone, setPhone] = useState(vendorInfo.phone || '+91 98765 43210');
-  const [designation, setDesignation] = useState('Senior Vendor & Regional Store Manager');
-  const [jurisdiction, setJurisdiction] = useState('All India Vendor Operations');
-  const [avatarUrl, setAvatarUrl] = useState(vendorInfo.logo);
+  // Profile Form State (Populated from Redux user state with fallbacks)
+  const [fullName, setFullName] = useState(user?.fullName || vendorInfo.ownerName || 'Mohd Arham');
+  const [email, setEmail] = useState(user?.email || vendorInfo.email || 'arham@lts.com');
+  const [phone, setPhone] = useState(user?.phone || vendorInfo.phone || '+91 98765 43210');
+  const [designation, setDesignation] = useState(user?.designation || 'Senior Vendor & Regional Store Manager');
+  const [jurisdiction, setJurisdiction] = useState(user?.regionalJurisdiction || user?.jurisdiction || 'All India Vendor Operations');
+  const [avatarUrl, setAvatarUrl] = useState(user?.avatar || vendorInfo.logo);
 
-  // Settings State (Pre-filled from reference screenshot 2)
+  // Settings State
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [twoFactorAuth, setTwoFactorAuth] = useState(true);
-  const [emailAlerts, setEmailAlerts] = useState(true);
-  const [autoSyncFreq, setAutoSyncFreq] = useState('Real-Time (Instant)');
+  const [twoFactorAuth, setTwoFactorAuth] = useState(user?.twoFactorAuth ?? true);
+  const [emailAlerts, setEmailAlerts] = useState(user?.emailAlerts ?? true);
+  const [autoSyncFreq, setAutoSyncFreq] = useState(user?.syncFrequency || 'Real-Time (Instant)');
 
   const [toastMessage, setToastMessage] = useState('');
 
@@ -145,7 +146,7 @@ export const ProfileSettings = () => {
                 <h4 className="text-lg font-black text-[#172033]">{fullName}</h4>
                 <div className="flex items-center space-x-2">
                   <span className="bg-purple-100 text-purple-700 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full border border-purple-200">
-                    Vendor Merchant Account
+                    {user?.storeName ? `${user.storeName} • Merchant` : 'Vendor Merchant Account'}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 font-medium">{designation}</p>

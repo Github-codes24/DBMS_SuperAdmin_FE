@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { logoutVendor, resetAuth } from '@/redux/slices/authSlice';
 import { LogIn, CheckCircle2, Lock, ArrowRight } from 'lucide-react';
 
 export const VendorLogout = ({ onRelogin }) => {
+  const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
   const [toastMsg, setToastMsg] = useState('');
 
   const handleLoggedOutClick = () => {
+    dispatch(logoutVendor());
     if (onRelogin) {
       onRelogin();
     } else {
@@ -13,10 +18,17 @@ export const VendorLogout = ({ onRelogin }) => {
     }
   };
 
+  const handleSignInAgain = () => {
+    dispatch(resetAuth());
+    if (onRelogin) {
+      onRelogin();
+    }
+  };
+
   return (
-    <div className="space-y-4 text-left relative">
+    <div className="space-y-4 text-left relative font-sans">
       {toastMsg && (
-        <div className="fixed bottom-5 right-5 bg-[#172033] text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 text-xs z-50 border border-slate-700">
+        <div className="fixed bottom-5 right-5 bg-[#172033] text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2 text-xs z-50 border border-slate-700 animate-in fade-in">
           <CheckCircle2 className="w-4 h-4 text-[#F97316]" />
           <span>{toastMsg}</span>
         </div>
@@ -48,7 +60,9 @@ export const VendorLogout = ({ onRelogin }) => {
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs font-medium">
             <tr className="hover:bg-slate-50/50">
-              <td className="py-2.5 font-bold text-[#172033]">Rajesh Fresh Mart</td>
+              <td className="py-2.5 font-bold text-[#172033]">
+                {user?.storeName || user?.fullName || 'Ar Fresh Mart'}
+              </td>
               <td className="py-2.5 font-bold">
                 <button
                   onClick={handleLoggedOutClick}
@@ -61,7 +75,7 @@ export const VendorLogout = ({ onRelogin }) => {
               </td>
               <td className="py-2.5 text-right">
                 <button
-                  onClick={onRelogin}
+                  onClick={handleSignInAgain}
                   className="text-[#F97316] font-bold hover:underline cursor-pointer inline-flex items-center gap-1"
                 >
                   <span>Re-login</span>
@@ -75,7 +89,7 @@ export const VendorLogout = ({ onRelogin }) => {
 
       <div className="pt-2">
         <button
-          onClick={onRelogin}
+          onClick={handleSignInAgain}
           className="px-4 py-2 bg-[#F97316] hover:bg-orange-600 text-white font-bold rounded-full text-xs shadow-xs cursor-pointer inline-flex items-center gap-1.5 transition-colors"
         >
           <LogIn className="w-3.5 h-3.5" />

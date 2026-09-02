@@ -1,24 +1,37 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
+import { loginVendor, clearAuthError, fetchVendorProfile } from '@/redux/slices/authSlice';
+import { Eye, EyeOff, ArrowRight, Loader2, AlertCircle, X } from 'lucide-react';
 
 export const VendorLogin = ({ onLoginSuccess }) => {
-  const [vendorId, setVendorId] = useState('rajesh@lts.com');
-  const [password, setPassword] = useState('pass@123');
+  const dispatch = useDispatch();
+  const { loading, error } = useSelector((state) => state.auth);
+
+  const [vendorId, setVendorId] = useState('arham@lts.com');
+  const [password, setPassword] = useState('password123');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      setIsSuccess(true);
-      setTimeout(() => {
-        if (onLoginSuccess) onLoginSuccess();
-      }, 800);
-    }, 1000);
+    dispatch(clearAuthError());
+
+    try {
+      const loginPayload = {
+        email: vendorId.trim(),
+        password
+      };
+
+      await dispatch(loginVendor(loginPayload)).unwrap();
+      await dispatch(fetchVendorProfile()).unwrap();
+
+      if (onLoginSuccess) {
+        onLoginSuccess();
+      }
+    } catch (err) {
+      // Error is caught and managed in Redux state (state.auth.error)
+      console.error('Vendor authentication failed:', err);
+    }
   };
 
   return (
@@ -39,6 +52,24 @@ export const VendorLogin = ({ onLoginSuccess }) => {
           </p>
         </div>
 
+        {/* Backend Error Alert Box */}
+        {error && (
+          <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-2xl text-xs font-semibold flex items-start justify-between gap-2 shadow-xs animate-in fade-in duration-200">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+              <span>{typeof error === 'string' ? error : error?.message || 'Authentication failed'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => dispatch(clearAuthError())}
+              className="text-rose-400 hover:text-rose-700 p-0.5 rounded cursor-pointer"
+              title="Dismiss error"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Vendor ID / Email Field */}
@@ -50,7 +81,7 @@ export const VendorLogin = ({ onLoginSuccess }) => {
               type="text"
               value={vendorId}
               onChange={(e) => setVendorId(e.target.value)}
-              placeholder="rajesh@lts.com"
+              placeholder="arham@lts.com"
               className="w-full px-4 py-3 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs font-semibold text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316] focus:bg-white transition-all"
               required
             />
@@ -81,7 +112,7 @@ export const VendorLogin = ({ onLoginSuccess }) => {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 transition-colors"
+                className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                 title={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -103,21 +134,16 @@ export const VendorLogin = ({ onLoginSuccess }) => {
             </label>
           </div>
 
-          {/* Large Orange Login Button matching user screenshot */}
+          {/* Large Orange Login Button */}
           <button
             type="submit"
-            disabled={isLoading}
-            className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-orange-600 active:bg-orange-700 disabled:opacity-80 text-white font-bold rounded-xl shadow-md shadow-orange-500/20 text-xs sm:text-sm flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5 cursor-pointer mt-2"
+            disabled={loading}
+            className="w-full py-3.5 px-4 bg-[#F97316] hover:bg-orange-600 active:bg-orange-700 disabled:opacity-75 disabled:cursor-not-allowed text-white font-bold rounded-xl shadow-md shadow-orange-500/20 text-xs sm:text-sm flex items-center justify-center space-x-2 transition-all transform hover:-translate-y-0.5 cursor-pointer mt-2"
           >
-            {isLoading ? (
+            {loading ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin text-white" />
-                <span>Signing in...</span>
-              </>
-            ) : isSuccess ? (
-              <>
-                <CheckCircle2 className="w-4 h-4 text-white" />
-                <span>Success! Opening Dashboard...</span>
+                <span>Signing in to LTS...</span>
               </>
             ) : (
               <>
