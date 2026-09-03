@@ -1,5 +1,12 @@
-import { useState } from 'react';
-import { useSelector } from 'react-redux';
+import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+  updateVendorProfile,
+  updateVendorPassword,
+  updateVendorPreferences,
+  clearProfileError,
+  clearProfileSuccess
+} from '@/redux/slices/profileSlice.js';
 import {
   User,
   Sliders,
@@ -11,66 +18,214 @@ import {
   Save,
   Shield,
   CheckCircle2,
-  X
+  X,
+  Loader2,
+  AlertCircle,
+  KeyRound
 } from 'lucide-react';
 import { vendorInfo } from '@/data/vendorMockData';
 
 export const ProfileSettings = () => {
+  const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
+  const {
+    preferences,
+    profileUpdating,
+    passwordUpdating,
+    preferencesUpdating,
+    error,
+    successMessage
+  } = useSelector((state) => state.profile);
 
   // Tab State: 'profile' | 'settings'
   const [activeTab, setActiveTab] = useState('profile');
 
   // Profile Form State (Populated from Redux user state with fallbacks)
-  const [fullName, setFullName] = useState(user?.fullName || vendorInfo.ownerName || 'Mohd Arham');
-  const [email, setEmail] = useState(user?.email || vendorInfo.email || 'arham@lts.com');
-  const [phone, setPhone] = useState(user?.phone || vendorInfo.phone || '+91 98765 43210');
-  const [designation, setDesignation] = useState(user?.designation || 'Senior Vendor & Regional Store Manager');
-  const [jurisdiction, setJurisdiction] = useState(user?.regionalJurisdiction || user?.jurisdiction || 'All India Vendor Operations');
+  const [fullName, setFullName] = useState(user?.fullName || 'Mohd Arham');
+  const [email, setEmail] = useState(user?.email || 'arham@lts.com');
+  const [phone, setPhone] = useState(user?.phone || '+91 98765 43210');
+  const [designation, setDesignation] = useState(
+    user?.designation || 'Senior Vendor & Regional Store Manager'
+  );
+  const [jurisdiction, setJurisdiction] = useState(
+    user?.regionalJurisdiction || user?.jurisdiction || 'All India Vendor Operations'
+  );
   const [avatarUrl, setAvatarUrl] = useState(user?.avatar || vendorInfo.logo);
 
-  // Settings State
+  // Password State
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [twoFactorAuth, setTwoFactorAuth] = useState(user?.twoFactorAuth ?? true);
-  const [emailAlerts, setEmailAlerts] = useState(user?.emailAlerts ?? true);
-  const [autoSyncFreq, setAutoSyncFreq] = useState(user?.syncFrequency || 'Real-Time (Instant)');
+
+  // Preferences State
+  const [twoFactorAuth, setTwoFactorAuth] = useState(
+    preferences?.twoFactorAuth ?? user?.twoFactorAuth ?? true
+  );
+  const [emailAlerts, setEmailAlerts] = useState(
+    preferences?.emailAlerts ?? user?.emailAlerts ?? true
+  );
+  const [autoSyncFreq, setAutoSyncFreq] = useState(
+    preferences?.syncFrequency || user?.syncFrequency || 'Hourly Sync'
+  );
 
   const [toastMessage, setToastMessage] = useState('');
+  const [localError, setLocalError] = useState('');
 
-  const handleSaveProfile = (e) => {
-    e.preventDefault();
-    setToastMessage('Profile changes saved successfully!');
-    setTimeout(() => setToastMessage(''), 3000);
-  };
+  // Synchronize profile form when user state updates
+  useEffect(() => {
+    if (user) {
+      if (user.fullName) setFullName(user.fullName);
+      if (user.email) setEmail(user.email);
+      if (user.phone) setPhone(user.phone);
+      if (user.designation) setDesignation(user.designation);
+      if (user.regionalJurisdiction || user.jurisdiction) {
+        setJurisdiction(user.regionalJurisdiction || user.jurisdiction);
+      }
+    }
+  }, [user]);
 
-  const handleSaveSettings = (e) => {
+  // Synchronize preferences
+  useEffect(() => {
+    if (preferences) {
+      if (typeof preferences.twoFactorAuth === 'boolean') {
+        setTwoFactorAuth(preferences.twoFactorAuth);
+      }
+      if (typeof preferences.emailAlerts === 'boolean') {
+        setEmailAlerts(preferences.emailAlerts);
+      }
+      if (preferences.syncFrequency) {
+        setAutoSyncFreq(preferences.syncFrequency);
+      }
+    }
+  }, [preferences]);
+
+  // Handle Save Profile (API 29)
+  const handleSaveProfile = async (e) => {
     e.preventDefault();
-    if (newPassword && newPassword !== confirmPassword) {
-      alert('New password and confirm password do not match!');
+    setLocalError('');
+
+    if (!fullName.trim()) {
+      setLocalError('Full name is required.');
       return;
     }
-    setToastMessage('Account settings preferences updated!');
-    setTimeout(() => setToastMessage(''), 3000);
+
+    try {
+      // Send ONLY supported fields as required by API 29
+      const result = await dispatch(
+        updateVendorProfile({
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          designation: designation.trim(),
+          regionalJurisdiction: jurisdiction.trim()
+        })
+      ).unwrap();
+
+      setToastMessage('Profile changes saved successfully!');
+      setTimeout(() => setToastMessage(''), 3500);
+    } catch (err) {
+      console.error('Update profile error:', err);
+    }
+  };
+
+  // Handle Save Password (API 30)
+  const handleSavePassword = async (e) => {
+    e.preventDefault();
+    setLocalError('');
+
+    if (!currentPassword) {
+      setLocalError('Please enter your current password.');
+      return;
+    }
+    if (!newPassword) {
+      setLocalError('Please enter a new password.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setLocalError('New password and confirm password do not match!');
+      return;
+    }
+
+    try {
+      const res = await dispatch(
+        updateVendorPassword({
+          currentPassword,
+          newPassword,
+          confirmPassword
+        })
+      ).unwrap();
+
+      setToastMessage(res?.message || 'Password updated successfully!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setTimeout(() => setToastMessage(''), 3500);
+    } catch (err) {
+      console.error('Update password error:', err);
+    }
+  };
+
+  // Handle Save Preferences (API 31)
+  const handleSavePreferences = async (e) => {
+    e.preventDefault();
+    setLocalError('');
+
+    try {
+      await dispatch(
+        updateVendorPreferences({
+          twoFactorAuth,
+          emailAlerts,
+          syncFrequency: autoSyncFreq
+        })
+      ).unwrap();
+
+      setToastMessage('Account settings preferences updated!');
+      setTimeout(() => setToastMessage(''), 3500);
+    } catch (err) {
+      console.error('Update preferences error:', err);
+    }
   };
 
   return (
     <div className="max-w-4xl mx-auto space-y-4 font-sans">
       {/* Toast Notification */}
-      {toastMessage && (
+      {(toastMessage || successMessage) && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in">
           <div className="flex items-center space-x-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>{toastMessage}</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span>{toastMessage || successMessage}</span>
           </div>
-          <button onClick={() => setToastMessage('')} className="text-emerald-600 hover:text-emerald-800">
+          <button
+            onClick={() => {
+              setToastMessage('');
+              dispatch(clearProfileSuccess());
+            }}
+            className="text-emerald-600 hover:text-emerald-800 cursor-pointer"
+          >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
-      {/* Main Account Management Card matching both reference screenshots */}
+      {/* Error Alert Banner */}
+      {(error || localError) && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-2xl text-xs font-semibold flex items-center justify-between shadow-sm">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+            <span>{localError || error}</span>
+          </div>
+          <button
+            onClick={() => {
+              setLocalError('');
+              dispatch(clearProfileError());
+            }}
+            className="text-rose-600 hover:text-rose-800 p-1 cursor-pointer"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Main Account Management Card */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xl overflow-hidden">
         {/* Dark Header Banner (#0F172A) */}
         <div className="bg-[#0F172A] text-white p-6 pb-0 space-y-4">
@@ -90,9 +245,10 @@ export const ProfileSettings = () => {
             </div>
           </div>
 
-          {/* Dual Tabs Bar matching reference screenshot */}
+          {/* Dual Tabs Bar */}
           <div className="flex items-center space-x-6 border-b border-slate-800 pt-2">
             <button
+              type="button"
               onClick={() => setActiveTab('profile')}
               className={`pb-3 text-xs font-extrabold flex items-center space-x-2 transition-all border-b-2 cursor-pointer ${
                 activeTab === 'profile'
@@ -105,6 +261,7 @@ export const ProfileSettings = () => {
             </button>
 
             <button
+              type="button"
               onClick={() => setActiveTab('settings')}
               className={`pb-3 text-xs font-extrabold flex items-center space-x-2 transition-all border-b-2 cursor-pointer ${
                 activeTab === 'settings'
@@ -118,7 +275,7 @@ export const ProfileSettings = () => {
           </div>
         </div>
 
-        {/* TAB CONTENT 1: MY PROFILE (Matching Screenshot 1) */}
+        {/* TAB CONTENT 1: MY PROFILE (API 29) */}
         {activeTab === 'profile' && (
           <form onSubmit={handleSaveProfile} className="p-6 space-y-6">
             {/* User Avatar & Badge Row */}
@@ -148,6 +305,11 @@ export const ProfileSettings = () => {
                   <span className="bg-purple-100 text-purple-700 font-extrabold text-[10px] px-2.5 py-0.5 rounded-full border border-purple-200">
                     {user?.storeName ? `${user.storeName} • Merchant` : 'Vendor Merchant Account'}
                   </span>
+                  {user?.storeStatus && (
+                    <span className="bg-emerald-100 text-emerald-700 font-extrabold text-[10px] px-2 py-0.5 rounded-full">
+                      {user.storeStatus}
+                    </span>
+                  )}
                 </div>
                 <p className="text-xs text-slate-500 font-medium">{designation}</p>
               </div>
@@ -170,16 +332,16 @@ export const ProfileSettings = () => {
                 </div>
               </div>
 
-              {/* Email Address */}
+              {/* Email Address (Read-Only) */}
               <div className="space-y-1">
-                <label className="block font-extrabold text-[#172033]">Email Address *</label>
+                <label className="block font-extrabold text-[#172033]">Email Address (Account ID)</label>
                 <div className="relative">
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl font-semibold text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316]"
-                    required
+                    readOnly
+                    className="w-full pl-9 pr-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl font-semibold text-slate-500 cursor-not-allowed focus:outline-none"
+                    title="Account email address is managed centrally."
                   />
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3 pointer-events-none" />
                 </div>
@@ -233,29 +395,41 @@ export const ProfileSettings = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setFullName(vendorInfo.ownerName);
-                  setEmail(vendorInfo.email);
+                  setFullName(user?.fullName || 'Mohd Arham');
+                  setPhone(user?.phone || '+91 98765 43210');
+                  setDesignation(user?.designation || 'Senior Vendor & Regional Store Manager');
+                  setJurisdiction(user?.regionalJurisdiction || user?.jurisdiction || 'All India Vendor Operations');
                 }}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer"
               >
-                Cancel
+                Reset Form
               </button>
               <button
                 type="submit"
-                className="px-6 py-2.5 bg-[#F97316] hover:bg-orange-600 text-white font-bold rounded-xl text-xs shadow-md shadow-orange-500/20 flex items-center space-x-2 cursor-pointer"
+                disabled={profileUpdating}
+                className="px-6 py-2.5 bg-[#F97316] hover:bg-orange-600 disabled:opacity-70 text-white font-bold rounded-xl text-xs shadow-md shadow-orange-500/20 flex items-center space-x-2 cursor-pointer transition-colors"
               >
-                <Save className="w-4 h-4" />
-                <span>Save Profile Changes</span>
+                {profileUpdating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Saving Profile...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    <span>Save Profile Changes</span>
+                  </>
+                )}
               </button>
             </div>
           </form>
         )}
 
-        {/* TAB CONTENT 2: ACCOUNT SETTINGS (Matching Screenshot 2) */}
+        {/* TAB CONTENT 2: ACCOUNT SETTINGS (APIs 30 & 31) */}
         {activeTab === 'settings' && (
-          <form onSubmit={handleSaveSettings} className="p-6 space-y-6">
-            {/* SECTION 1: SECURITY & PASSWORD MANAGEMENT */}
-            <div className="space-y-3">
+          <div className="p-6 space-y-8">
+            {/* SECTION 1: SECURITY & PASSWORD MANAGEMENT (API 30) */}
+            <form onSubmit={handleSavePassword} className="space-y-4">
               <div className="flex items-center space-x-2 text-xs font-extrabold uppercase text-[#172033] tracking-wider border-b border-slate-100 pb-2">
                 <Shield className="w-4 h-4 text-[#F97316]" />
                 <span>SECURITY & PASSWORD MANAGEMENT</span>
@@ -263,48 +437,71 @@ export const ProfileSettings = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 <div>
-                  <label className="block font-bold text-slate-600 mb-1">Current Password</label>
+                  <label className="block font-bold text-slate-600 mb-1">Current Password *</label>
                   <input
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Current password"
+                    placeholder="Enter current password"
                     className="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl font-medium text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316]"
+                    required
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-600 mb-1">New Password</label>
+                  <label className="block font-bold text-slate-600 mb-1">New Password *</label>
                   <input
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="New password"
+                    placeholder="Enter new password"
                     className="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl font-medium text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316]"
+                    required
                   />
                 </div>
 
                 <div>
-                  <label className="block font-bold text-slate-600 mb-1">Confirm Password</label>
+                  <label className="block font-bold text-slate-600 mb-1">Confirm Password *</label>
                   <input
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Confirm password"
+                    placeholder="Confirm new password"
                     className="w-full px-3.5 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl font-medium text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316]"
+                    required
                   />
                 </div>
               </div>
-            </div>
 
-            {/* SECTION 2: SYSTEM & PREFERENCE CONTROLS */}
-            <div className="space-y-3 pt-2">
+              <div className="flex justify-end pt-2">
+                <button
+                  type="submit"
+                  disabled={passwordUpdating}
+                  className="px-5 py-2.5 bg-slate-800 hover:bg-slate-900 disabled:opacity-70 text-white font-bold rounded-xl text-xs shadow-xs flex items-center space-x-2 cursor-pointer transition-colors"
+                >
+                  {passwordUpdating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Updating Password...</span>
+                    </>
+                  ) : (
+                    <>
+                      <KeyRound className="w-3.5 h-3.5" />
+                      <span>Update Password</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+
+            {/* SECTION 2: SYSTEM & PREFERENCE CONTROLS (API 31) */}
+            <form onSubmit={handleSavePreferences} className="space-y-4 pt-4 border-t border-slate-100">
               <div className="flex items-center space-x-2 text-xs font-extrabold uppercase text-[#172033] tracking-wider border-b border-slate-100 pb-2">
                 <Sliders className="w-4 h-4 text-[#F97316]" />
                 <span>SYSTEM & PREFERENCE CONTROLS</span>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-3 text-xs">
                 {/* 2FA Preference Card */}
                 <div className="p-3.5 bg-[#F8FAFC] rounded-xl border border-slate-200/80 flex items-center justify-between">
                   <div>
@@ -346,38 +543,37 @@ export const ProfileSettings = () => {
                   <select
                     value={autoSyncFreq}
                     onChange={(e) => setAutoSyncFreq(e.target.value)}
-                    className="px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316]"
+                    className="px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316] cursor-pointer"
                   >
-                    <option value="Real-Time (Instant)">Real-Time (Instant)</option>
                     <option value="Hourly Sync">Hourly Sync</option>
+                    <option value="Real-Time (Instant)">Real-Time (Instant)</option>
                     <option value="Daily Midnight">Daily Midnight</option>
                   </select>
                 </div>
               </div>
-            </div>
 
-            {/* Settings Action Footer Buttons */}
-            <div className="flex items-center justify-end space-x-3 pt-4 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrentPassword('');
-                  setNewPassword('');
-                  setConfirmPassword('');
-                }}
-                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2.5 bg-[#0F172A] hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-md flex items-center space-x-2 cursor-pointer"
-              >
-                <Save className="w-4 h-4" />
-                <span>Save Settings Preferences</span>
-              </button>
-            </div>
-          </form>
+              {/* Preferences Action Footer Buttons */}
+              <div className="flex items-center justify-end space-x-3 pt-3">
+                <button
+                  type="submit"
+                  disabled={preferencesUpdating}
+                  className="px-6 py-2.5 bg-[#0F172A] hover:bg-slate-800 disabled:opacity-70 text-white font-bold rounded-xl text-xs shadow-md flex items-center space-x-2 cursor-pointer transition-colors"
+                >
+                  {preferencesUpdating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving Preferences...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      <span>Save Settings Preferences</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
         )}
       </div>
     </div>

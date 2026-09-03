@@ -1,76 +1,100 @@
-import React, { useState } from 'react';
-import { X, CheckCircle2, BarChart3, Download, Settings2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+  fetchReports,
+  updateReportSettings,
+  exportReportsCsv,
+  clearReportsError
+} from '@/redux/slices/reportsSlice.js';
+import {
+  X,
+  CheckCircle2,
+  BarChart3,
+  Download,
+  Settings2,
+  Loader2,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
+  FileSpreadsheet
+} from 'lucide-react';
 
 export const SalesReports = () => {
+  const dispatch = useDispatch();
+  const {
+    reports,
+    page,
+    pages,
+    totalReports,
+    loading,
+    updating,
+    exporting,
+    error
+  } = useSelector((state) => state.reports);
+
+  // Search & Pagination State
   const [search, setSearch] = useState('');
-  const [reports, setReports] = useState([
-    { id: 'TC014', name: 'Today Sales Report', count: 128, status: 'Active', period: 'Daily' },
-    { id: 'TC021', name: 'Weekly Performance Report', count: 94, status: 'Active', period: 'Weekly' },
-    { id: 'TC031', name: 'Monthly Revenue Analytics', count: 0, status: 'Disabled', period: 'Monthly' }
-  ]);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Manage Report Modal & Toast State
   const [managingReport, setManagingReport] = useState(null);
   const [editName, setEditName] = useState('');
-  const [editPeriod, setEditPeriod] = useState('Daily');
-  const [editStatus, setEditStatus] = useState('Active');
+  const [editPeriod, setEditPeriod] = useState('Daily Summary');
+  const [editStatus, setEditStatus] = useState('Active (Generating)');
   const [toastMessage, setToastMessage] = useState('');
 
-  const filtered = reports.filter(
-    (row) =>
-      row.name.toLowerCase().includes(search.toLowerCase()) ||
-      row.id.toLowerCase().includes(search.toLowerCase())
-  );
+  // Initial and reactive load on search / page change (API 26)
+  useEffect(() => {
+    dispatch(fetchReports({ page: currentPage, search }));
+  }, [dispatch, currentPage, search]);
+
+  const handleSearchChange = (e) => {
+    setSearch(e.target.value);
+    setCurrentPage(1);
+  };
 
   const handleOpenManage = (report) => {
     setManagingReport(report);
-    setEditName(report.name);
-    setEditPeriod(report.period);
-    setEditStatus(report.status);
+    setEditName(report.name || '');
+    setEditPeriod(report.period || 'Weekly Aggregate');
+    setEditStatus(report.status || 'Active (Generating)');
   };
 
-  const handleSaveReport = (e) => {
+  // Save Report Settings (API 27)
+  const handleSaveReport = async (e) => {
     e.preventDefault();
     if (!managingReport) return;
 
-    const updated = reports.map((r) => {
-      if (r.id === managingReport.id) {
-        return {
-          ...r,
-          name: editName,
+    try {
+      await dispatch(
+        updateReportSettings({
+          reportId: managingReport.reportId || managingReport.id,
+          name: editName.trim(),
           period: editPeriod,
           status: editStatus
-        };
-      }
-      return r;
-    });
+        })
+      ).unwrap();
 
-    setReports(updated);
-    setManagingReport(null);
-    setToastMessage(`Report "${editName}" updated successfully!`);
-    setTimeout(() => setToastMessage(''), 3000);
+      setToastMessage(`Report "${editName}" updated successfully!`);
+      setManagingReport(null);
+      dispatch(fetchReports({ page: currentPage, search }));
+      setTimeout(() => setToastMessage(''), 3500);
+    } catch (err) {
+      console.error('Update report settings error:', err);
+    }
   };
 
-  const handleExportCSV = () => {
-    const headers = ['Report ID', 'Report Name', 'Period', 'Customer Count', 'Status'];
-    const rows = reports.map((r) => [
-      `"${r.id}"`,
-      `"${r.name.replace(/"/g, '""')}"`,
-      `"${r.period}"`,
-      r.count,
-      `"${r.status}"`
-    ]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    const today = new Date().toISOString().slice(0, 10);
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `lts_vendor_sales_reports_${today}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setToastMessage('Exported sales reports CSV successfully!');
-    setTimeout(() => setToastMessage(''), 3500);
+  // Export Reports CSV (API 28)
+  const handleExportCSV = async () => {
+    try {
+      const res = await dispatch(exportReportsCsv()).unwrap();
+      setToastMessage(`Exported "${res.filename}" successfully!`);
+      setTimeout(() => setToastMessage(''), 3500);
+    } catch (err) {
+      setToastMessage(typeof err === 'string' ? err : 'Failed to export sales reports CSV');
+      setTimeout(() => setToastMessage(''), 4000);
+    }
   };
 
   return (
@@ -79,30 +103,75 @@ export const SalesReports = () => {
       {toastMessage && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-2xl text-xs font-bold flex items-center justify-between shadow-sm animate-in fade-in">
           <div className="flex items-center space-x-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
             <span>{toastMessage}</span>
           </div>
-          <button onClick={() => setToastMessage('')} className="text-emerald-600 hover:text-emerald-800">
+          <button onClick={() => setToastMessage('')} className="text-emerald-600 hover:text-emerald-800 cursor-pointer">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
-      {/* Top Toolbar */}
+      {/* Error Alert Banner */}
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 p-3.5 rounded-2xl text-xs font-semibold flex items-center justify-between shadow-sm">
+          <div className="flex items-center space-x-2">
+            <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => dispatch(fetchReports({ page: currentPage, search }))}
+              className="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded-lg text-[11px] font-bold cursor-pointer"
+            >
+              Retry
+            </button>
+            <button
+              onClick={() => dispatch(clearReportsError())}
+              className="text-rose-600 hover:text-rose-800 p-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Top Search & Export Toolbar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search report name / ID..."
-          className="flex-1 px-3.5 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs font-medium text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316]"
-        />
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={search}
+            onChange={handleSearchChange}
+            placeholder="Search report title, ID (e.g. TC021), period..."
+            className="w-full pl-9 pr-8 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs font-medium text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316]"
+          />
+          {search && (
+            <button
+              onClick={() => {
+                setSearch('');
+                setCurrentPage(1);
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
         <button
           onClick={handleExportCSV}
-          className="px-3.5 py-2.5 bg-[#F97316] hover:bg-orange-600 text-white font-bold rounded-xl text-xs shadow-xs whitespace-nowrap flex items-center space-x-1.5 cursor-pointer self-start sm:self-auto"
+          disabled={exporting}
+          className="px-3.5 py-2.5 bg-[#F97316] hover:bg-orange-600 disabled:opacity-70 text-white font-bold rounded-xl text-xs shadow-xs whitespace-nowrap flex items-center space-x-1.5 cursor-pointer self-start sm:self-auto transition-colors"
+          title="Export Sales Reports CSV File"
         >
-          <Download className="w-3.5 h-3.5" />
-          <span>Export CSV</span>
+          {exporting ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
+          ) : (
+            <Download className="w-3.5 h-3.5" />
+          )}
+          <span>{exporting ? 'Exporting...' : 'Export CSV'}</span>
         </button>
       </div>
 
@@ -120,40 +189,116 @@ export const SalesReports = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 text-xs font-medium">
-            {filtered.map((row) => (
-              <tr key={row.id} className="hover:bg-slate-50/70 transition-colors">
-                <td className="py-3 font-extrabold text-[#172033]">{row.id}</td>
-                <td className="py-3 font-semibold text-[#172033]">{row.name}</td>
-                <td className="py-3 text-slate-500 font-semibold">{row.period}</td>
-                <td className="py-3 font-bold text-[#172033]">{row.count}</td>
-                <td className="py-3 font-bold">
-                  {row.status === 'Active' ? (
-                    <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-[10px]">Active</span>
-                  ) : (
-                    <span className="bg-rose-100 text-rose-600 px-2 py-0.5 rounded text-[10px]">Disabled</span>
-                  )}
-                </td>
-                <td className="py-3 text-right">
-                  <button
-                    onClick={() => handleOpenManage(row)}
-                    className="text-[#F97316] font-bold hover:underline cursor-pointer flex items-center space-x-1 ml-auto"
-                  >
-                    <Settings2 className="w-3.5 h-3.5" />
-                    <span>Manage</span>
-                  </button>
+            {loading ? (
+              <tr>
+                <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <Loader2 className="w-6 h-6 animate-spin text-[#F97316]" />
+                    <span className="text-xs font-semibold">Loading sales reports...</span>
+                  </div>
                 </td>
               </tr>
-            ))}
+            ) : reports.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-12 text-center text-slate-400">
+                  <div className="flex flex-col items-center justify-center space-y-2">
+                    <FileSpreadsheet className="w-8 h-8 text-slate-300" />
+                    <p className="text-xs font-bold text-slate-600">No reports found</p>
+                    <p className="text-[11px] text-slate-400">
+                      {search
+                        ? 'Try searching with a different report title or period.'
+                        : 'Generated analytical performance reports will appear here.'}
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            ) : (
+              reports.map((row) => (
+                <tr key={row.reportId || row.id || row._id} className="hover:bg-slate-50/70 transition-colors">
+                  <td className="py-3 font-extrabold text-[#172033] font-mono">{row.reportId || row.id}</td>
+                  <td className="py-3 font-semibold text-[#172033]">{row.name}</td>
+                  <td className="py-3 text-slate-500 font-semibold">{row.period}</td>
+                  <td className="py-3 font-bold text-[#172033]">{row.customersCount ?? row.count ?? 0}</td>
+                  <td className="py-3 font-bold">
+                    {(row.status === 'Active' || row.status === 'Active (Generating)') ? (
+                      <span className="bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold">
+                        {row.status || 'Active'}
+                      </span>
+                    ) : (
+                      <span className="bg-rose-100 text-rose-600 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold">
+                        {row.status || 'Disabled'}
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-3 text-right">
+                    <button
+                      onClick={() => handleOpenManage(row)}
+                      className="text-[#F97316] font-bold hover:underline cursor-pointer flex items-center space-x-1 ml-auto px-2 py-1 rounded-lg hover:bg-orange-50 transition-colors"
+                    >
+                      <Settings2 className="w-3.5 h-3.5" />
+                      <span>Manage</span>
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* Bottom Display */}
-      <div className="pt-2 text-xs text-slate-400 font-medium">
-        <span>Showing {filtered.length} report parameters</span>
+      {/* Bottom Pagination & Counts Bar */}
+      <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+        <span className="text-slate-500 font-medium">
+          Showing <span className="font-bold text-[#172033]">{reports.length}</span> of{' '}
+          <span className="font-bold text-[#172033]">{totalReports || reports.length}</span> reports
+          {pages > 1 && (
+            <span className="text-slate-400 ml-1">
+              (Page {page} of {pages})
+            </span>
+          )}
+        </span>
+
+        {/* Pagination Buttons */}
+        <div className="flex items-center space-x-1.5">
+          <button
+            onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+            disabled={currentPage <= 1 || loading}
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 font-bold rounded-xl text-xs flex items-center space-x-1 cursor-pointer transition-colors"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+            <span>Previous</span>
+          </button>
+
+          {Array.from({ length: Math.min(5, pages || 1) }, (_, i) => {
+            const pageNum = i + 1;
+            const isActive = pageNum === currentPage;
+            return (
+              <button
+                key={pageNum}
+                onClick={() => setCurrentPage(pageNum)}
+                className={`w-8 h-8 rounded-xl text-xs font-extrabold flex items-center justify-center transition-colors cursor-pointer ${
+                  isActive
+                    ? 'bg-[#F97316] text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                {pageNum}
+              </button>
+            );
+          })}
+
+          <button
+            onClick={() => setCurrentPage((prev) => Math.min(pages || 1, prev + 1))}
+            disabled={currentPage >= (pages || 1) || loading}
+            className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 font-bold rounded-xl text-xs flex items-center space-x-1 cursor-pointer transition-colors"
+          >
+            <span>Next</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
-      {/* Interactive Manage Report Modal */}
+      {/* Interactive Manage Report Modal (API 27) */}
       {managingReport && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl p-6 w-full max-w-md space-y-4">
@@ -161,12 +306,12 @@ export const SalesReports = () => {
               <div className="flex items-center space-x-2">
                 <BarChart3 className="w-5 h-5 text-[#F97316]" />
                 <h3 className="text-base font-extrabold text-[#172033]">
-                  Manage Report — <span className="text-[#F97316]">{managingReport.id}</span>
+                  Manage Report — <span className="font-mono text-[#F97316]">{managingReport.reportId || managingReport.id}</span>
                 </h3>
               </div>
               <button
                 onClick={() => setManagingReport(null)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg"
+                className="text-slate-400 hover:text-slate-600 p-1 rounded-lg cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -193,11 +338,11 @@ export const SalesReports = () => {
                 <select
                   value={editPeriod}
                   onChange={(e) => setEditPeriod(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316]"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316] cursor-pointer"
                 >
-                  <option value="Daily">Daily Summary</option>
-                  <option value="Weekly">Weekly Aggregate</option>
-                  <option value="Monthly">Monthly Analytics</option>
+                  <option value="Daily Summary">Daily Summary</option>
+                  <option value="Weekly Aggregate">Weekly Aggregate</option>
+                  <option value="Monthly Analytics">Monthly Analytics</option>
                 </select>
               </div>
 
@@ -208,10 +353,10 @@ export const SalesReports = () => {
                 <select
                   value={editStatus}
                   onChange={(e) => setEditStatus(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316]"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl font-bold text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316] cursor-pointer"
                 >
-                  <option value="Active">Active (Generating)</option>
-                  <option value="Disabled">Disabled (Archived)</option>
+                  <option value="Active (Generating)">Active (Generating)</option>
+                  <option value="Disabled (Archived)">Disabled (Archived)</option>
                 </select>
               </div>
 
@@ -219,15 +364,23 @@ export const SalesReports = () => {
                 <button
                   type="button"
                   onClick={() => setManagingReport(null)}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-[#F97316] hover:bg-orange-600 text-white font-bold rounded-xl shadow-md shadow-orange-500/20 cursor-pointer"
+                  disabled={updating}
+                  className="px-5 py-2 bg-[#F97316] hover:bg-orange-600 disabled:opacity-70 text-white font-bold rounded-xl shadow-md shadow-orange-500/20 flex items-center space-x-1.5 cursor-pointer"
                 >
-                  Save Parameters
+                  {updating ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Parameters</span>
+                  )}
                 </button>
               </div>
             </form>

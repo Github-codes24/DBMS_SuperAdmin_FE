@@ -5,6 +5,10 @@ import productsReducer from "./slices/productsSlice.js";
 import ordersReducer from "./slices/ordersSlice.js";
 import customersReducer from "./slices/customersSlice.js";
 import inventoryReducer from "./slices/inventorySlice.js";
+import reportsReducer from "./slices/reportsSlice.js";
+import profileReducer from "./slices/profileSlice.js";
+import notificationsReducer from "./slices/notificationsSlice.js";
+import ticketsReducer from "./slices/ticketsSlice.js";
 
 export const store = configureStore({
   reducer: {
@@ -13,7 +17,11 @@ export const store = configureStore({
     products: productsReducer,
     orders: ordersReducer,
     customers: customersReducer,
-    inventory: inventoryReducer
+    inventory: inventoryReducer,
+    reports: reportsReducer,
+    profile: profileReducer,
+    notifications: notificationsReducer,
+    tickets: ticketsReducer
   }
 });
 

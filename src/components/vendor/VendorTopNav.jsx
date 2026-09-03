@@ -2,6 +2,11 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { logoutVendor } from '@/redux/slices/authSlice';
 import {
+  fetchNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead
+} from '@/redux/slices/notificationsSlice';
+import {
   Search,
   Bell,
   MessageSquare,
@@ -12,11 +17,12 @@ import {
   X,
   CheckCheck
 } from 'lucide-react';
-import { vendorInfo, vendorNotifications, platformInfo } from '@/data/vendorMockData';
+import { vendorInfo, platformInfo } from '@/data/vendorMockData';
 
 export const VendorTopNav = ({ onLoginClick, onNavigate, onLogoutClick }) => {
   const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector((state) => state.auth);
+  const { notifications, unreadCount } = useSelector((state) => state.notifications);
 
   // Fiscal Year Selector State
   const [selectedFY, setSelectedFY] = useState('FY 2026-2027');
@@ -29,16 +35,20 @@ export const VendorTopNav = ({ onLoginClick, onNavigate, onLogoutClick }) => {
 
   // Notification Drawer State
   const [notifDrawerOpen, setNotifDrawerOpen] = useState(false);
-  const [notificationsList, setNotificationsList] = useState(vendorNotifications);
 
   // Global Search State
   const [searchQuery, setSearchQuery] = useState('');
 
   const fiscalYears = ['FY 2026-2027', 'FY 2025-2026', 'FY 2024-2025', 'FY 2023-2024'];
-  const unreadCount = notificationsList.filter(n => n.unread).length;
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      dispatch(fetchNotifications({ page: 1 }));
+    }
+  }, [dispatch, isAuthenticated]);
 
   const handleMarkAllRead = () => {
-    setNotificationsList(notificationsList.map(n => ({ ...n, unread: false })));
+    dispatch(markAllNotificationsAsRead());
   };
 
   // Click outside listener
@@ -182,25 +192,38 @@ export const VendorTopNav = ({ onLoginClick, onNavigate, onLogoutClick }) => {
               </div>
 
               <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                {notificationsList.map((notif) => (
-                  <div
-                    key={notif.id}
-                    className={`p-3 rounded-xl border text-xs transition-all ${
-                      notif.unread
-                        ? 'bg-orange-50/60 border-orange-200/80 font-semibold'
-                        : 'bg-slate-50/50 border-slate-100 text-slate-600'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-extrabold uppercase text-[#F97316]">
-                        {notif.category}
-                      </span>
-                      <span className="text-[9px] text-slate-400 font-medium">{notif.time}</span>
-                    </div>
-                    <h4 className="font-bold text-[#172033]">{notif.title}</h4>
-                    <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{notif.message}</p>
+                {notifications.length === 0 ? (
+                  <div className="py-8 text-center text-slate-400 text-xs">
+                    No new notifications
                   </div>
-                ))}
+                ) : (
+                  notifications.map((notif) => (
+                    <div
+                      key={notif._id || notif.notificationId || notif.id}
+                      onClick={() => {
+                        if (notif.status === 'Unread' && notif._id) {
+                          dispatch(markNotificationAsRead(notif._id));
+                        }
+                      }}
+                      className={`p-3 rounded-xl border text-xs transition-all cursor-pointer ${
+                        notif.status === 'Unread'
+                          ? 'bg-orange-50/60 border-orange-200/80 font-semibold hover:bg-orange-100/50'
+                          : 'bg-slate-50/50 border-slate-100 text-slate-600 hover:bg-slate-100/50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-extrabold uppercase text-[#F97316]">
+                          {notif.category || 'General'}
+                        </span>
+                        <span className="text-[9px] text-slate-400 font-mono">
+                          {notif.notificationId || notif._id?.slice(-6)}
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-[#172033]">{notif.title}</h4>
+                      <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">{notif.body || notif.message}</p>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           )}
