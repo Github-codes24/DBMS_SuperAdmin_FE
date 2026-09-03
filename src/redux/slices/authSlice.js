@@ -165,6 +165,16 @@ const authSlice = createSlice({
         state.user = null;
         state.error = null;
       });
+
+    // Handle updateVendorProfile fulfilled to keep auth.user in sync
+    builder.addCase('profile/updateVendorProfile/fulfilled', (state, action) => {
+      if (action.payload) {
+        state.user = {
+          ...state.user,
+          ...action.payload
+        };
+      }
+    });
   }
 });
 
