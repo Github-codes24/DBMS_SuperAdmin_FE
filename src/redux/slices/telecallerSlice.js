@@ -20,7 +20,14 @@ export const createTelecaller = createAsyncThunk(
   async (telecallerData, { dispatch, rejectWithValue }) => {
     try {
       const response = await api.post('/superadmin/telecallers', telecallerData);
-      toast.success(response.data.message || 'Telecaller created successfully');
+      const emailSent = response.data.data?.emailSent;
+      if (emailSent === true) {
+        toast.success('Telecaller account created successfully. Login credentials have been sent to the registered email address.');
+      } else if (emailSent === false) {
+        toast.warning('Telecaller account created successfully, but credentials email could not be sent.');
+      } else {
+        toast.success(response.data.message || 'Telecaller created successfully');
+      }
       dispatch(fetchTelecallers());
       return response.data;
     } catch (error) {
