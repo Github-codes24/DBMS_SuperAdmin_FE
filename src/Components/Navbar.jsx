@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutAdmin } from '../redux/slices/authSlice';
+import logo from '../assets/logo.png';
 import { 
   ChevronDown, 
   UserCircle, 
@@ -147,18 +148,10 @@ function Navbar() {
       {/* Main Navbar with Gradient & Glassmorphism */}
       <div className="w-full bg-gradient-to-r from-[#c84302] via-[#f26522] to-[#fa7c3e] text-white px-4 md:px-8 py-2.5 flex items-center justify-between shadow-lg shadow-orange-500/10 backdrop-blur-md">
         
-        {/* Left Side: Official LTS Brand Logo matching user photo */}
+        {/* Left Side: Official LTS Brand Logo */}
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate('/dashboard')}>
-          <div className="bg-white/95 backdrop-blur-md px-3.5 py-1.5 rounded-2xl border border-white/60 shadow-md flex items-center gap-2 group-hover:scale-105 group-hover:shadow-lg transition-all duration-200">
-            <div className="flex items-center font-black text-xl tracking-tight leading-none">
-              <span className="text-[#f26522]">LT</span>
-              <span className="text-[#f26522] font-black">$</span>
-            </div>
-            <div className="text-sm md:text-base font-extrabold tracking-tight flex items-center gap-1 leading-none">
-              <span className="text-[#f26522]">Local</span>
-              <span className="text-slate-900 font-black">Trade</span>
-              <span className="text-[#f26522]">Street</span>
-            </div>
+          <div className="bg-white px-3 py-1.5 rounded-2xl border border-white/60 shadow-md flex items-center group-hover:scale-105 group-hover:shadow-lg transition-all duration-200">
+            <img src={logo} alt="Local Trade Street" className="h-7 w-auto object-contain" />
           </div>
 
           <div className="hidden lg:flex items-center gap-2">

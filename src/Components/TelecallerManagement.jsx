@@ -143,8 +143,16 @@ function TelecallerManagement({ compact = false }) {
     })).unwrap().then((res) => {
       setIsAddModalOpen(false);
       setNewTc({ id: '', name: '', mobile: '', email: '', area: '', password: '', status: 'Active' });
-      setToastMsg(`New Telecaller "${res.telecaller?.fullName || newTc.name}" added successfully!`);
-      setTimeout(() => setToastMsg(''), 4000);
+      const emailSent = res?.data?.emailSent;
+      const telecallerName = res?.data?.telecaller?.fullName || newTc.name;
+      if (emailSent === true) {
+        setToastMsg(`Telecaller account "${telecallerName}" created successfully. Login credentials have been sent to the registered email address.`);
+      } else if (emailSent === false) {
+        setToastMsg(`Telecaller account "${telecallerName}" created successfully, but credentials email could not be sent.`);
+      } else {
+        setToastMsg(`New Telecaller "${telecallerName}" added successfully!`);
+      }
+      setTimeout(() => setToastMsg(''), 6000);
     });
   };
 

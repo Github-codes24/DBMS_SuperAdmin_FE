@@ -33,7 +33,14 @@ export const createVendor = createAsyncThunk(
   async (vendorData, { dispatch, rejectWithValue }) => {
     try {
       const response = await api.post('/superadmin/vendors/', vendorData);
-      toast.success(response.data.message || 'Vendor created successfully');
+      const emailSent = response.data.data?.emailSent;
+      if (emailSent === true) {
+        toast.success('Vendor created successfully. Login credentials have been sent to the registered email address.');
+      } else if (emailSent === false) {
+        toast.warning('Vendor created successfully, but the credentials email could not be sent.');
+      } else {
+        toast.success(response.data.message || 'Vendor created successfully');
+      }
       dispatch(fetchVendors());
       return response.data;
     } catch (error) {
@@ -54,6 +61,22 @@ export const updateVendor = createAsyncThunk(
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to update vendor.';
+      toast.error(message);
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const deleteVendor = createAsyncThunk(
+  'vendor/deleteVendor',
+  async (vendorId, { dispatch, rejectWithValue }) => {
+    try {
+      const response = await api.delete(`/superadmin/vendors/${vendorId}`);
+      toast.success(response.data?.message || 'Vendor deleted successfully');
+      dispatch(fetchVendors());
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to delete vendor.';
       toast.error(message);
       return rejectWithValue(message);
     }
@@ -149,6 +172,16 @@ const vendorSlice = createSlice({
         state.isSaving = false;
       })
       .addCase(updateVendor.rejected, (state) => {
+        state.isSaving = false;
+      })
+      // Delete Vendor
+      .addCase(deleteVendor.pending, (state) => {
+        state.isSaving = true;
+      })
+      .addCase(deleteVendor.fulfilled, (state) => {
+        state.isSaving = false;
+      })
+      .addCase(deleteVendor.rejected, (state) => {
         state.isSaving = false;
       })
       // Bulk Import

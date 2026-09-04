@@ -7,10 +7,15 @@ import {
   fetchVendorDetail,
   createVendor,
   updateVendor,
+  deleteVendor,
   bulkImportVendors,
   clearSelectedVendor
 } from '../redux/slices/vendorSlice';
-import { Search, Download, Lock, FileSpreadsheet, FileText, Upload, X, Check, FileDown, UserPlus, Plus, ChevronUp, ChevronDown, Building2, MapPin, Eye, Phone, Mail } from 'lucide-react';
+import {
+  Search, Download, Lock, FileSpreadsheet, FileText, Upload, X, Check,
+  FileDown, UserPlus, Plus, ChevronUp, ChevronDown, Building2, MapPin,
+  Eye, EyeOff, Phone, Mail, Edit2, Trash2, Ban, UserCheck, AlertTriangle
+} from 'lucide-react';
 
 function VendorDatabase({ compact = false }) {
   const dispatch = useDispatch();
@@ -33,6 +38,7 @@ function VendorDatabase({ compact = false }) {
 
   // Add Vendor Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [showAddPassword, setShowAddPassword] = useState(false);
   const [newVendor, setNewVendor] = useState({
     srNo: '',
     transNo: '',
@@ -43,6 +49,7 @@ function VendorDatabase({ compact = false }) {
     verificationDateTime: new Date().toISOString().slice(0, 10) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     contactNo: '',
     email: '',
+    password: '',
     gstNo: '',
     address: '',
     pincode: '',
@@ -61,6 +68,17 @@ function VendorDatabase({ compact = false }) {
   // Export Dropdown State
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const exportDropdownRef = useRef(null);
+
+  // Edit Vendor Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingVendor, setEditingVendor] = useState(null);
+
+  // Confirmation Popup Modal State (for Block / Delete)
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    type: null, // 'block' | 'delete'
+    vendor: null,
+  });
 
   // Role Access Check: Only Super Admin and Admin have access
   const userRole = (localStorage.getItem('userRole') || 'Super Admin').trim();
@@ -125,25 +143,42 @@ function VendorDatabase({ compact = false }) {
       category: newVendor.category,
       verificationDateTime: new Date().toISOString(),
       contactNo: newVendor.contactNo,
+      email: newVendor.email,
+      password: newVendor.password,
       state: newVendor.state,
       city: newVendor.city,
       status: newVendor.status
     })).unwrap().then((res) => {
       setIsAddModalOpen(false);
+      setShowAddPassword(false);
       setNewVendor({
         srNo: '',
         transNo: '',
         id: '',
         name: '',
+        ownerName: '',
         category: '',
         verificationDateTime: new Date().toISOString().slice(0, 10) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         contactNo: '',
+        email: '',
+        password: '',
+        gstNo: '',
+        address: '',
+        pincode: '',
         state: '',
         city: '',
         status: 'Active',
       });
-      setToastMsg(`Vendor "${res.vendor?.vendorName || newVendor.name}" added successfully!`);
-      setTimeout(() => setToastMsg(''), 4000);
+      const emailSent = res?.data?.emailSent;
+      const vendorName = res?.data?.vendor?.vendorName || newVendor.name;
+      if (emailSent === true) {
+        setToastMsg(`Vendor "${vendorName}" created successfully. Login credentials have been sent to the registered email address.`);
+      } else if (emailSent === false) {
+        setToastMsg(`Vendor "${vendorName}" created successfully, but the credentials email could not be sent.`);
+      } else {
+        setToastMsg(`Vendor "${vendorName}" added successfully!`);
+      }
+      setTimeout(() => setToastMsg(''), 6000);
     });
   };
 
@@ -156,10 +191,140 @@ function VendorDatabase({ compact = false }) {
     })).unwrap().then(() => {
       setToastMsg(`Status for "${ven.name}" toggled successfully!`);
       setTimeout(() => setToastMsg(''), 4000);
-      if (selectedVendorDetail && selectedVendorDetail.id === ven.id) {
+      if (selectedVendorDetail && (selectedVendorDetail._id === ven._id || selectedVendorDetail.id === ven.id)) {
         setSelectedVendorDetail({ ...selectedVendorDetail, status: newStatus });
       }
     });
+  };
+
+  // Open Edit Vendor Modal
+  const handleOpenEditModal = (ven) => {
+    if (!hasAccessPermission) return;
+    setEditingVendor({
+      _id: ven._id,
+      id: ven.id,
+      name: ven.name || '',
+      ownerName: ven.ownerName !== '-' ? ven.ownerName : '',
+      category: ven.category || '',
+      transNo: ven.transNo || '',
+      contactNo: ven.contactNo !== '-' ? ven.contactNo : '',
+      email: ven.email !== '-' ? ven.email : '',
+      state: ven.state !== '-' ? ven.state : '',
+      city: ven.city !== '-' ? ven.city : '',
+      status: ven.status || 'Active',
+      gstNo: ven.gstNo !== '-' ? ven.gstNo : '',
+      address: ven.address !== '-' ? ven.address : '',
+      pincode: ven.pincode !== '-' ? ven.pincode : '',
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Submit Edit Vendor Form
+  const handleEditVendorSubmit = (e) => {
+    e.preventDefault();
+    if (!editingVendor) return;
+    if (!editingVendor.name || !editingVendor.category) {
+      alert('Please fill in Vendor Name and Category');
+      return;
+    }
+
+    const targetId = editingVendor._id || editingVendor.id;
+    const updatePayload = {
+      vendorName: editingVendor.name,
+      ownerName: editingVendor.ownerName,
+      category: editingVendor.category,
+      transNo: editingVendor.transNo,
+      contactNo: editingVendor.contactNo,
+      email: editingVendor.email,
+      state: editingVendor.state,
+      city: editingVendor.city,
+      status: editingVendor.status,
+      gstin: editingVendor.gstNo,
+      completeAddress: editingVendor.address,
+      pincode: editingVendor.pincode,
+    };
+
+    dispatch(updateVendor({
+      vendorId: targetId,
+      updateData: updatePayload,
+    })).unwrap().then(() => {
+      setIsEditModalOpen(false);
+      setToastMsg(`Vendor "${editingVendor.name}" updated successfully!`);
+      setTimeout(() => setToastMsg(''), 4000);
+      if (selectedVendorDetail && (selectedVendorDetail._id === targetId || selectedVendorDetail.id === targetId)) {
+        setSelectedVendorDetail({
+          ...selectedVendorDetail,
+          ...editingVendor,
+        });
+      }
+      setEditingVendor(null);
+    });
+  };
+
+  // Prompt Confirmation for Block Action
+  const handlePromptBlock = (ven) => {
+    if (!hasAccessPermission) return;
+    setConfirmModal({
+      isOpen: true,
+      type: 'block',
+      vendor: ven,
+    });
+  };
+
+  // Prompt Confirmation for Delete Action
+  const handlePromptDelete = (ven) => {
+    if (!hasAccessPermission) return;
+    setConfirmModal({
+      isOpen: true,
+      type: 'delete',
+      vendor: ven,
+    });
+  };
+
+  // Close Confirmation Modal
+  const handleCloseConfirmModal = () => {
+    setConfirmModal({
+      isOpen: false,
+      type: null,
+      vendor: null,
+    });
+  };
+
+  // Execute Confirmed Block or Delete Action
+  const handleConfirmAction = () => {
+    if (!confirmModal.vendor) return;
+    const ven = confirmModal.vendor;
+    const targetId = ven._id || ven.id;
+
+    if (confirmModal.type === 'block') {
+      const newStatus = ven.status === 'Blocked' ? 'Active' : 'Blocked';
+      dispatch(updateVendor({
+        vendorId: targetId,
+        updateData: { status: newStatus },
+      })).unwrap().then(() => {
+        setToastMsg(`Vendor "${ven.name}" has been ${newStatus === 'Blocked' ? 'blocked' : 'unblocked'}.`);
+        setTimeout(() => setToastMsg(''), 4000);
+        if (selectedVendorDetail && (selectedVendorDetail._id === targetId || selectedVendorDetail.id === targetId)) {
+          setSelectedVendorDetail({ ...selectedVendorDetail, status: newStatus });
+        }
+        handleCloseConfirmModal();
+      }).catch(() => {
+        handleCloseConfirmModal();
+      });
+    } else if (confirmModal.type === 'delete') {
+      dispatch(deleteVendor(targetId))
+        .unwrap()
+        .then(() => {
+          setToastMsg(`Vendor "${ven.name}" deleted successfully.`);
+          setTimeout(() => setToastMsg(''), 4000);
+          if (selectedVendorDetail && (selectedVendorDetail._id === targetId || selectedVendorDetail.id === targetId)) {
+            setSelectedVendorDetail(null);
+          }
+          handleCloseConfirmModal();
+        }).catch(() => {
+          handleCloseConfirmModal();
+        });
+    }
   };
 
   // Handle Export CSV
@@ -303,7 +468,7 @@ function VendorDatabase({ compact = false }) {
             </p>
           </div>
 
-          {/* Action Buttons: Add Vendor, Import (Excel/CSV) & Export */}
+          {/* Action Buttons: Add Vendor */}
           {hasAccessPermission ? (
             <div className="flex items-center gap-2 flex-wrap">
               {/* Add Vendor Button */}
@@ -315,55 +480,6 @@ function VendorDatabase({ compact = false }) {
                 <UserPlus size={14} />
                 <span>+ Add Vendor</span>
               </button>
-
-              {/* Import Button */}
-              <button
-                onClick={() => setIsUploadModalOpen(true)}
-                className="px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-[#f26522] border border-orange-200 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                title="Import Excel or CSV File"
-              >
-                <Upload size={14} />
-                <span>Import (Excel/CSV)</span>
-              </button>
-
-              {/* Single Unified Export Button */}
-              <div className="relative" ref={exportDropdownRef}>
-                <button
-                  onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
-                  className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1.5"
-                  title="Export Vendor Data"
-                >
-                  <Download size={14} />
-                  <span>Export Data</span>
-                  <ChevronDown size={13} className="ml-0.5 text-slate-300" />
-                </button>
-
-                {isExportDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 animate-in fade-in duration-150">
-                    <button
-                      onClick={() => {
-                        handleExportCSV();
-                        setIsExportDropdownOpen(false);
-                      }}
-                      className="w-full px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-orange-50 hover:text-[#f26522] flex items-center gap-2 transition-colors cursor-pointer text-left"
-                    >
-                      <FileSpreadsheet size={15} className="text-[#f26522]" />
-                      <span>Export Excel (.csv)</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        handleExportPDF();
-                        setIsExportDropdownOpen(false);
-                      }}
-                      className="w-full px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-orange-50 hover:text-[#f26522] flex items-center gap-2 transition-colors cursor-pointer text-left"
-                    >
-                      <FileText size={15} className="text-slate-600" />
-                      <span>Export PDF Report</span>
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
           ) : (
             <div className="flex items-center gap-2 p-1.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-400 text-xs font-medium">
@@ -421,7 +537,7 @@ function VendorDatabase({ compact = false }) {
           ref={manualScrollRef}
           className="max-h-[320px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar"
         >
-          <table className="w-full min-w-[750px] text-left border-collapse">
+          <table className="w-full min-w-[880px] text-left border-collapse">
             <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs z-10">
               <tr className="border-b border-slate-100 text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                 <th className="py-2.5 px-3">SR. NO.</th>
@@ -432,12 +548,13 @@ function VendorDatabase({ compact = false }) {
                 <th className="py-2.5 px-3">STATE</th>
                 <th className="py-2.5 px-3">CITY</th>
                 <th className="py-2.5 px-3">STATUS</th>
+                <th className="py-2.5 px-3 text-center">ACTIONS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium">
               {filteredVendors.length > 0 ? (
                 filteredVendors.map((ven, idx) => (
-                  <tr key={ven.id} className="hover:bg-slate-50/60 transition-colors">
+                  <tr key={ven.id || ven._id || idx} className="hover:bg-slate-50/60 transition-colors">
                     <td className="py-3 px-3 font-bold text-slate-800">{String(idx + 1).padStart(2, '0')}</td>
                     <td className="py-3 px-3 font-bold text-[#f26522] font-mono text-[11px]">{ven.transNo || ven.id}</td>
                     
@@ -458,23 +575,72 @@ function VendorDatabase({ compact = false }) {
                     <td className="py-3 px-3 text-slate-600 font-medium">{ven.state}</td>
                     <td className="py-3 px-3 text-slate-600 font-medium">{ven.city}</td>
                     <td className="py-3 px-3">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleStatus(ven)}
-                        disabled={isSaving}
-                        className={`font-bold text-xs px-2.5 py-0.5 rounded-full border transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-left cursor-pointer ${
-                          ven.status === 'Active' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200'
+                      <span
+                        className={`font-bold text-xs px-2.5 py-0.5 rounded-full border inline-block ${
+                          ven.status === 'Active'
+                            ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                            : ven.status === 'Blocked'
+                            ? 'bg-rose-50 text-rose-600 border-rose-200'
+                            : 'bg-amber-50 text-amber-600 border-amber-200'
                         }`}
-                        title="Click to toggle status"
                       >
                         {ven.status}
-                      </button>
+                      </span>
+                    </td>
+
+                    {/* Actions Column: View, Edit, Block, Delete */}
+                    <td className="py-3 px-3 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {/* View Action */}
+                        <button
+                          type="button"
+                          onClick={() => setSelectedVendorDetail(ven)}
+                          title="View Details"
+                          className="p-1.5 rounded-lg text-slate-600 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+                        >
+                          <Eye size={13} />
+                        </button>
+
+                        {/* Edit Action */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEditModal(ven)}
+                          title="Edit Vendor"
+                          className="p-1.5 rounded-lg text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors cursor-pointer"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+
+                        {/* Block / Unblock Action */}
+                        <button
+                          type="button"
+                          onClick={() => handlePromptBlock(ven)}
+                          title={ven.status === 'Blocked' ? 'Unblock Vendor' : 'Block Vendor'}
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                            ven.status === 'Blocked'
+                              ? 'text-emerald-600 border-emerald-200 hover:bg-emerald-50'
+                              : 'text-amber-600 border-amber-200 hover:bg-amber-50'
+                          }`}
+                        >
+                          {ven.status === 'Blocked' ? <UserCheck size={13} /> : <Ban size={13} />}
+                        </button>
+
+                        {/* Delete Action */}
+                        <button
+                          type="button"
+                          onClick={() => handlePromptDelete(ven)}
+                          title="Delete Vendor"
+                          className="p-1.5 rounded-lg text-rose-600 border border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="8" className="py-6 text-center text-xs text-slate-400">
+                  <td colSpan="9" className="py-6 text-center text-xs text-slate-400">
                     No vendor records found matching search criteria.
                   </td>
                 </tr>
@@ -502,7 +668,10 @@ function VendorDatabase({ compact = false }) {
                 <h3 className="text-xs font-bold text-slate-800">Add New Vendor Record (Super Admin)</h3>
               </div>
               <button
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={() => {
+                  setIsAddModalOpen(false);
+                  setShowAddPassword(false);
+                }}
                 className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
               >
                 <X size={16} />
@@ -512,30 +681,6 @@ function VendorDatabase({ compact = false }) {
             {/* Form */}
             <form onSubmit={handleAddVendorSubmit} className="p-5 space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                {/* Sr. No. */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Sr. No.</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 06"
-                    value={newVendor.srNo}
-                    onChange={(e) => setNewVendor({ ...newVendor, srNo: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Trans No. */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Trans No.</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. TRX90106"
-                    value={newVendor.transNo}
-                    onChange={(e) => setNewVendor({ ...newVendor, transNo: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
                 {/* Vendor Name */}
                 <div className="col-span-2">
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">Vendor Name *</label>
@@ -562,14 +707,14 @@ function VendorDatabase({ compact = false }) {
                   />
                 </div>
 
-                {/* Contact Verification Date & Time */}
+                {/* Trans No. */}
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Verification Date & Time</label>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Trans No.</label>
                   <input
                     type="text"
-                    placeholder="e.g. 2026-07-31 10:30 AM"
-                    value={newVendor.verificationDateTime}
-                    onChange={(e) => setNewVendor({ ...newVendor, verificationDateTime: e.target.value })}
+                    placeholder="e.g. TRX90106"
+                    value={newVendor.transNo}
+                    onChange={(e) => setNewVendor({ ...newVendor, transNo: e.target.value })}
                     className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
                   />
                 </div>
@@ -582,6 +727,18 @@ function VendorDatabase({ compact = false }) {
                     placeholder="e.g. +91 98765 43210"
                     value={newVendor.contactNo}
                     onChange={(e) => setNewVendor({ ...newVendor, contactNo: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+
+                {/* Email Address */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="e.g. vendor@example.com"
+                    value={newVendor.email}
+                    onChange={(e) => setNewVendor({ ...newVendor, email: e.target.value })}
                     className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
                   />
                 </div>
@@ -622,13 +779,50 @@ function VendorDatabase({ compact = false }) {
                     <option value="Pending">Pending</option>
                   </select>
                 </div>
+
+                {/* Password */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showAddPassword ? "text" : "password"}
+                      placeholder="Enter vendor login password"
+                      value={newVendor.password}
+                      onChange={(e) => setNewVendor({ ...newVendor, password: e.target.value })}
+                      className="w-full px-3 py-1.5 pr-8 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAddPassword(!showAddPassword)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      title={showAddPassword ? "Hide password" : "Show password"}
+                    >
+                      {showAddPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Contact Verification Date & Time */}
+                <div className="col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Verification Date & Time</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2026-07-31 10:30 AM"
+                    value={newVendor.verificationDateTime}
+                    onChange={(e) => setNewVendor({ ...newVendor, verificationDateTime: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
               </div>
 
               {/* Modal Footer */}
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
+                  onClick={() => {
+                    setIsAddModalOpen(false);
+                    setShowAddPassword(false);
+                  }}
                   className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
                 >
                   Cancel
@@ -801,7 +995,13 @@ function VendorDatabase({ compact = false }) {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-base font-black tracking-tight">{selectedVendorDetail.name}</h3>
-                    <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40 uppercase">
+                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border uppercase ${
+                      selectedVendorDetail.status === 'Active'
+                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                        : selectedVendorDetail.status === 'Blocked'
+                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                        : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    }`}>
                       {selectedVendorDetail.status || 'Active'}
                     </span>
                   </div>
@@ -924,6 +1124,317 @@ function VendorDatabase({ compact = false }) {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* EDIT VENDOR MODAL ⭐ */}
+      {isEditModalOpen && editingVendor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Edit2 size={18} className="text-[#f26522]" />
+                <h3 className="text-xs font-bold text-slate-800">Edit Vendor Record</h3>
+              </div>
+              <button
+                onClick={() => {
+                  setIsEditModalOpen(false);
+                  setEditingVendor(null);
+                }}
+                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleEditVendorSubmit} className="p-5 space-y-3">
+              <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-1">
+                {/* Vendor Name */}
+                <div className="col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Vendor Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Zenith Traders Pvt Ltd"
+                    value={editingVendor.name}
+                    onChange={(e) => setEditingVendor({ ...editingVendor, name: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+
+                {/* Owner Name */}
+                <div className="col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Owner Name</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Rajesh Patel"
+                    value={editingVendor.ownerName}
+                    onChange={(e) => setEditingVendor({ ...editingVendor, ownerName: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+
+                {/* Category */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Category *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Electronics / Medical / Grocery"
+                    value={editingVendor.category}
+                    onChange={(e) => setEditingVendor({ ...editingVendor, category: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+
+                {/* Trans No. */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Trans No.</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. TRX90106"
+                    value={editingVendor.transNo}
+                    onChange={(e) => setEditingVendor({ ...editingVendor, transNo: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+
+                {/* Contact No. */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Contact No.</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. +91 98765 43210"
+                    value={editingVendor.contactNo}
+                    onChange={(e) => setEditingVendor({ ...editingVendor, contactNo: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+
+                {/* Email Address */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    placeholder="e.g. vendor@example.com"
+                    value={editingVendor.email}
+                    onChange={(e) => setEditingVendor({ ...editingVendor, email: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+
+                {/* State */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">State</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Maharashtra"
+                    value={editingVendor.state}
+                    onChange={(e) => setEditingVendor({ ...editingVendor, state: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+
+                {/* City */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">City</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Pune"
+                    value={editingVendor.city}
+                    onChange={(e) => setEditingVendor({ ...editingVendor, city: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Status</label>
+                  <select
+                    value={editingVendor.status}
+                    onChange={(e) => setEditingVendor({ ...editingVendor, status: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Pending">Pending</option>
+                    <option value="Blocked">Blocked</option>
+                  </select>
+                </div>
+
+                {/* GSTIN No */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">GSTIN / Tax No</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 27AAAAA0000A1Z5"
+                    value={editingVendor.gstNo}
+                    onChange={(e) => setEditingVendor({ ...editingVendor, gstNo: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+
+                {/* Pincode */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Pincode</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 440001"
+                    value={editingVendor.pincode}
+                    onChange={(e) => setEditingVendor({ ...editingVendor, pincode: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+
+                {/* Complete Address */}
+                <div className="col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Complete Address</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Shop No. 12, Main Commercial Complex, MG Road"
+                    value={editingVendor.address}
+                    onChange={(e) => setEditingVendor({ ...editingVendor, address: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setEditingVendor(null);
+                  }}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-5 py-2 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  <Check size={14} />
+                  <span>{isSaving ? 'Updating...' : 'Update Vendor'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION POPUP MODAL (FOR BLOCK & DELETE) ⭐ */}
+      {confirmModal.isOpen && confirmModal.vendor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className="p-6 text-center">
+              {/* Icon */}
+              <div className={`w-12 h-12 rounded-full mx-auto flex items-center justify-center mb-4 ${
+                confirmModal.type === 'delete'
+                  ? 'bg-rose-100 text-rose-600'
+                  : confirmModal.vendor.status === 'Blocked'
+                  ? 'bg-emerald-100 text-emerald-600'
+                  : 'bg-amber-100 text-amber-600'
+              }`}>
+                {confirmModal.type === 'delete' ? (
+                  <Trash2 size={24} />
+                ) : confirmModal.vendor.status === 'Blocked' ? (
+                  <UserCheck size={24} />
+                ) : (
+                  <Ban size={24} />
+                )}
+              </div>
+
+              {/* Title */}
+              <h3 className="text-base font-bold text-slate-900 mb-1">
+                {confirmModal.type === 'delete'
+                  ? 'Delete Vendor Record'
+                  : confirmModal.vendor.status === 'Blocked'
+                  ? 'Unblock Vendor'
+                  : 'Block Vendor'}
+              </h3>
+
+              {/* Description */}
+              <p className="text-xs text-slate-500 mb-4 px-2">
+                {confirmModal.type === 'delete' ? (
+                  <>
+                    Are you sure you want to delete vendor <strong className="text-slate-800 font-semibold">{confirmModal.vendor.name}</strong>? This action cannot be undone and will permanently remove this record.
+                  </>
+                ) : confirmModal.vendor.status === 'Blocked' ? (
+                  <>
+                    Are you sure you want to unblock vendor <strong className="text-slate-800 font-semibold">{confirmModal.vendor.name}</strong>? This vendor will regain full access to the portal.
+                  </>
+                ) : (
+                  <>
+                    Are you sure you want to block vendor <strong className="text-slate-800 font-semibold">{confirmModal.vendor.name}</strong>? This vendor will be restricted from accessing the portal.
+                  </>
+                )}
+              </p>
+
+              {/* Vendor Info Card */}
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-left text-xs mb-5 space-y-1.5">
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-400 font-medium">Vendor ID:</span>
+                  <span className="font-mono font-bold text-slate-700">{confirmModal.vendor.transNo || confirmModal.vendor.id}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-400 font-medium">Category:</span>
+                  <span className="font-semibold text-slate-700">{confirmModal.vendor.category}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-slate-400 font-medium">Current Status:</span>
+                  <span className="font-bold text-slate-800">{confirmModal.vendor.status}</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleCloseConfirmModal}
+                  disabled={isSaving}
+                  className="w-full py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAction}
+                  disabled={isSaving}
+                  className={`w-full py-2.5 px-4 text-xs font-bold text-white rounded-xl transition-colors cursor-pointer disabled:opacity-50 shadow-xs flex items-center justify-center gap-1.5 ${
+                    confirmModal.type === 'delete'
+                      ? 'bg-rose-600 hover:bg-rose-700'
+                      : confirmModal.vendor.status === 'Blocked'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
+                >
+                  {isSaving ? (
+                    <span>Processing...</span>
+                  ) : confirmModal.type === 'delete' ? (
+                    <>
+                      <Trash2 size={14} />
+                      <span>Yes, Delete</span>
+                    </>
+                  ) : confirmModal.vendor.status === 'Blocked' ? (
+                    <>
+                      <UserCheck size={14} />
+                      <span>Yes, Unblock</span>
+                    </>
+                  ) : (
+                    <>
+                      <Ban size={14} />
+                      <span>Yes, Block</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

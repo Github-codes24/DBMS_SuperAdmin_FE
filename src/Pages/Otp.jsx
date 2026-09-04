@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { ShieldCheck, ArrowRight, RefreshCw, KeyRound } from "lucide-react";
 import otpImg from "../assets/otp-illustration.png";
+import logo from "../assets/logo.png";
 
 function Otp() {
   const navigate = useNavigate();
@@ -52,17 +53,9 @@ function Otp() {
         {/* Left Side - OTP Card */}
         <div className="w-full max-w-[430px] bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl border border-orange-100 p-8 sm:p-10 flex flex-col items-center">
           
-          {/* Official LTS Logo Header matching user photo */}
-          <div className="flex items-center gap-2 mb-6 cursor-pointer group hover:scale-105 transition-transform" onClick={() => navigate("/")}>
-            <div className="flex items-center font-black text-2xl tracking-tight leading-none">
-              <span className="text-[#f26522]">LT</span>
-              <span className="text-[#f26522] font-black">$</span>
-            </div>
-            <div className="text-xl sm:text-2xl font-extrabold tracking-tight flex items-center gap-1 leading-none">
-              <span className="text-[#f26522]">Local</span>
-              <span className="text-slate-900 font-black">Trade</span>
-              <span className="text-[#f26522]">Street</span>
-            </div>
+          {/* Official LTS Logo Header */}
+          <div className="flex items-center justify-center mb-6 cursor-pointer group hover:scale-105 transition-transform" onClick={() => navigate("/")}>
+            <img src={logo} alt="Local Trade Street" className="h-9 sm:h-10 w-auto object-contain" />
           </div>
 
           {/* Form */}

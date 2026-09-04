@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Eye, EyeOff, Lock, CheckCircle2, ShieldCheck } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import resetImg from "../assets/reset.png";
+import logo from "../assets/logo.png";
 
 function Reset() {
   const navigate = useNavigate();
@@ -51,20 +52,12 @@ function Reset() {
         {/* Left Side: Reset Password Form Card */}
         <div className="w-full max-w-[430px] bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl border border-orange-100 p-8 sm:p-10 flex flex-col items-center">
           
-          {/* Official LTS Logo Header matching user photo */}
+          {/* Official LTS Logo Header */}
           <div
-            className="flex items-center gap-2 mb-6 cursor-pointer group hover:scale-105 transition-transform"
+            className="flex items-center justify-center mb-6 cursor-pointer group hover:scale-105 transition-transform"
             onClick={() => navigate("/")}
           >
-            <div className="flex items-center font-black text-2xl tracking-tight leading-none">
-              <span className="text-[#f26522]">LT</span>
-              <span className="text-[#f26522] font-black">$</span>
-            </div>
-            <div className="text-xl sm:text-2xl font-extrabold tracking-tight flex items-center gap-1 leading-none">
-              <span className="text-[#f26522]">Local</span>
-              <span className="text-slate-900 font-black">Trade</span>
-              <span className="text-[#f26522]">Street</span>
-            </div>
+            <img src={logo} alt="Local Trade Street" className="h-9 sm:h-10 w-auto object-contain" />
           </div>
 
           <div className="w-full text-center">
