@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchUsers, createUser, updateUser, deleteUser } from '../redux/slices/userSlice';
+import { formatPhoneNumber } from '../utils/phoneFormatter';
 import { 
   Plus, 
   Search, 
@@ -78,11 +79,13 @@ function UserManagement() {
 
   // Filtered Users
   const filteredUsers = users.filter((user) => {
+    const formattedPhone = formatPhoneNumber(user.phone);
     const matchesSearch = 
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.userId.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.phone.includes(searchTerm);
+      user.phone.includes(searchTerm) ||
+      formattedPhone.includes(searchTerm);
     const matchesRole = roleFilter === 'All' || user.role === roleFilter;
     const matchesStatus = statusFilter === 'All' || user.status === statusFilter;
 
@@ -254,7 +257,7 @@ function UserManagement() {
       <div className="bg-white/90 backdrop-blur-md p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row gap-4 justify-between items-center">
         
         {/* Search Input */}
-        <div className="relative w-full md:w-80">
+        <div className="relative flex-1 w-full md:max-w-xl lg:max-w-2xl">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
           <input
             type="text"
@@ -266,7 +269,7 @@ function UserManagement() {
         </div>
 
         {/* Dropdown Filters */}
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto shrink-0">
           <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold uppercase tracking-wider">
             <Filter size={14} className="text-[#f26522]" />
             <span>Filters:</span>
@@ -389,7 +392,7 @@ function UserManagement() {
                     <td className="py-3.5 px-4 text-slate-700 font-bold">
                       <div className="flex items-center gap-1.5">
                         <Phone size={13} className="text-slate-400 shrink-0" />
-                        <span>{user.phone}</span>
+                        <span>{formatPhoneNumber(user.phone)}</span>
                       </div>
                     </td>
 

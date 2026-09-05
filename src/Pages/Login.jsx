@@ -6,6 +6,8 @@ import { Eye, EyeOff, AlertCircle, Lock, Mail, ShieldCheck, ArrowRight, CheckCir
 import homeImg from "../assets/home.png";
 import logo from "../assets/logo.png";
 
+const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9]+([.-][a-zA-Z0-9]+)*\.[a-zA-Z]{2,}$/;
+
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,6 +19,8 @@ function Login() {
   const [rememberMe, setRememberMe] = useState(false);
   const [role, setRole] = useState("Super Admin");
   const [noticeMessage, setNoticeMessage] = useState(location.state?.message || "");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
 
   const { loading, error } = useSelector((state) => state.auth);
   const isLoading = loading;
@@ -33,11 +37,65 @@ function Login() {
     }
   }, [error]);
 
+  const validateEmailFormat = (val) => {
+    const trimmed = (val || "").trim();
+    if (!trimmed) {
+      return "Email address is required.";
+    }
+    if (!EMAIL_REGEX.test(trimmed)) {
+      return "Please enter a valid email address.";
+    }
+    return "";
+  };
+
+  const handleEmailChange = (e) => {
+    const val = e.target.value;
+    setEmail(val);
+    if (noticeMessage) setNoticeMessage("");
+    if (emailError) {
+      setEmailError(validateEmailFormat(val));
+    }
+  };
+
+  const handleEmailBlur = () => {
+    if (email.trim()) {
+      setEmailError(validateEmailFormat(email));
+    }
+  };
+
+  const handlePasswordChange = (e) => {
+    const val = e.target.value;
+    setPassword(val);
+    if (noticeMessage) setNoticeMessage("");
+    if (passwordError && val) {
+      setPasswordError("");
+    }
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!email || !password) return;
 
-    dispatch(loginAdmin({ email, password }))
+    const emailErr = validateEmailFormat(email);
+    const passwordErr = !password ? "Password is required." : "";
+
+    if (emailErr) {
+      setEmailError(emailErr);
+    } else {
+      setEmailError("");
+    }
+
+    if (passwordErr) {
+      setPasswordError(passwordErr);
+    } else {
+      setPasswordError("");
+    }
+
+    if (emailErr || passwordErr) {
+      return;
+    }
+
+    const trimmedEmail = email.trim();
+    dispatch(loginAdmin({ email: trimmedEmail, password }))
       .unwrap()
       .then(() => {
         navigate("/dashboard", { replace: true });
@@ -93,35 +151,48 @@ function Login() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="w-full space-y-4 text-left">
+            <form onSubmit={handleSubmit} noValidate className="w-full space-y-4 text-left">
               {/* Email Address */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
                 <div className="relative">
-                  <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Mail size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${emailError ? "text-rose-400" : "text-slate-400"}`} />
                   <input
                     type="email"
-                    required
                     placeholder="Enter email address"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 transition-all font-medium"
+                    onChange={handleEmailChange}
+                    onBlur={handleEmailBlur}
+                    className={`w-full pl-10 pr-4 py-3 text-xs sm:text-sm bg-slate-50 border rounded-xl text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all font-medium ${
+                      emailError
+                        ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+                        : "border-slate-200 focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20"
+                    }`}
                   />
                 </div>
+                {emailError && (
+                  <p className="mt-1.5 text-xs font-semibold text-rose-600 flex items-center gap-1.5 animate-in fade-in">
+                    <AlertCircle size={14} className="shrink-0 text-rose-500" />
+                    <span>{emailError}</span>
+                  </p>
+                )}
               </div>
 
               {/* Password */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
                 <div className="relative">
-                  <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <Lock size={16} className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${passwordError ? "text-rose-400" : "text-slate-400"}`} />
                   <input
                     type={showPassword ? "text" : "password"}
-                    required
                     placeholder="Enter password"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pl-10 pr-11 py-3 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 transition-all font-medium"
+                    onChange={handlePasswordChange}
+                    className={`w-full pl-10 pr-11 py-3 text-xs sm:text-sm bg-slate-50 border rounded-xl text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all font-medium ${
+                      passwordError
+                        ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
+                        : "border-slate-200 focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20"
+                    }`}
                   />
                   <button
                     type="button"
@@ -131,6 +202,12 @@ function Login() {
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                {passwordError && (
+                  <p className="mt-1.5 text-xs font-semibold text-rose-600 flex items-center gap-1.5 animate-in fade-in">
+                    <AlertCircle size={14} className="shrink-0 text-rose-500" />
+                    <span>{passwordError}</span>
+                  </p>
+                )}
               </div>
 
               {/* Remember Me & Forgot Password */}
@@ -184,11 +261,11 @@ function Login() {
           </div>
 
           {/* Floating Badge */}
-          <div className="mt-4 bg-white/90 backdrop-blur-md px-5 py-2.5 rounded-2xl shadow-xl border border-orange-100 flex items-center gap-3">
-            <ShieldCheck size={22} className="text-[#f26522]" />
+          <div className="mt-4 bg-white/90 backdrop-blur-md px-5 py-3 rounded-2xl shadow-xl border border-orange-100 flex items-center gap-3.5">
+            <ShieldCheck size={24} className="text-[#f26522] shrink-0" />
             <div className="text-left">
-              <div className="text-xs font-bold text-slate-800">LTS Verified Enterprise Portal</div>
-              <div className="text-[10px] text-slate-500 font-medium">100% Encrypted & Authenticated Suite</div>
+              <div className="text-sm font-bold text-slate-800">LTS Verified Enterprise Portal</div>
+              <div className="text-xs text-slate-500 font-medium mt-0.5">100% Encrypted & Authenticated Suite</div>
             </div>
           </div>
         </div>
