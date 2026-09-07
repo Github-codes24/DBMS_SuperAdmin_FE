@@ -110,7 +110,10 @@ const initialState = {
     pendingQueries: 0,
     vendorActivity: 0,
     onlineUsers: 0,
-    pendingVendorPayment: "No Pending Payments"
+    pendingVendorPayment:  {
+      count: 0,
+      totalAmount: 0
+    }
   },
   states: [],
   categories: [],

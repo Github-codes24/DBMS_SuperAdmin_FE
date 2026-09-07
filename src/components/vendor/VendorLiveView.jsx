@@ -1,4 +1,4 @@
-import React from 'react';
+import React,{useState} from 'react';
 import { VendorTopNav } from './VendorTopNav';
 import { VendorSidebar } from './VendorSidebar';
 import { VendorLogin } from './screens/VendorLogin';
@@ -13,14 +13,22 @@ import { ProfileSettings } from './screens/ProfileSettings';
 import { Notifications } from './screens/Notifications';
 import { HelpSupport } from './screens/HelpSupport';
 import { VendorLogout } from './screens/VendorLogout';
+import { SearchResults } from './screens/SearchResults';
 
 export const VendorLiveView = ({ activeFlowItem, setActiveFlowItem, onLogout }) => {
+    const [searchQuery, setSearchQuery] = useState('');
+      const [selectedFY, setSelectedFY] = useState('FY 2026-2027');
+
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    setActiveFlowItem('13 Search Results');
+  };
   const renderCurrentScreen = () => {
     switch (activeFlowItem) {
       case '01 Vendor Login':
         return <VendorLogin onLoginSuccess={() => setActiveFlowItem('02 Vendor Dashboard')} />;
       case '02 Vendor Dashboard':
-        return <VendorDashboard onNavigate={(screen) => setActiveFlowItem(screen)} />;
+        return <VendorDashboard onNavigate={(screen) => setActiveFlowItem(screen)}  fiscalYear={selectedFY} />;
       case '03 My Products':
         return <MyProducts onAddProductClick={() => setActiveFlowItem('04 Add Product')} />;
       case '04 Add Product':
@@ -53,6 +61,14 @@ export const VendorLiveView = ({ activeFlowItem, setActiveFlowItem, onLogout }) 
             }}
           />
         );
+
+         case '13 Search Results':
+        return (
+          <SearchResults
+            query={searchQuery}
+            onBack={() => setActiveFlowItem('02 Vendor Dashboard')}
+          />
+        );
       default:
         return <VendorDashboard onNavigate={(screen) => setActiveFlowItem(screen)} />;
     }
@@ -61,7 +77,20 @@ export const VendorLiveView = ({ activeFlowItem, setActiveFlowItem, onLogout }) 
   return (
     <div className="bg-[#F8FAFC] min-h-screen flex flex-col font-sans">
       {/* Top Navbar Header */}
-      <VendorTopNav
+      {/* <VendorTopNav
+        onNotificationClick={() => setActiveFlowItem('10 Notifications')}
+        onLoginClick={() => setActiveFlowItem('01 Vendor Login')}
+        onLogoutClick={() => {
+          if (onLogout) onLogout();
+          else setActiveFlowItem('12 Logout');
+        }}
+      /> */}
+
+            <VendorTopNav
+        onNavigate={(screen) => setActiveFlowItem(screen)}
+        onSearch={handleSearch}
+        selectedFY={selectedFY}
+        onFYChange={setSelectedFY}
         onNotificationClick={() => setActiveFlowItem('10 Notifications')}
         onLoginClick={() => setActiveFlowItem('01 Vendor Login')}
         onLogoutClick={() => {

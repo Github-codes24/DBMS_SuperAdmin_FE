@@ -25,7 +25,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 
-export const VendorDashboard = ({ onNavigate }) => {
+export const VendorDashboard = ({ onNavigate , fiscalYear }) => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const {
@@ -61,10 +61,12 @@ export const VendorDashboard = ({ onNavigate }) => {
 
   // 1. Fetch Dashboard Stats, Cascade Data, & Recent Orders on mount
   useEffect(() => {
-    dispatch(fetchDashboardStats());
-    dispatch(fetchCascadeData());
-    dispatch(fetchRecentOrders());
-  }, [dispatch]);
+    dispatch(fetchDashboardStats(fiscalYear ));
+    // dispatch(fetchCascadeData());
+    dispatch(fetchRecentOrders(fiscalYear ));
+  }, [dispatch,fiscalYear ]);
+
+  
 
   // Sync initial selection once data arrives
   useEffect(() => {
@@ -514,28 +516,52 @@ export const VendorDashboard = ({ onNavigate }) => {
         </div>
 
         {/* Card 4: Pending Vendor Payment Card matching screenshot */}
+        
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between space-y-6">
           <div className="flex items-center justify-between">
             <span className="text-xs font-black uppercase text-[#172033] tracking-wide">
               PENDING VENDOR PAYMENT
             </span>
-            <span className="bg-[#E6F4EA] text-[#137333] font-extrabold text-xs px-3 py-1 rounded-full border border-emerald-200/80">
-              {stats?.pendingVendorPayment === 'No Pending Payments' ? 'Up to date' : 'Updated'}
-            </span>
+            {statsLoading ? (
+              <Loader2 className="w-4 h-4 animate-spin text-orange-500" />
+            ) : (stats?.pendingVendorPayment?.count ?? 0) === 0 ? (
+              <span className="bg-[#E6F4EA] text-[#137333] font-extrabold text-xs px-3 py-1 rounded-full border border-emerald-200/80">
+                Up to date
+              </span>
+            ) : (
+              <span className="bg-amber-50 text-amber-700 font-extrabold text-xs px-3 py-1 rounded-full border border-amber-200">
+                Action Needed
+              </span>
+            )}
           </div>
 
           <div className="flex flex-col items-center justify-center text-center space-y-3 my-auto py-8">
             <div className="w-16 h-16 bg-[#F1F5F9] rounded-2xl flex items-center justify-center text-slate-400 border border-slate-200">
               <Layers className="w-8 h-8 text-slate-400 opacity-80" />
             </div>
-            <h4 className="text-sm font-extrabold text-[#172033]">
-              {stats?.pendingVendorPayment || 'No Pending Payments'}
-            </h4>
-            <p className="text-xs text-slate-400 font-medium max-w-[200px] leading-relaxed">
-              {stats?.pendingVendorPayment === 'No Pending Payments'
-                ? 'All vendor payouts & invoices are cleared.'
-                : 'Payout status provided by backend.'}
-            </p>
+
+            {statsLoading ? (
+              <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+            ) : (stats?.pendingVendorPayment?.count ?? 0) === 0 ? (
+              <>
+                <h4 className="text-sm font-extrabold text-[#172033]">No Pending Payments</h4>
+                <p className="text-xs text-slate-400 font-medium max-w-[200px] leading-relaxed">
+                  All vendor payouts & invoices are cleared.
+                </p>
+              </>
+            ) : (
+              <>
+                <h4 className="text-2xl font-black text-[#172033]">
+                  ₹{Number(stats.pendingVendorPayment.totalAmount || 0).toLocaleString('en-IN')}
+                </h4>
+                <p className="text-xs text-slate-500 font-semibold">
+                  Owed to {stats.pendingVendorPayment.count} vendor{stats.pendingVendorPayment.count === 1 ? '' : 's'}
+                </p>
+                <p className="text-xs text-slate-400 font-medium max-w-[200px] leading-relaxed">
+                  Review and clear payouts to keep vendors active.
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>

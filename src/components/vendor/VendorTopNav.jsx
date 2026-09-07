@@ -19,13 +19,13 @@ import {
 } from 'lucide-react';
 import { vendorInfo, platformInfo } from '@/data/vendorMockData';
 
-export const VendorTopNav = ({ onLoginClick, onNavigate, onLogoutClick }) => {
+export const VendorTopNav = ({ onLoginClick, onNavigate, onLogoutClick,onSearch, selectedFY, onFYChange  }) => {
   const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector((state) => state.auth);
   const { notifications, unreadCount } = useSelector((state) => state.notifications);
 
   // Fiscal Year Selector State
-  const [selectedFY, setSelectedFY] = useState('FY 2026-2027');
+  // const [selectedFY, setSelectedFY] = useState('FY 2026-2027');
   const [fyMenuOpen, setFyMenuOpen] = useState(false);
   const fyDropdownRef = useRef(null);
 
@@ -49,6 +49,11 @@ export const VendorTopNav = ({ onLoginClick, onNavigate, onLogoutClick }) => {
 
   const handleMarkAllRead = () => {
     dispatch(markAllNotificationsAsRead());
+  };
+   const handleSearch = () => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length === 0) return;
+    if (onSearch) onSearch(trimmed);
   };
 
   // Click outside listener
@@ -89,7 +94,7 @@ export const VendorTopNav = ({ onLoginClick, onNavigate, onLogoutClick }) => {
       </div>
 
       {/* Global Search Bar (Middle-Left) */}
-      <div className="hidden md:flex items-center relative max-w-xs w-full mx-4">
+      {/* <div className="hidden md:flex items-center relative max-w-xs w-full mx-4">
         <Search className="w-4 h-4 text-orange-200 absolute left-3 pointer-events-none" />
         <input
           type="text"
@@ -97,6 +102,30 @@ export const VendorTopNav = ({ onLoginClick, onNavigate, onLogoutClick }) => {
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Global Search (Orders, Products, Customers)..."
           className="w-full pl-9 pr-3 py-1.5 bg-orange-600/50 hover:bg-orange-600 focus:bg-white text-white focus:text-[#172033] placeholder-orange-200 focus:placeholder-slate-400 rounded-full text-xs font-medium focus:outline-none focus:ring-2 focus:ring-white transition-all border border-orange-400/40"
+        />
+      </div> */}
+
+            <div className="hidden md:flex items-center relative max-w-xs w-full mx-4">
+        <button
+          type="button"
+          onClick={handleSearch}
+          aria-label="Search"
+        //   className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#F97316] cursor-pointer"
+        // >
+        className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-200 hover:text-white cursor-pointer"
+        >
+          <Search className="w-4 h-4" />
+        </button>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleSearch();
+          }}
+          placeholder="Global Search (Orders, Products, Customers)..."
+          // className="w-full pl-9 pr-3 py-1.5 bg-white text-[#172033] placeholder-slate-400 rounded-full text-xs font-medium focus:outline-none focus:ring-2 focus:ring-white/70 transition-all border border-white/60 shadow-sm"
+                    className="w-full pl-9 pr-3 py-1.5 bg-orange-600/50 hover:bg-orange-600 focus:bg-orange-600 text-white placeholder-orange-200 rounded-full text-xs font-medium focus:outline-none focus:ring-2 focus:ring-white transition-all border border-orange-400/40"
         />
       </div>
 
@@ -125,7 +154,7 @@ export const VendorTopNav = ({ onLoginClick, onNavigate, onLogoutClick }) => {
                   <button
                     key={fy}
                     onClick={() => {
-                      setSelectedFY(fy);
+                      onFYChange(fy);
                       setFyMenuOpen(false);
                     }}
                     className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold flex items-center justify-between transition-colors ${
