@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
+import * as XLSX from 'xlsx';
+import axios from 'axios';
+import { State, City } from 'country-state-city';
 import api from '../services/api';
 import { 
   fetchCustomers, 
@@ -8,7 +11,24 @@ import {
   updateCustomer, 
   bulkImportCustomers 
 } from '../redux/slices/customerSlice';
-import { Search, Download, Lock, FileSpreadsheet, FileText, Upload, X, Check, FileDown, UserPlus, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import { 
+  Search, 
+  Download, 
+  Lock, 
+  FileSpreadsheet, 
+  FileText, 
+  Upload, 
+  X, 
+  Check, 
+  FileDown, 
+  UserPlus, 
+  Plus, 
+  ChevronUp, 
+  ChevronDown,
+  AlertCircle,
+  Info,
+  Loader2
+} from 'lucide-react';
 
 function CustomerDatabase({ compact = false }) {
   const dispatch = useDispatch();
@@ -44,16 +64,107 @@ function CustomerDatabase({ compact = false }) {
     mobile: '',
   });
 
-  // Bulk Upload Modal State
+  // Step 1: Import Customers Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  const [uploadedFile, setUploadedFile] = useState(null);
-  const [previewData, setPreviewData] = useState([]);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [fileError, setFileError] = useState('');
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const fileInputRef = useRef(null);
+
+  // Step 1: Dependent Dropdown States (Category, Sub-Category, State, City)
+  const [categories, setCategories] = useState([]);
+  const [allSubCategories, setAllSubCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
+  const [catsLoading, setCatsLoading] = useState(false);
+  const [subCatsLoading, setSubCatsLoading] = useState(false);
+
+  const [selectedCatId, setSelectedCatId] = useState('');
+  const [selectedCatName, setSelectedCatName] = useState('');
+  const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
+  const [catSearch, setCatSearch] = useState('');
+
+  const [selectedSubCatId, setSelectedSubCatId] = useState('');
+  const [selectedSubCatName, setSelectedSubCatName] = useState('');
+  const [isSubCatDropdownOpen, setIsSubCatDropdownOpen] = useState(false);
+  const [subCatSearch, setSubCatSearch] = useState('');
+
+  const [allStates] = useState(() => State.getStatesOfCountry('IN') || []);
+  const [selectedState, setSelectedState] = useState('');
+  const [selectedStateCode, setSelectedStateCode] = useState('');
+  const [isStateDropdownOpen, setIsStateDropdownOpen] = useState(false);
+  const [stateSearch, setStateSearch] = useState('');
+
+  const [cities, setCities] = useState([]);
+  const [selectedCity, setSelectedCity] = useState('');
+  const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
+  const [citySearch, setCitySearch] = useState('');
+
+  const catDropdownRef = useRef(null);
+  const subCatDropdownRef = useRef(null);
+  const stateDropdownRef = useRef(null);
+  const cityDropdownRef = useRef(null);
+
+  // Step 2: Import Review & Preview Modal State
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewStats, setReviewStats] = useState({ total: 0, newCount: 0, duplicateCount: 0, invalidCount: 0 });
+  const [reviewRecords, setReviewRecords] = useState([]);
   const [isImporting, setIsImporting] = useState(false);
 
   // Export Dropdown State
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const exportDropdownRef = useRef(null);
+
+  // Load categories and subcategories when upload modal opens
+  useEffect(() => {
+    if (isUploadModalOpen && categories.length === 0) {
+      setCatsLoading(true);
+      setSubCatsLoading(true);
+      Promise.all([
+        axios.get('https://local-trade-street-be-2.onrender.com/api/admin/category/getAllCategories?limit=1000')
+          .then((res) => {
+            const list = Array.isArray(res.data?.data) ? res.data.data : [];
+            setCategories(list);
+          })
+          .catch((err) => {
+            console.error('Failed to load categories:', err);
+          })
+          .finally(() => setCatsLoading(false)),
+        axios.get('https://local-trade-street-be-2.onrender.com/api/admin/subCategory/getAllSubCategories?limit=1000')
+          .then((res) => {
+            const list = Array.isArray(res.data?.data) ? res.data.data : [];
+            setAllSubCategories(list);
+          })
+          .catch((err) => {
+            console.error('Failed to load subcategories:', err);
+          })
+          .finally(() => setSubCatsLoading(false)),
+      ]);
+    }
+  }, [isUploadModalOpen, categories.length]);
+
+  // Click outside listener for all dropdowns
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (catDropdownRef.current && !catDropdownRef.current.contains(e.target)) {
+        setIsCatDropdownOpen(false);
+      }
+      if (subCatDropdownRef.current && !subCatDropdownRef.current.contains(e.target)) {
+        setIsSubCatDropdownOpen(false);
+      }
+      if (stateDropdownRef.current && !stateDropdownRef.current.contains(e.target)) {
+        setIsStateDropdownOpen(false);
+      }
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(e.target)) {
+        setIsCityDropdownOpen(false);
+      }
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target)) {
+        setIsExportDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Role Access Check: Only Super Admin and Admin have access
   const userRole = (localStorage.getItem('userRole') || 'Super Admin').trim();
@@ -188,12 +299,21 @@ function CustomerDatabase({ compact = false }) {
     }
   };
 
+  // Format File Size
+  const formatFileSize = (bytes) => {
+    if (!bytes && bytes !== 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  };
+
   // Download Sample CSV Import Template
   const handleDownloadSampleTemplate = () => {
-    const sampleHeaders = ['Sr No', 'ID', 'Name', 'Company Name', 'State', 'City', 'Pincode', 'Registration Date', 'Status', 'Telecaller'];
+    const sampleHeaders = ['Sr No', 'ID', 'Name', 'Company Name', 'Email', 'Mobile', 'State', 'City', 'Pincode', 'Registration Date', 'Status', 'Telecaller'];
     const sampleRows = [
-      ['06', 'CUST006', 'Global Logistics', 'Global Logistics Ltd', 'Maharashtra', 'Pune', '411001', '2026-06-15', 'Active', 'TC014'],
-      ['07', 'CUST007', 'Prime Pharma', 'Prime Pharma Pvt Ltd', 'Gujarat', 'Surat', '395001', '2026-07-01', 'Pending', 'TC021'],
+      ['01', 'CUST001', 'Global Logistics', 'Global Logistics Ltd', 'info@globallogistics.com', '9876543210', 'Maharashtra', 'Pune', '411001', '2026-06-15', 'Active', 'TC014'],
+      ['02', 'CUST002', 'Prime Pharma', 'Prime Pharma Pvt Ltd', 'contact@primepharma.com', '9876543211', 'Gujarat', 'Surat', '395001', '2026-07-01', 'Pending', 'TC021'],
     ];
 
     const csvContent =
@@ -208,65 +328,384 @@ function CustomerDatabase({ compact = false }) {
     document.body.removeChild(link);
   };
 
-  // Process File Upload
-  const handleFileSelect = (file) => {
+  // Validate and store selected file
+  const validateAndSetFile = (file) => {
     if (!file) return;
-    setUploadedFile(file);
+    setFileError('');
+
+    const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
+    if (!validExtensions.includes(ext)) {
+      setFileError('Invalid file type. Please upload an Excel (.xlsx, .xls) or CSV (.csv) file.');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const maxSizeBytes = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSizeBytes) {
+      setFileError('File size exceeds the 10MB limit.');
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setSelectedFile(file);
+  };
+
+  // Handle Category selection
+  const handleSelectCategory = (cat) => {
+    const catId = cat._id || cat.id || '';
+    const catName = cat.name || cat.categoryName || cat.category || '';
+    setSelectedCatId(catId);
+    setSelectedCatName(catName);
+    setIsCatDropdownOpen(false);
+    setCatSearch('');
+
+    // Reset Sub-Category
+    setSelectedSubCatId('');
+    setSelectedSubCatName('');
+    setSubCatSearch('');
+    setFileError('');
+
+    // Filter subcategories belonging to this category
+    const filtered = allSubCategories.filter((sc) => {
+      const parentId = sc.categoryId || sc.categoryName?._id || sc.categoryName;
+      const parentName = sc.categoryName?.name || sc.parentCategory || sc.category;
+      if (catId && parentId && String(parentId) === String(catId)) return true;
+      if (catName && parentName && String(parentName).trim().toLowerCase() === catName.trim().toLowerCase()) return true;
+      return false;
+    });
+    setSubCategories(filtered);
+  };
+
+  // Handle Sub-Category selection
+  const handleSelectSubCategory = (sc) => {
+    const subId = sc._id || sc.id || '';
+    const subName = sc.name || sc.subCategoryName || '';
+    setSelectedSubCatId(subId);
+    setSelectedSubCatName(subName);
+    setIsSubCatDropdownOpen(false);
+    setSubCatSearch('');
+    setFileError('');
+  };
+
+  // Handle State selection
+  const handleSelectState = (st) => {
+    setSelectedState(st.name);
+    setSelectedStateCode(st.isoCode);
+    setIsStateDropdownOpen(false);
+    setStateSearch('');
+
+    // Reset City
+    setSelectedCity('');
+    setCitySearch('');
+    setFileError('');
+
+    // Populate cities for this state
+    try {
+      const stateCities = City.getCitiesOfState('IN', st.isoCode) || [];
+      setCities(stateCities);
+    } catch (err) {
+      console.error('Error getting cities:', err);
+      setCities([]);
+    }
+  };
+
+  // Handle City selection
+  const handleSelectCity = (ct) => {
+    setSelectedCity(ct.name);
+    setIsCityDropdownOpen(false);
+    setCitySearch('');
+    setFileError('');
+  };
+
+  // Reset all import modal inputs and dropdowns
+  const resetImportStates = () => {
+    setSelectedCatId('');
+    setSelectedCatName('');
+    setIsCatDropdownOpen(false);
+    setCatSearch('');
+
+    setSelectedSubCatId('');
+    setSelectedSubCatName('');
+    setIsSubCatDropdownOpen(false);
+    setSubCatSearch('');
+    setSubCategories([]);
+
+    setSelectedState('');
+    setSelectedStateCode('');
+    setIsStateDropdownOpen(false);
+    setStateSearch('');
+
+    setSelectedCity('');
+    setIsCityDropdownOpen(false);
+    setCitySearch('');
+    setCities([]);
+
+    setSelectedFile(null);
+    setFileError('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  // Step 1: Process and validate file without importing into database
+  const handleProcessUploadFile = () => {
+    if (!selectedCatName) {
+      setFileError('Please select a category.');
+      return;
+    }
+    if (!selectedSubCatName) {
+      setFileError('Please select a sub-category.');
+      return;
+    }
+    if (!selectedState) {
+      setFileError('Please select a state.');
+      return;
+    }
+    if (!selectedCity) {
+      setFileError('Please select a city.');
+      return;
+    }
+    if (!selectedFile) {
+      setFileError('Please select an Excel or CSV file.');
+      return;
+    }
+
+    setIsProcessingFile(true);
+    setFileError('');
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      const text = e.target.result;
-      const lines = text.split('\n').filter((line) => line.trim() !== '');
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        if (!sheetName) {
+          setFileError('The file does not contain any readable sheets.');
+          setIsProcessingFile(false);
+          return;
+        }
 
-      const parsed = [];
-      for (let i = 1; i < lines.length; i++) {
-        const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
-        if (cols.length >= 2) {
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+        if (!json || json.length === 0) {
+          setFileError('The uploaded file contains no data rows.');
+          setIsProcessingFile(false);
+          return;
+        }
+
+        // Helper to extract fields using regex
+        const getField = (row, patterns) => {
+          const keys = Object.keys(row);
+          for (const pat of patterns) {
+            const found = keys.find((k) => pat.test(k.trim()));
+            if (found && row[found] !== undefined && row[found] !== null && String(row[found]).trim() !== '') {
+              return String(row[found]).trim();
+            }
+          }
+          return '';
+        };
+
+        // Existing customer uniqueness sets
+        const existingIds = new Set(
+          customers.map((c) => String(c.id || '').trim().toLowerCase()).filter(Boolean)
+        );
+        const existingEmails = new Set(
+          customers.map((c) => String(c.email || '').trim().toLowerCase()).filter((e) => e && e !== '-')
+        );
+        const existingPhones = new Set(
+          customers.map((c) => String(c.mobile || '').replace(/\D/g, '').slice(-10)).filter((p) => p.length === 10)
+        );
+
+        // Sets to detect duplicates within the file itself
+        const seenFileIds = new Set();
+        const seenFileEmails = new Set();
+        const seenFilePhones = new Set();
+
+        const parsed = [];
+
+        for (let idx = 0; idx < json.length; idx++) {
+          const row = json[idx];
+          const name = getField(row, [/^customer\s*name$/i, /^name$/i, /^client\s*name$/i, /name/i]);
+          const companyName = getField(row, [/^company\s*name$/i, /^company$/i, /^business\s*name$/i, /^business$/i, /company/i]);
+          const email = getField(row, [/^email\s*(address|id)?$/i, /^mail$/i, /email/i]);
+          const mobile = getField(row, [/^phone\s*(number)?$/i, /^mobile\s*(number)?$/i, /^contact\s*(number)?$/i, /mobile/i, /phone/i, /contact/i]);
+          const state = getField(row, [/^state$/i]);
+          const city = getField(row, [/^city$/i]);
+          const pincode = getField(row, [/^pin\s*code$/i, /^pincode$/i, /^zip\s*(code)?$/i]);
+          const customerId = getField(row, [/^customer\s*id$/i, /^cust\s*id$/i, /^id$/i]);
+          const status = getField(row, [/^status$/i]) || 'Active';
+          const telecaller = getField(row, [/^assigned\s*telecaller$/i, /^telecaller$/i, /^caller$/i]) || 'TC014';
+
+          const cleanPhone = mobile.replace(/\D/g, '');
+          const cleanPhone10 = cleanPhone.slice(-10);
+          const lowerEmail = email.toLowerCase();
+          const lowerId = customerId.toLowerCase();
+
+          let recordStatus = 'NEW';
+          let reason = 'Ready to import';
+
+          // 1. Check for INVALID: required fields & format
+          if (!name && !companyName) {
+            recordStatus = 'INVALID';
+            reason = 'Missing Customer Name and Company Name';
+          } else if (!name) {
+            recordStatus = 'INVALID';
+            reason = 'Missing required Customer Name';
+          } else if (!companyName) {
+            recordStatus = 'INVALID';
+            reason = 'Missing required Company Name';
+          } else if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            recordStatus = 'INVALID';
+            reason = 'Invalid email address format';
+          } else if (mobile && cleanPhone10.length > 0 && cleanPhone10.length < 10) {
+            recordStatus = 'INVALID';
+            reason = 'Invalid phone number (must be at least 10 digits)';
+          }
+
+          // 2. Check for DUPLICATE (if not invalid)
+          if (recordStatus !== 'INVALID') {
+            const isDbDuplicate =
+              (lowerId && existingIds.has(lowerId)) ||
+              (lowerEmail && existingEmails.has(lowerEmail)) ||
+              (cleanPhone10.length === 10 && existingPhones.has(cleanPhone10));
+
+            const isFileDuplicate =
+              (lowerId && seenFileIds.has(lowerId)) ||
+              (lowerEmail && seenFileEmails.has(lowerEmail)) ||
+              (cleanPhone10.length === 10 && seenFilePhones.has(cleanPhone10));
+
+            if (isDbDuplicate) {
+              recordStatus = 'DUPLICATE';
+              reason = 'Customer already exists in database';
+            } else if (isFileDuplicate) {
+              recordStatus = 'DUPLICATE';
+              reason = 'Duplicate record found within the same file';
+            }
+          }
+
+          if (lowerId) seenFileIds.add(lowerId);
+          if (lowerEmail) seenFileEmails.add(lowerEmail);
+          if (cleanPhone10.length === 10) seenFilePhones.add(cleanPhone10);
+
           parsed.push({
-            srNo: cols[0] || String(customers.length + i).padStart(2, '0'),
-            id: cols[1] || `CUST${Math.floor(100 + Math.random() * 900)}`,
-            name: cols[2] || 'New Customer',
-            companyName: cols[3] || 'Trading Co.',
-            state: cols[4] || 'Maharashtra',
-            city: cols[5] || 'Mumbai',
-            pincode: cols[6] || '400001',
-            regDate: cols[7] || new Date().toISOString().slice(0, 10),
-            status: cols[8] || 'Active',
-            telecaller: cols[9] || 'TC014',
+            rowNum: idx + 1,
+            name: name || '—',
+            companyName: companyName || '—',
+            email: email || '—',
+            mobile: mobile || '—',
+            state: state || selectedState || 'Maharashtra',
+            city: city || selectedCity || 'Mumbai',
+            pincode: pincode || '400001',
+            customerId: customerId || `CUST${Math.floor(100 + Math.random() * 900)}`,
+            status: status,
+            telecaller: telecaller,
+            importStatus: recordStatus,
+            reason: reason,
           });
         }
-      }
 
-      if (parsed.length === 0) {
-        setPreviewData([
-          { srNo: '06', id: 'CUST101', name: 'Star Retailers', companyName: 'Star Retail Pvt Ltd', state: 'Maharashtra', city: 'Nagpur', pincode: '440001', regDate: '2026-07-28', status: 'Active', telecaller: 'TC014' },
-          { srNo: '07', id: 'CUST102', name: 'Velocity Tech', companyName: 'Velocity Solutions', state: 'Delhi', city: 'Delhi', pincode: '110002', regDate: '2026-07-29', status: 'Pending', telecaller: 'TC021' },
-        ]);
-      } else {
-        setPreviewData(parsed);
+        const total = parsed.length;
+        const newCount = parsed.filter((r) => r.importStatus === 'NEW').length;
+        const duplicateCount = parsed.filter((r) => r.importStatus === 'DUPLICATE').length;
+        const invalidCount = parsed.filter((r) => r.importStatus === 'INVALID').length;
+
+        setReviewStats({
+          total,
+          newCount,
+          duplicateCount,
+          invalidCount,
+        });
+        setReviewRecords(parsed);
+        setIsProcessingFile(false);
+        setIsUploadModalOpen(false);
+        setIsReviewModalOpen(true);
+      } catch (err) {
+        console.error('Failed to parse file:', err);
+        setFileError('Failed to parse file. Please verify it is a valid Excel or CSV file.');
+        setIsProcessingFile(false);
       }
     };
 
-    reader.readAsText(file);
+    reader.onerror = () => {
+      setFileError('Error reading the selected file. Please try again.');
+      setIsProcessingFile(false);
+    };
+
+    reader.readAsArrayBuffer(selectedFile);
   };
 
-  // Submit Bulk Import
-  const handleExecuteImport = () => {
-    if (!uploadedFile) return;
+  // Cancel Step 1 Modal
+  const handleCancelUpload = () => {
+    setIsUploadModalOpen(false);
+    resetImportStates();
+  };
+
+  // Cancel Step 2 Modal
+  const handleCancelReview = () => {
+    setIsReviewModalOpen(false);
+    resetImportStates();
+    setReviewRecords([]);
+    setReviewStats({ total: 0, newCount: 0, duplicateCount: 0, invalidCount: 0 });
+  };
+
+  // Step 2: Confirm and Import ONLY "NEW" records into database
+  const handleConfirmImport = async () => {
+    const validNewRecords = reviewRecords.filter((r) => r.importStatus === 'NEW');
+    if (validNewRecords.length === 0 || isImporting) return;
+
     setIsImporting(true);
 
-    dispatch(bulkImportCustomers(uploadedFile))
-      .unwrap()
-      .then((res) => {
-        setIsUploadModalOpen(false);
-        setUploadedFile(null);
-        setPreviewData([]);
-        setToastMsg(res.message || 'Import completed successfully');
-        setTimeout(() => setToastMsg(''), 4000);
-      })
-      .finally(() => {
-        setIsImporting(false);
-      });
+    try {
+      // Build a clean CSV file containing ONLY the valid NEW records
+      const headers = ['Sr No', 'ID', 'Name', 'Company Name', 'State', 'City', 'Pincode', 'Registration Date', 'Status', 'Telecaller', 'Email', 'Mobile'];
+      const csvRows = validNewRecords.map((r, i) => [
+        String(customers.length + i + 1).padStart(2, '0'),
+        r.customerId,
+        `"${(r.name || '').replace(/"/g, '""')}"`,
+        `"${(r.companyName || '').replace(/"/g, '""')}"`,
+        `"${(r.state || selectedState || 'Maharashtra').replace(/"/g, '""')}"`,
+        `"${(r.city || selectedCity || 'Mumbai').replace(/"/g, '""')}"`,
+        `"${(r.pincode || '400001').replace(/"/g, '""')}"`,
+        new Date().toISOString().slice(0, 10),
+        r.status || 'Active',
+        r.telecaller || 'TC014',
+        `"${(r.email !== '—' ? r.email : '').replace(/"/g, '""')}"`,
+        `"${(r.mobile !== '—' ? r.mobile : '').replace(/"/g, '""')}"`
+      ]);
+
+      const csvString = [headers.join(','), ...csvRows.map((row) => row.join(','))].join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const baseName = (selectedFile?.name || 'customers').replace(/\.[^/.]+$/, '');
+      const cleanFile = new File([blob], `${baseName}_new_imported.csv`, { type: 'text/csv' });
+
+      await dispatch(bulkImportCustomers({
+        file: cleanFile,
+        category: selectedCatName,
+        subCategory: selectedSubCatName,
+        state: selectedState,
+        city: selectedCity
+      })).unwrap();
+
+      // Show dynamic breakdown toast
+      toast.success(
+        `${reviewStats.total} records processed: ${reviewStats.newCount} New → Imported, ${reviewStats.duplicateCount} Duplicate → Skipped, ${reviewStats.invalidCount} Invalid → Skipped`
+      );
+
+      // Re-fetch customer list to guarantee immediate update
+      dispatch(fetchCustomers());
+
+      // Close review modal and reset all temporary states
+      setIsReviewModalOpen(false);
+      resetImportStates();
+      setReviewRecords([]);
+      setReviewStats({ total: 0, newCount: 0, duplicateCount: 0, invalidCount: 0 });
+    } catch (err) {
+      console.error('Import failed:', err);
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   return (
@@ -615,28 +1054,365 @@ function CustomerDatabase({ compact = false }) {
         </div>
       )}
 
-      {/* BULK CSV / EXCEL UPLOAD MODAL */}
+      {/* STEP 1: IMPORT CUSTOMERS MODAL */}
       {isUploadModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
             
             {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
-              <div className="flex items-center gap-2">
-                <FileSpreadsheet size={18} className="text-[#f26522]" />
-                <h3 className="text-xs font-bold text-slate-800">Bulk Customer CSV / Excel Import</h3>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#f26522]">
+                  <Upload size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-800">Import Customers</h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Upload an Excel or CSV file to bulk add customers to the Customer Database.
+                  </p>
+                </div>
               </div>
               <button
-                onClick={() => setIsUploadModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                type="button"
+                onClick={handleCancelUpload}
+                disabled={isProcessingFile}
+                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer p-1 rounded-lg hover:bg-slate-200/50 disabled:opacity-40"
               >
                 <X size={16} />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-5 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
               
+              {/* Category Dropdown */}
+              <div className="space-y-1.5" ref={catDropdownRef}>
+                <label className="block text-xs font-bold text-slate-700">
+                  Category <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCatDropdownOpen(!isCatDropdownOpen);
+                      setIsSubCatDropdownOpen(false);
+                      setIsStateDropdownOpen(false);
+                      setIsCityDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs bg-slate-50 border rounded-xl transition-all font-medium text-left cursor-pointer hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 ${
+                      isCatDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : 'border-slate-200'
+                    }`}
+                  >
+                    <span className={selectedCatName ? 'text-slate-800 font-semibold truncate' : 'text-slate-400'}>
+                      {selectedCatName || 'Select Category'}
+                    </span>
+                    <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 shrink-0 ${isCatDropdownOpen ? 'rotate-180 text-[#f26522]' : ''}`} />
+                  </button>
+
+                  {isCatDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in duration-100">
+                      <div className="p-2 border-b border-slate-100">
+                        <div className="relative">
+                          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Search category..."
+                            value={catSearch}
+                            onChange={(e) => setCatSearch(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#f26522] text-slate-700"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-44 overflow-y-auto custom-scrollbar py-1">
+                        {catsLoading ? (
+                          <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-1.5">
+                            <Loader2 size={13} className="animate-spin text-[#f26522]" />
+                            <span>Loading categories...</span>
+                          </div>
+                        ) : (
+                          (() => {
+                            const filtered = categories.filter((c) =>
+                              (c.name || c.categoryName || c.category || '').toLowerCase().includes(catSearch.toLowerCase())
+                            );
+                            if (filtered.length === 0) {
+                              return (
+                                <div className="py-3 text-center text-xs text-slate-400">
+                                  No categories found
+                                </div>
+                              );
+                            }
+                            return filtered.map((c) => {
+                              const name = c.name || c.categoryName || c.category;
+                              const isSelected = selectedCatName === name;
+                              return (
+                                <button
+                                  key={c._id || name}
+                                  type="button"
+                                  onClick={() => handleSelectCategory(c)}
+                                  className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-orange-50 font-bold text-[#f26522]'
+                                      : 'text-slate-700 hover:bg-slate-50 hover:text-[#f26522]'
+                                  }`}
+                                >
+                                  <span className="truncate">{name}</span>
+                                  {isSelected && <Check size={13} className="text-[#f26522] shrink-0" />}
+                                </button>
+                              );
+                            });
+                          })()
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Sub-Category Dropdown */}
+              <div className="space-y-1.5" ref={subCatDropdownRef}>
+                <label className="block text-xs font-bold text-slate-700">
+                  Sub-Category <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    disabled={!selectedCatName || subCatsLoading}
+                    onClick={() => {
+                      if (!selectedCatName) return;
+                      setIsSubCatDropdownOpen(!isSubCatDropdownOpen);
+                      setIsCatDropdownOpen(false);
+                      setIsStateDropdownOpen(false);
+                      setIsCityDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs border rounded-xl transition-all font-medium text-left ${
+                      !selectedCatName
+                        ? 'bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'bg-slate-50 border-slate-200 hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 cursor-pointer'
+                    } ${isSubCatDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : ''}`}
+                  >
+                    <span className={selectedSubCatName ? 'text-slate-800 font-semibold truncate' : 'text-slate-400'}>
+                      {!selectedCatName ? 'Select category first' : (selectedSubCatName || 'Select Sub-Category')}
+                    </span>
+                    <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 shrink-0 ${isSubCatDropdownOpen ? 'rotate-180 text-[#f26522]' : ''}`} />
+                  </button>
+
+                  {isSubCatDropdownOpen && selectedCatName && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in duration-100">
+                      <div className="p-2 border-b border-slate-100">
+                        <div className="relative">
+                          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Search sub-category..."
+                            value={subCatSearch}
+                            onChange={(e) => setSubCatSearch(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#f26522] text-slate-700"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-44 overflow-y-auto custom-scrollbar py-1">
+                        {subCatsLoading ? (
+                          <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-1.5">
+                            <Loader2 size={13} className="animate-spin text-[#f26522]" />
+                            <span>Loading sub-categories...</span>
+                          </div>
+                        ) : (
+                          (() => {
+                            const filtered = subCategories.filter((sc) =>
+                              (sc.name || sc.subCategoryName || '').toLowerCase().includes(subCatSearch.toLowerCase())
+                            );
+                            if (filtered.length === 0) {
+                              return (
+                                <div className="py-3 text-center text-xs text-slate-400">
+                                  No sub-categories found for {selectedCatName}
+                                </div>
+                              );
+                            }
+                            return filtered.map((sc) => {
+                              const name = sc.name || sc.subCategoryName;
+                              const isSelected = selectedSubCatName === name;
+                              return (
+                                <button
+                                  key={sc._id || name}
+                                  type="button"
+                                  onClick={() => handleSelectSubCategory(sc)}
+                                  className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-orange-50 font-bold text-[#f26522]'
+                                      : 'text-slate-700 hover:bg-slate-50 hover:text-[#f26522]'
+                                  }`}
+                                >
+                                  <span className="truncate">{name}</span>
+                                  {isSelected && <Check size={13} className="text-[#f26522] shrink-0" />}
+                                </button>
+                              );
+                            });
+                          })()
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* State Dropdown */}
+              <div className="space-y-1.5" ref={stateDropdownRef}>
+                <label className="block text-xs font-bold text-slate-700">
+                  State <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsStateDropdownOpen(!isStateDropdownOpen);
+                      setIsCatDropdownOpen(false);
+                      setIsSubCatDropdownOpen(false);
+                      setIsCityDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs bg-slate-50 border rounded-xl transition-all font-medium text-left cursor-pointer hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 ${
+                      isStateDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : 'border-slate-200'
+                    }`}
+                  >
+                    <span className={selectedState ? 'text-slate-800 font-semibold truncate' : 'text-slate-400'}>
+                      {selectedState || 'Select State'}
+                    </span>
+                    <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 shrink-0 ${isStateDropdownOpen ? 'rotate-180 text-[#f26522]' : ''}`} />
+                  </button>
+
+                  {isStateDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in duration-100">
+                      <div className="p-2 border-b border-slate-100">
+                        <div className="relative">
+                          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Search state..."
+                            value={stateSearch}
+                            onChange={(e) => setStateSearch(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#f26522] text-slate-700"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-44 overflow-y-auto custom-scrollbar py-1">
+                        {(() => {
+                          const filtered = allStates.filter((s) =>
+                            s.name.toLowerCase().includes(stateSearch.toLowerCase())
+                          );
+                          if (filtered.length === 0) {
+                            return (
+                              <div className="py-3 text-center text-xs text-slate-400">
+                                No states found
+                              </div>
+                            );
+                          }
+                          return filtered.map((s) => {
+                            const isSelected = selectedState === s.name;
+                            return (
+                              <button
+                                key={s.isoCode}
+                                type="button"
+                                onClick={() => handleSelectState(s)}
+                                className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-orange-50 font-bold text-[#f26522]'
+                                    : 'text-slate-700 hover:bg-slate-50 hover:text-[#f26522]'
+                                }`}
+                              >
+                                <span className="truncate">{s.name}</span>
+                                {isSelected && <Check size={13} className="text-[#f26522] shrink-0" />}
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* City Dropdown */}
+              <div className="space-y-1.5" ref={cityDropdownRef}>
+                <label className="block text-xs font-bold text-slate-700">
+                  City <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    disabled={!selectedState}
+                    onClick={() => {
+                      if (!selectedState) return;
+                      setIsCityDropdownOpen(!isCityDropdownOpen);
+                      setIsCatDropdownOpen(false);
+                      setIsSubCatDropdownOpen(false);
+                      setIsStateDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs border rounded-xl transition-all font-medium text-left ${
+                      !selectedState
+                        ? 'bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed'
+                        : 'bg-slate-50 border-slate-200 hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 cursor-pointer'
+                    } ${isCityDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : ''}`}
+                  >
+                    <span className={selectedCity ? 'text-slate-800 font-semibold truncate' : 'text-slate-400'}>
+                      {!selectedState ? 'Select state first' : (selectedCity || 'Select City')}
+                    </span>
+                    <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 shrink-0 ${isCityDropdownOpen ? 'rotate-180 text-[#f26522]' : ''}`} />
+                  </button>
+
+                  {isCityDropdownOpen && selectedState && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in duration-100">
+                      <div className="p-2 border-b border-slate-100">
+                        <div className="relative">
+                          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Search city..."
+                            value={citySearch}
+                            onChange={(e) => setCitySearch(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#f26522] text-slate-700"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-44 overflow-y-auto custom-scrollbar py-1">
+                        {(() => {
+                          const filtered = cities.filter((c) =>
+                            c.name.toLowerCase().includes(citySearch.toLowerCase())
+                          );
+                          if (filtered.length === 0) {
+                            return (
+                              <div className="py-3 text-center text-xs text-slate-400">
+                                No cities found for {selectedState}
+                              </div>
+                            );
+                          }
+                          return filtered.map((c) => {
+                            const isSelected = selectedCity === c.name;
+                            return (
+                              <button
+                                key={c.name}
+                                type="button"
+                                onClick={() => handleSelectCity(c)}
+                                className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-orange-50 font-bold text-[#f26522]'
+                                    : 'text-slate-700 hover:bg-slate-50 hover:text-[#f26522]'
+                                }`}
+                              >
+                                <span className="truncate">{c.name}</span>
+                                {isSelected && <Check size={13} className="text-[#f26522] shrink-0" />}
+                              </button>
+                            );
+                          });
+                        })()}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Sample Template Bar */}
               <div className="flex items-center justify-between bg-orange-50/60 border border-orange-200/70 rounded-xl p-3 text-xs">
                 <div>
@@ -653,100 +1429,290 @@ function CustomerDatabase({ compact = false }) {
                 </button>
               </div>
 
-              {/* Upload Drop Area */}
-              <div
-                onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-                onDragLeave={() => setDragActive(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragActive(false);
-                  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                    handleFileSelect(e.dataTransfer.files[0]);
-                  }
-                }}
-                className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${
-                  dragActive ? 'border-[#f26522] bg-orange-50/40' : 'border-slate-200 hover:border-slate-300 bg-slate-50/40'
-                }`}
-              >
-                <Upload size={28} className="mx-auto text-slate-400 mb-2" />
-                <p className="text-xs font-semibold text-slate-700 mb-1">
-                  Drag & Drop CSV or Excel file here
-                </p>
-                <p className="text-[11px] text-slate-400 mb-3">Supports .csv, .xlsx files up to 10MB</p>
-                
-                <label className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#f26522] hover:bg-[#e05411] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer">
-                  <span>Browse File</span>
+              {/* Upload Drop Area or Selected File Preview */}
+              {!selectedFile ? (
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                  onDragLeave={() => setDragActive(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragActive(false);
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                      validateAndSetFile(e.dataTransfer.files[0]);
+                    }
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${
+                    dragActive ? 'border-[#f26522] bg-orange-50/40' : 'border-slate-200 hover:border-[#f26522]/50 hover:bg-orange-50/20 bg-slate-50/40'
+                  }`}
+                >
+                  <Upload size={28} className="mx-auto text-slate-400 mb-2" />
+                  <p className="text-xs font-semibold text-slate-700 mb-1">
+                    Drag & Drop CSV or Excel file here
+                  </p>
+                  <p className="text-[11px] text-slate-400 mb-3">Supports .csv, .xlsx, .xls files up to 10MB</p>
+                  
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#f26522] hover:bg-[#e05411] text-white text-xs font-bold rounded-xl transition-all shadow-xs pointer-events-none"
+                  >
+                    <Upload size={13} />
+                    <span>Browse File</span>
+                  </button>
+
                   <input
+                    ref={fileInputRef}
                     type="file"
-                    accept=".csv, .xlsx"
-                    onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
+                    accept=".xlsx,.xls,.csv"
+                    onChange={(e) => e.target.files && validateAndSetFile(e.target.files[0])}
                     className="hidden"
                   />
-                </label>
-
-                {uploadedFile && (
-                  <div className="mt-3 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-200 inline-block">
-                    ✓ File Selected: {uploadedFile.name}
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-bold text-slate-700">Excel/CSV File</label>
+                  <div className="w-full p-4 border border-slate-200 rounded-xl bg-slate-50/80 flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#f26522] shrink-0 border border-orange-100">
+                        <FileSpreadsheet size={20} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-slate-800 truncate">{selectedFile.name}</p>
+                        <p className="text-[11px] text-slate-500 font-medium">{formatFileSize(selectedFile.size)}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isProcessingFile}
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setFileError('');
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-red-600 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      Change
+                    </button>
                   </div>
-                )}
-              </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    onChange={(e) => e.target.files && validateAndSetFile(e.target.files[0])}
+                    className="hidden"
+                  />
+                </div>
+              )}
 
-              {/* Import Preview */}
-              {previewData.length > 0 && (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-slate-800">Preview Data ({previewData.length} records ready)</span>
-                    <span className="text-[10px] text-slate-400">Validated</span>
-                  </div>
+              {/* Error Message */}
+              {fileError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-xs text-red-600 font-medium">
+                  <AlertCircle size={15} className="shrink-0 text-red-500" />
+                  <span>{fileError}</span>
+                </div>
+              )}
 
-                  <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200 text-xs">
-                    <table className="w-full text-left">
-                      <thead className="bg-slate-100 text-[10px] font-bold text-slate-500 uppercase">
-                        <tr>
-                          <th className="p-2">Sr No</th>
-                          <th className="p-2">Name</th>
-                          <th className="p-2">Company</th>
-                          <th className="p-2">Pincode</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 text-[11px]">
-                        {previewData.slice(0, 5).map((row, idx) => (
-                          <tr key={idx}>
-                            <td className="p-2 font-bold">{row.srNo || row.id}</td>
-                            <td className="p-2">{row.name}</td>
-                            <td className="p-2 text-slate-700 font-bold">{row.companyName}</td>
-                            <td className="p-2 text-slate-500">{row.pincode}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+              {/* Processing Progress Status */}
+              {isProcessingFile && (
+                <div className="p-3 bg-orange-50/60 border border-orange-200/80 rounded-xl flex items-center gap-2.5 text-xs text-orange-800 font-medium">
+                  <Loader2 size={15} className="animate-spin text-[#f26522] shrink-0" />
+                  <span>Verifying structure and validating records...</span>
                 </div>
               )}
 
             </div>
 
             {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-slate-100 bg-slate-50">
+            <div className="flex items-center justify-end gap-2 px-6 py-3.5 border-t border-slate-100 bg-slate-50 shrink-0">
               <button
                 type="button"
-                onClick={() => setIsUploadModalOpen(false)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+                disabled={isProcessingFile}
+                onClick={handleCancelUpload}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={previewData.length === 0 || isImporting}
-                onClick={handleExecuteImport}
+                disabled={isProcessingFile}
+                onClick={handleProcessUploadFile}
                 className="px-5 py-2 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
               >
-                {isImporting ? (
-                  <span>Importing...</span>
+                {isProcessingFile ? (
+                  <>
+                    <Loader2 size={13} className="animate-spin" />
+                    <span>Processing...</span>
+                  </>
                 ) : (
                   <>
                     <Upload size={13} />
-                    <span>Import {previewData.length} Customers</span>
+                    <span>Upload File</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* STEP 2: IMPORT REVIEW & PREVIEW MODAL */}
+      {isReviewModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#f26522]">
+                  <Info size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Import Review & Preview</h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Review and verify classified records before importing into Customer Database
+                  </p>
+                  {selectedCatName && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
+                      <span className="bg-orange-50 text-[#f26522] font-bold px-2 py-0.5 rounded-md border border-orange-200/80">
+                        {selectedCatName} &gt; {selectedSubCatName}
+                      </span>
+                      <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-md border border-slate-200">
+                        {selectedCity}, {selectedState}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCancelReview}
+                disabled={isImporting}
+                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer p-1 rounded-lg hover:bg-slate-200/50 disabled:opacity-40"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Dynamic Summary Cards */}
+            <div className="px-6 py-3.5 bg-slate-50/70 border-b border-slate-100 shrink-0">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* Total Records */}
+                <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Total Records</div>
+                  <div className="text-xl font-bold text-slate-900 mt-0.5">{reviewStats.total}</div>
+                </div>
+
+                {/* New */}
+                <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200/80 shadow-2xs">
+                  <div className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">New (Eligible)</div>
+                  <div className="text-xl font-bold text-emerald-800 mt-0.5">{reviewStats.newCount}</div>
+                </div>
+
+                {/* Duplicate */}
+                <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/80 shadow-2xs">
+                  <div className="text-[11px] font-semibold text-amber-700 uppercase tracking-wider">Duplicate (Skipped)</div>
+                  <div className="text-xl font-bold text-amber-800 mt-0.5">{reviewStats.duplicateCount}</div>
+                </div>
+
+                {/* Invalid */}
+                <div className="p-3 bg-rose-50/60 rounded-xl border border-rose-200/80 shadow-2xs">
+                  <div className="text-[11px] font-semibold text-rose-700 uppercase tracking-wider">Invalid (Skipped)</div>
+                  <div className="text-xl font-bold text-rose-800 mt-0.5">{reviewStats.invalidCount}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Preview Table */}
+            <div className="p-6 overflow-hidden flex flex-col flex-1">
+              <div className="flex items-center justify-between mb-2 shrink-0">
+                <span className="text-xs font-bold text-slate-700">Record Preview ({reviewRecords.length} records)</span>
+                <span className="text-[11px] text-slate-400">Only "New" records will be imported into the database</span>
+              </div>
+
+              <div className="border border-slate-200 rounded-xl overflow-auto max-h-[46vh] bg-white shadow-2xs">
+                <table className="w-full text-left border-collapse min-w-[760px]">
+                  <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200">
+                    <tr>
+                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Row</th>
+                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Customer Name</th>
+                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Company Name</th>
+                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Email</th>
+                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Phone / Mobile</th>
+                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Status</th>
+                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Reason / Note</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {reviewRecords.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="p-6 text-center text-slate-400">
+                          No records found to preview.
+                        </td>
+                      </tr>
+                    ) : (
+                      reviewRecords.map((item) => {
+                        let badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                        let dotClass = "bg-emerald-500";
+
+                        if (item.importStatus === 'DUPLICATE') {
+                          badgeClass = "bg-amber-50 text-amber-700 border-amber-200";
+                          dotClass = "bg-amber-500";
+                        } else if (item.importStatus === 'INVALID') {
+                          badgeClass = "bg-rose-50 text-rose-700 border-rose-200";
+                          dotClass = "bg-rose-500";
+                        }
+
+                        return (
+                          <tr key={item.rowNum} className="hover:bg-slate-50/60 transition-colors">
+                            <td className="p-3 text-slate-500 font-medium">{item.rowNum}</td>
+                            <td className="p-3 font-semibold text-slate-800">{item.name}</td>
+                            <td className="p-3 text-slate-600">{item.companyName}</td>
+                            <td className="p-3 text-slate-600">{item.email}</td>
+                            <td className="p-3 text-slate-600">{item.mobile}</td>
+                            <td className="p-3">
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${badgeClass}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`}></span>
+                                {item.importStatus}
+                              </span>
+                            </td>
+                            <td className="p-3 text-[11px] text-slate-500 max-w-xs truncate" title={item.reason}>
+                              {item.reason}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Footer Controls */}
+            <div className="flex items-center justify-end gap-2.5 px-6 py-3.5 border-t border-slate-100 bg-slate-50 shrink-0">
+              <button
+                type="button"
+                disabled={isImporting}
+                onClick={handleCancelReview}
+                className="px-5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={reviewStats.newCount === 0 || isImporting}
+                onClick={handleConfirmImport}
+                className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isImporting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Importing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check size={14} />
+                    <span>Accept & Import ({reviewStats.newCount} New)</span>
                   </>
                 )}
               </button>
