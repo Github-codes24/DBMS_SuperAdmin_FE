@@ -4,9 +4,13 @@ import { toast } from 'react-toastify';
 
 export const fetchTelecallers = createAsyncThunk(
   'telecaller/fetchTelecallers',
-  async (_, { rejectWithValue }) => {
+  async (params, { rejectWithValue }) => {
     try {
-      const response = await api.get('/superadmin/telecallers');
+      const config = {};
+      if (params) {
+        config.params = params;
+      }
+      const response = await api.get('/superadmin/telecallers', config);
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to fetch telecallers.';
@@ -90,7 +94,17 @@ const initialState = {
 const telecallerSlice = createSlice({
   name: 'telecaller',
   initialState,
-  reducers: {},
+  reducers: {
+    clearTelecallers: (state) => {
+      state.telecallers = [];
+      state.totalTelecallers = 0;
+      state.activeTelecallersCount = 0;
+      state.totalPages = 1;
+      state.currentPage = 1;
+      state.loading = false;
+      state.error = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       // Fetch Telecallers
@@ -143,4 +157,5 @@ const telecallerSlice = createSlice({
   },
 });
 
+export const { clearTelecallers } = telecallerSlice.actions;
 export default telecallerSlice.reducer;
