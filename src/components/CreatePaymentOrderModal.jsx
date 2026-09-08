@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Trash2 } from 'lucide-react';
-import { AVAILABLE_PACKAGES } from '../mockData';
+import { AVAILABLE_PACKAGES, DISCOUNT_OPTIONS } from '../mockData';
 
 export default function CreatePaymentOrderModal({ vendor, onClose, onSendPaymentLink }) {
   const [alternatePhone, setAlternatePhone] = useState(vendor.alternatePhone || vendor.phone || '');
@@ -9,7 +9,7 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
   const [gateway, setGateway] = useState('RazorPay');
 
   const [selectedPkgId, setSelectedPkgId] = useState('');
-  const [selectedDiscount, setSelectedDiscount] = useState('0');
+  const [selectedDiscount, setSelectedDiscount] = useState('1');
 
   const [orderItems, setOrderItems] = useState([]);
 
@@ -38,7 +38,7 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
 
     setOrderItems([...orderItems, newItem]);
     setSelectedPkgId('');
-    setSelectedDiscount('0');
+    setSelectedDiscount('1');
   };
 
   const handleRemoveItem = (id) => {
@@ -155,11 +155,11 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
                     value={selectedDiscount}
                     onChange={(e) => setSelectedDiscount(e.target.value)}
                   >
-                    <option value="0">0%</option>
-                    <option value="5">5%</option>
-                    <option value="10">10%</option>
-                    <option value="15">15%</option>
-                    <option value="20">20%</option>
+                    {DISCOUNT_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
