@@ -146,6 +146,14 @@ export const AVAILABLE_PACKAGES = [
   { id: 4, name: "Banner Boost Add-on", price: 499, taxPercent: 18 }
 ];
 
+export const DISCOUNT_OPTIONS = [
+  { value: "1", label: "1%" },
+  { value: "2", label: "2%" },
+  { value: "3", label: "3%" },
+  { value: "4", label: "4%" },
+  { value: "5", label: "5%" }
+];
+
 export const INITIAL_NOTIFICATIONS_REPORT = [
   { id: 1, date: "2026-07-28", customer: "Shri Shyam Electricals And Refrigeration Repair", vendorCode: "VEND-000068107", type: "WhatsApp & SMS", notificationDetails: "Package Details: TP-Prime 1 Year sent to +91 8744909050", status: "Delivered" },
   { id: 2, date: "2026-07-26", customer: "Shri Shyam Electricals And Refrigeration Repair", vendorCode: "VEND-000068107", type: "Payment Link", notificationDetails: "RazorPay payment link of ₹2,859.00 sent via SMS", status: "Clicked" },

@@ -30,7 +30,7 @@ export default function App() {
   const { isAuthenticated, token, user: currentUser } = useSelector((state) => state.auth);
 
   const [activeNav, setActiveNav] = useState('vendor_mgmt');
-  const [vendors, setVendors] = useState(INITIAL_VENDORS);
+  const [vendors, setVendors] = useState([]);
   const [loadingVendors, setLoadingVendors] = useState(false);
   const [vendorsError, setVendorsError] = useState(null);
   const [selectedVendor, setSelectedVendor] = useState(null);
@@ -38,23 +38,42 @@ export default function App() {
   const [modalState, setModalState] = useState('none'); // 'none' | 'edit' | 'paymentOrder' | 'paymentHistory' | 'packageSuccess' | 'addVendor'
   const [successMessage, setSuccessMessage] = useState('');
 
-  const fetchVendors = async () => {
-    const activeToken = token || localStorage.getItem('lts_telecaller_token');
-
-    if (!activeToken || activeToken === 'mock-token') {
-      // In mock/demo mode, use INITIAL_VENDORS and skip API call
-      setVendors(INITIAL_VENDORS);
+  const fetchVendors = async (searchQuery = '') => {
+    const term = (typeof searchQuery === 'string' ? searchQuery : (searchQuery?.query || '')).trim().toLowerCase();
+    if (!term) {
+      setVendors([]);
       return;
     }
 
+    const activeToken = token || localStorage.getItem('lts_telecaller_token');
+
     setLoadingVendors(true);
     setVendorsError(null);
+
+    if (!activeToken || activeToken === 'mock-token') {
+      // In mock/demo mode, filter from INITIAL_VENDORS by search term
+      const matched = INITIAL_VENDORS.filter((v) => {
+        return (
+          (v.phone && v.phone.toLowerCase().includes(term)) ||
+          (v.alternatePhone && v.alternatePhone.toLowerCase().includes(term)) ||
+          (v.whatsappNo && v.whatsappNo.toLowerCase().includes(term)) ||
+          (v.vendorCode && v.vendorCode.toLowerCase().includes(term)) ||
+          (v.company && v.company.toLowerCase().includes(term)) ||
+          (v.vendorName && v.vendorName.toLowerCase().includes(term)) ||
+          (v.city && v.city.toLowerCase().includes(term))
+        );
+      });
+      setVendors(matched);
+      setLoadingVendors(false);
+      return;
+    }
+
     try {
       const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
       const headers = {
         'Authorization': `Bearer ${activeToken}`,
       };
-      const response = await fetch(`${baseUrl}/api/telecaller/vendors`, {
+      const response = await fetch(`${baseUrl}/api/telecaller/vendors?search=${encodeURIComponent(term)}`, {
         method: 'GET',
         headers,
       });
@@ -103,14 +122,22 @@ export default function App() {
           };
         })
       }));
-      setVendors(mappedVendors);
+
+      const finalVendors = mappedVendors.filter((v) =>
+        (v.phone && v.phone.toLowerCase().includes(term)) ||
+        (v.alternatePhone && v.alternatePhone.toLowerCase().includes(term)) ||
+        (v.whatsappNo && v.whatsappNo.toLowerCase().includes(term)) ||
+        (v.vendorCode && v.vendorCode.toLowerCase().includes(term)) ||
+        (v.company && v.company.toLowerCase().includes(term)) ||
+        (v.vendorName && v.vendorName.toLowerCase().includes(term)) ||
+        (v.city && v.city.toLowerCase().includes(term))
+      );
+
+      setVendors(finalVendors);
     } catch (err) {
       console.error(err);
       setVendorsError(err.message || 'Server error occurred');
-      // If API fails and we have no vendors, fallback to INITIAL_VENDORS
-      if (vendors.length === 0) {
-        setVendors(INITIAL_VENDORS);
-      }
+      setVendors([]);
     } finally {
       setLoadingVendors(false);
     }
@@ -122,13 +149,6 @@ export default function App() {
       dispatch(fetchProfile());
     }
   }, [isAuthenticated, dispatch]);
-
-  // Fetch vendors from backend when authenticated and navigating to Vendor Management
-  useEffect(() => {
-    if (isAuthenticated && activeNav === 'vendor_mgmt') {
-      fetchVendors();
-    }
-  }, [isAuthenticated, activeNav, token]);
 
   // Handle Login
   const handleLogin = (user) => {
@@ -315,13 +335,16 @@ export default function App() {
               )}
               <VendorSearch
                 vendors={vendors}
+                loading={loadingVendors}
+                onSearch={fetchVendors}
+                onClear={() => setVendors([])}
                 onOpenEdit={handleOpenEdit}
                 onOpenView={handleOpenView}
                 onOpenPaymentOrder={handleOpenPaymentOrder}
                 onSendPackageDetails={handleSendPackageDetails}
                 onOpenPaymentHistory={handleOpenPaymentHistory}
                 onOpenAddVendor={() => setModalState('addVendor')}
-                onRefresh={fetchVendors}
+                onRefresh={() => setVendors([])}
               />
             </>
           )}
