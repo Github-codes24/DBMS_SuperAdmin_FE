@@ -1,12 +1,12 @@
 import React from 'react';
-import { X, FileText, Download } from 'lucide-react';
+import { X, FileText } from 'lucide-react';
 
 export default function PaymentHistoryModal({ vendor, onClose }) {
   const history = vendor.paymentHistory || [];
 
   const handleDownloadInvoice = (item) => {
-    if (item.invoiceCode === 'N/A') {
-      alert(`Invoice is not generated yet for transaction ${item.transCode} (Status: ${item.status}).`);
+    if (!item.invoiceCode || item.invoiceCode === 'N/A') {
+      alert(`Invoice is not generated yet for transaction ${item.transCode} (Status: ${item.status}). Invoice will be available once payment is completed.`);
       return;
     }
     // Simulate invoice download
@@ -20,7 +20,8 @@ Vendor Name: ${vendor.vendorName}
 Company Name: ${vendor.company}
 Vendor Code: ${vendor.vendorCode}
 Registered Mobile: ${vendor.phone}
-Amount Paid: ₹${item.poAmt}
+Package: ${item.planName || 'Standard Package'} ${item.durationLabel ? `(${item.durationLabel})` : ''}
+Amount Paid: ₹${Number(item.poAmt || item.total || item.totalAmount || 0).toFixed(2)}
 Status: ${item.status}
 ================================================
 Thank you for your business!
@@ -36,7 +37,7 @@ Thank you for your business!
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" style={{ maxWidth: '850px' }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-content" style={{ maxWidth: '950px' }} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="modal-header">
           <h3>Vendor Payment History</h3>
@@ -47,42 +48,76 @@ Thank you for your business!
 
         {/* Body */}
         <div className="modal-body">
-          <div style={{ marginBottom: '12px', fontSize: '13px', color: '#475569' }}>
-            Showing payment records for: <strong>{vendor.company}</strong> (Vendor Code: <code>{vendor.vendorCode}</code>)
+          <div style={{ marginBottom: '14px', fontSize: '13px', color: '#475569', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              Showing payment records for: <strong>{vendor.company}</strong> (Vendor Code: <code>{vendor.vendorCode}</code>)
+            </div>
+            <span style={{ fontSize: '12px', background: '#f1f5f9', padding: '3px 8px', borderRadius: '4px', fontWeight: '600', color: '#334155' }}>
+              {history.length} Record{history.length !== 1 ? 's' : ''}
+            </span>
           </div>
 
           <div className="table-responsive">
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>S.No.</th>
+                  <th style={{ width: '45px', textAlign: 'center' }}>S.No.</th>
                   <th>Trans Code</th>
+                  <th>Package</th>
+                  <th>Duration</th>
                   <th>PO Date</th>
                   <th>PO Amt</th>
                   <th>Invoice Code</th>
                   <th>Invoice Date</th>
                   <th>Status</th>
-                  <th>Download Invoice</th>
+                  <th style={{ textAlign: 'center' }}>Invoice</th>
                 </tr>
               </thead>
               <tbody>
                 {history.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="no-data-row">
+                    <td colSpan="10" className="no-data-row">
                       No payment history available for this vendor
                     </td>
                   </tr>
                 ) : (
                   history.map((item, idx) => (
                     <tr key={item.id || idx}>
-                      <td>{idx + 1}</td>
+                      <td style={{ textAlign: 'center' }}>{idx + 1}</td>
                       <td style={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{item.transCode}</td>
-                      <td>{item.poDate}</td>
-                      <td>{item.poAmt}</td>
-                      <td>{item.invoiceCode}</td>
-                      <td>{item.invoiceDate}</td>
+                      <td style={{ fontWeight: '600', color: '#1e293b' }}>
+                        {item.planName || item.productName || '—'}
+                      </td>
                       <td>
-                        <span className={`status-tag status-${(item.status || '').toLowerCase()}`}>
+                        {item.durationLabel ? (
+                          <span
+                            style={{
+                              display: 'inline-block',
+                              padding: '2px 8px',
+                              background: '#f1f5f9',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: '500',
+                              color: '#475569',
+                            }}
+                          >
+                            {item.durationLabel}
+                          </span>
+                        ) : item.duration ? (
+                          `${item.duration} Days`
+                        ) : (
+                          '—'
+                        )}
+                      </td>
+                      <td>{item.poDate}</td>
+                      <td style={{ fontWeight: 'bold', color: '#0088a8' }}>
+                        ₹{Number(item.poAmt || item.total || item.totalAmount || 0).toFixed(2)}
+                      </td>
+                      <td>{item.invoiceCode || 'N/A'}</td>
+                      <td>{item.invoiceDate || 'N/A'}</td>
+                      <td>
+                        <span className={`status-tag status-${(item.status || '').toLowerCase().replace(/\s+/g, '-')}`}>
                           {item.status}
                         </span>
                       </td>
@@ -92,10 +127,10 @@ Thank you for your business!
                           style={{
                             background: 'none',
                             border: 'none',
-                            color: item.invoiceCode !== 'N/A' ? '#007bff' : '#94a3b8',
-                            cursor: item.invoiceCode !== 'N/A' ? 'pointer' : 'not-allowed'
+                            color: item.invoiceCode && item.invoiceCode !== 'N/A' ? '#007bff' : '#94a3b8',
+                            cursor: item.invoiceCode && item.invoiceCode !== 'N/A' ? 'pointer' : 'not-allowed'
                           }}
-                          title={item.invoiceCode !== 'N/A' ? "Download Invoice PDF" : "Invoice Not Available"}
+                          title={item.invoiceCode && item.invoiceCode !== 'N/A' ? "Download Invoice PDF" : "Invoice Not Available (Payment Link Sent/Pending)"}
                         >
                           <FileText size={18} />
                         </button>

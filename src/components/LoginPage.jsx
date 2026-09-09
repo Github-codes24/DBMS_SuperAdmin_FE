@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Lock, User, Eye, EyeOff, LogIn, ShieldCheck, Mail, Phone, UserPlus } from 'lucide-react';
 import { signupTelecaller, loginTelecaller, clearError } from '../redux/slices/authSlice';
+import logo from '../assets/logo.svg';
 
 export default function LoginPage({ onLogin }) {
   const dispatch = useDispatch();
@@ -97,7 +98,7 @@ export default function LoginPage({ onLogin }) {
       <div className="login-card">
         {/* Header Logo */}
         <div className="login-logo-header">
-          <img src="/lts-logo.svg" alt="Local Trade Street" className="login-logo-img" />
+          <img src={logo} alt="Local Trade Street" className="login-logo-img" />
           <h2 className="login-title">CRM Telecaller Portal</h2>
           <p className="login-subtitle">
             {isSignup

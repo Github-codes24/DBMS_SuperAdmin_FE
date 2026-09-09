@@ -1,7 +1,7 @@
 import React from 'react';
-import { LogOut } from 'lucide-react';
+import logo from '../assets/logo.svg';
 
-export default function Header({ currentUser, onLogout, onOpenProfile }) {
+export default function Header({ currentUser, _onLogout, onOpenProfile }) {
   const userName = currentUser?.name || 'Shivam';
   const userAvatar = currentUser?.avatar || userName.charAt(0);
   const financialYear = currentUser?.financialYear || '2026-2027';
@@ -10,7 +10,7 @@ export default function Header({ currentUser, onLogout, onOpenProfile }) {
     <header className="top-header">
       <div className="logo-container">
         <img
-          src="/lts-logo.svg"
+          src={logo}
           alt="Local Trade Street Logo"
           className="logo-img"
         />
