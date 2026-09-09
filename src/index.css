@@ -61,6 +61,8 @@ body {
 .logo-img {
   height: 38px;
   width: auto;
+  max-width: 100%;
+  object-fit: contain;
   display: block;
 }
 
@@ -846,6 +848,10 @@ textarea.form-control {
 .status-pending { background: #fef3c7; color: #d97706; }
 .status-cancel { background: #fee2e2; color: #dc2626; }
 .status-success { background: #dcfce7; color: #16a34a; }
+.status-payment-link-sent { background: #e0f2fe; color: #0284c7; }
+.status-paid { background: #dcfce7; color: #16a34a; }
+.status-failed { background: #fee2e2; color: #dc2626; }
+.status-expired { background: #f1f5f9; color: #64748b; }
 
 /* Login Page Styling */
 .login-wrapper {
@@ -881,6 +887,8 @@ textarea.form-control {
 .login-logo-img {
   height: 48px;
   width: auto;
+  max-width: 100%;
+  object-fit: contain;
   margin: 0 auto 12px auto;
   display: block;
 }
@@ -1181,6 +1189,49 @@ textarea.form-control {
   object-fit: cover;
   border: 2px solid var(--lts-orange);
 }
+
+/* Payment Order Row Actions */
+.btn-row-send-link {
+  background-color: var(--tp-blue-btn);
+  color: #ffffff;
+  border: none;
+  padding: 5px 12px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-row-send-link:hover:not(:disabled) {
+  background-color: var(--tp-blue-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.25);
+}
+
+.btn-row-send-link:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 
 
 

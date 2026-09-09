@@ -252,16 +252,113 @@ export default function App() {
     setModalState('paymentOrder');
   };
 
-  // Dispatch Payment Link
-  const handleSendPaymentLink = ({ vendor, gateway, totalAmount, targetPhone }) => {
+  // Dispatch Payment Link and record in Vendor Payment History
+  const handleSendPaymentLink = ({ vendor, gateway, totalAmount, targetPhone, item, selectedItems, items }) => {
     setModalState('none');
-    setSuccessMessage(`Payment link of ₹${totalAmount.toFixed(2)} (${gateway}) sent successfully to ${vendor.company} on ${targetPhone}!`);
+    const plansToProcess = selectedItems || (items ? items : (item ? [item] : []));
+    if (plansToProcess.length === 0) return;
+
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Build history entries for each successfully sent plan record
+    const newHistoryEntries = plansToProcess.map((plan) => ({
+      id: `PH-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      paymentOrderId: `PO-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      paymentItemId: plan.id,
+      transCode: `T${Math.floor(100000000000 + Math.random() * 900000000000)}`,
+      paymentLinkId: `plink_${Math.random().toString(36).substring(2, 12)}`,
+      vendorId: vendor.id,
+      vendorCode: vendor.vendorCode,
+      planId: plan.planId,
+      durationId: plan.durationId,
+      planName: plan.planName,
+      productName: plan.productName,
+      duration: plan.duration,
+      durationInMonths: plan.durationInMonths,
+      durationLabel: plan.durationLabel,
+      unitPrice: plan.unitPrice,
+      discountPercent: plan.discountPercent,
+      taxPercent: plan.taxPercent,
+      poAmt: plan.total,
+      totalAmount: plan.total,
+      poDate: todayStr,
+      invoiceCode: 'N/A',
+      invoiceDate: 'N/A',
+      status: 'Payment Link Sent',
+      gateway: gateway || 'RazorPay',
+      targetPhone: targetPhone,
+      createdAt: new Date().toISOString(),
+    }));
+
+    // Update vendor's payment history without creating duplicates
+    const currentHistory = Array.isArray(vendor.paymentHistory) ? [...vendor.paymentHistory] : [];
+
+    newHistoryEntries.forEach((entry) => {
+      const existingIdx = currentHistory.findIndex(
+        (h) =>
+          (h.paymentItemId && h.paymentItemId === entry.paymentItemId) ||
+          (h.planId &&
+            h.durationId &&
+            h.planId === entry.planId &&
+            h.durationId === entry.durationId &&
+            h.status === 'Payment Link Sent')
+      );
+
+      if (existingIdx !== -1) {
+        currentHistory[existingIdx] = {
+          ...currentHistory[existingIdx],
+          ...entry,
+          id: currentHistory[existingIdx].id,
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        currentHistory.unshift(entry);
+      }
+    });
+
+    const updatedVendor = {
+      ...vendor,
+      paymentHistory: currentHistory,
+      lastPaymentDate: todayStr,
+    };
+
+    // Update selectedVendor so opening PaymentHistoryModal displays the new records immediately
+    setSelectedVendor(updatedVendor);
+
+    // Update vendors array state
+    setVendors((prevVendors) =>
+      prevVendors.map((v) => (v.id === updatedVendor.id ? updatedVendor : v))
+    );
+
+    // Also update INITIAL_VENDORS for mock mode persistence
+    const mockVendorIdx = INITIAL_VENDORS.findIndex((v) => v.id === updatedVendor.id);
+    if (mockVendorIdx !== -1) {
+      INITIAL_VENDORS[mockVendorIdx] = {
+        ...INITIAL_VENDORS[mockVendorIdx],
+        paymentHistory: currentHistory,
+        lastPaymentDate: todayStr,
+      };
+    }
+
+    let pkgDesc = '';
+    if (plansToProcess.length === 1) {
+      pkgDesc = `for ${plansToProcess[0].productName || plansToProcess[0].planName} `;
+    } else if (plansToProcess.length > 1) {
+      const planNames = plansToProcess.map((p) => p.planName || p.productName).join(', ');
+      pkgDesc = `for ${plansToProcess.length} packages (${planNames}) `;
+    }
+
+    setSuccessMessage(
+      `Payment link of ₹${Number(totalAmount).toFixed(2)} ${pkgDesc}(${gateway}) sent successfully to ${vendor.company} on ${targetPhone}!`
+    );
     setModalState('packageSuccess');
   };
 
   // Open Payment History Modal
   const handleOpenPaymentHistory = (vendor) => {
-    setSelectedVendor(vendor);
+    // Pick the most up-to-date vendor from state (or fallback to vendor param)
+    const currentVendor = vendors.find((v) => v.id === vendor.id) || vendor;
+    setSelectedVendor(currentVendor);
     setModalState('paymentHistory');
   };
 
