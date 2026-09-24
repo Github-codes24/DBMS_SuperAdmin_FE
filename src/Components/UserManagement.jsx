@@ -68,14 +68,6 @@ function UserManagement() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [toastMsg, setToastMsg] = useState('');
 
-  // Manual Scroll Ref & Control (No Automatic Timer)
-  const manualScrollRef = useRef(null);
-  const handleManualScroll = (direction) => {
-    if (manualScrollRef.current) {
-      const scrollAmount = direction === 'up' ? -90 : 90;
-      manualScrollRef.current.scrollBy({ top: scrollAmount, behavior: 'smooth' });
-    }
-  };
 
   // Filtered Users
   const filteredUsers = users.filter((user) => {
@@ -300,35 +292,8 @@ function UserManagement() {
 
       </div>
 
-      {/* MANUAL SLIDING CONTROL BAR */}
-      <div className="flex items-center justify-between bg-white/90 backdrop-blur-md border border-slate-200/80 rounded-2xl px-4 py-2.5 text-xs shadow-2xs">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-black text-slate-800">Manual Slide Controls</span>
-          <span className="text-[10px] text-slate-400 font-medium">Scroll table view vertically</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handleManualScroll('up')}
-            className="p-1 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-bold px-3 py-1 active:scale-95 shadow-2xs"
-            title="Slide Up"
-          >
-            <ChevronUp size={13} />
-            <span>Slide Up</span>
-          </button>
-          <button
-            onClick={() => handleManualScroll('down')}
-            className="p-1 rounded-lg bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 text-[11px] font-bold px-3 py-1 active:scale-95 shadow-2xs"
-            title="Slide Down"
-          >
-            <ChevronDown size={13} />
-            <span>Slide Down</span>
-          </button>
-        </div>
-      </div>
-
       {/* Users Table */}
       <div
-        ref={manualScrollRef}
         className="bg-white/90 backdrop-blur-md rounded-2xl border border-slate-200/80 shadow-2xs max-h-[380px] overflow-x-auto overflow-y-auto scroll-smooth custom-scrollbar"
       >
         <table className="w-full min-w-[850px] text-left border-collapse">

@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import { State, City } from 'country-state-city';
 import api from '../services/api';
 import {
   fetchVendors,
@@ -14,30 +16,106 @@ import {
 import {
   Search, Download, Lock, FileSpreadsheet, FileText, Upload, X, Check,
   FileDown, UserPlus, Plus, ChevronUp, ChevronDown, Building2, MapPin,
-  Eye, EyeOff, Phone, Mail, Edit2, Trash2, Ban, UserCheck, AlertTriangle
+  Eye, EyeOff, Phone, Mail, Edit2, Trash2, Ban, UserCheck, AlertTriangle,
+  ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 function VendorDatabase({ compact = false }) {
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { vendors: apiVendors = [], selectedVendor = null, loading = false, isSaving = false } = useSelector((state) => state.vendor || {});
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedState, setSelectedState] = useState('All');
-  const [selectedCity, setSelectedCity] = useState('All');
+  const allStates = (State && typeof State.getStatesOfCountry === 'function') ? State.getStatesOfCountry('IN') : [];
+
+  // Read initial filter values from URL search params
+  const initialSearch = searchParams.get('search') || searchParams.get('q') || '';
+  const initialUrlState = searchParams.get('state') || 'All';
+  const initialUrlCity = searchParams.get('city') || 'All';
+  const initialPage = parseInt(searchParams.get('page') || '1', 10);
+
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
+  const [selectedState, setSelectedState] = useState(initialUrlState);
+  const [selectedStateCode, setSelectedStateCode] = useState('');
+  const [availableCities, setAvailableCities] = useState([]);
+  const [selectedCity, setSelectedCity] = useState(initialUrlCity);
   const [toastMsg, setToastMsg] = useState('');
   const [selectedVendorDetail, setSelectedVendorDetail] = useState(null);
 
-  // Manual Scroll Ref & Control
-  const manualScrollRef = useRef(null);
-  const handleManualScroll = (direction) => {
-    if (manualScrollRef.current) {
-      const scrollAmount = direction === 'up' ? -90 : 90;
-      manualScrollRef.current.scrollBy({ top: scrollAmount, behavior: 'smooth' });
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(isNaN(initialPage) || initialPage < 1 ? 1 : initialPage);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Initialize availableCities based on initial state from URL
+  useEffect(() => {
+    if (initialUrlState && initialUrlState !== 'All') {
+      const stObj = allStates.find((s) => s.name.toLowerCase() === initialUrlState.toLowerCase());
+      if (stObj) {
+        setSelectedStateCode(stObj.isoCode);
+        const stateCities = City.getCitiesOfState('IN', stObj.isoCode) || [];
+        setAvailableCities(stateCities);
+      }
+    }
+  }, []);
+
+  // Update URL helper function
+  const updateUrlParams = (updates) => {
+    const newParams = new URLSearchParams(searchParams);
+    
+    Object.entries(updates).forEach(([key, value]) => {
+      if (!value || value === 'All') {
+        newParams.delete(key);
+      } else {
+        newParams.set(key, value);
+      }
+    });
+
+    setSearchParams(newParams);
+  };
+
+  const handleSearchChange = (val) => {
+    setSearchTerm(val);
+    updateUrlParams({ search: val, state: selectedState, city: selectedCity });
+  };
+
+  const handleStateFilterChange = (stateName) => {
+    setSelectedState(stateName);
+    setSelectedCity('All');
+    if (stateName === 'All') {
+      setSelectedStateCode('');
+      setAvailableCities([]);
+      updateUrlParams({ search: searchTerm, state: 'All', city: 'All' });
+    } else {
+      const stObj = allStates.find((s) => s.name.toLowerCase() === stateName.toLowerCase());
+      if (stObj) {
+        setSelectedStateCode(stObj.isoCode);
+        const stateCities = City.getCitiesOfState('IN', stObj.isoCode) || [];
+        setAvailableCities(stateCities);
+      } else {
+        setAvailableCities([]);
+      }
+      updateUrlParams({ search: searchTerm, state: stateName, city: 'All' });
     }
   };
 
-  // Add Vendor Modal State
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const handleCityFilterChange = (cityName) => {
+    setSelectedCity(cityName);
+    updateUrlParams({ search: searchTerm, state: selectedState, city: cityName });
+  };
+
+
+  // View Mode State: 'table' | 'add-vendor'
+  const [viewMode, setViewMode] = useState('table');
+
+  // Custom Fields State
+  const [customFields, setCustomFields] = useState([
+    { id: 'field-1', label: 'GSTIN / Tax ID', type: 'text', placeholder: 'e.g. 27AAAAA0000A1Z5', required: false },
+    { id: 'field-2', label: 'Complete Business Address', type: 'text', placeholder: 'e.g. 102 Commerce Hub, MG Road', required: false },
+    { id: 'field-3', label: 'Pincode', type: 'text', placeholder: 'e.g. 400001', required: false }
+  ]);
+  const [isCustomFieldModalOpen, setIsCustomFieldModalOpen] = useState(false);
+  const [newCustomField, setNewCustomField] = useState({ label: '', type: 'text', placeholder: '', required: false });
+
+  // Add Vendor Form State
   const [showAddPassword, setShowAddPassword] = useState(false);
   const [newVendor, setNewVendor] = useState({
     srNo: '',
@@ -56,6 +134,7 @@ function VendorDatabase({ compact = false }) {
     state: '',
     city: '',
     status: 'Active',
+    customData: {}
   });
 
   // Bulk Upload Modal State
@@ -89,25 +168,41 @@ function VendorDatabase({ compact = false }) {
     dispatch(fetchVendors());
   }, [dispatch]);
 
-  const vendors = Array.isArray(apiVendors) ? apiVendors.map((v, idx) => ({
-    _id: v._id,
-    srNo: v.srNo || String(idx + 1).padStart(2, '0'),
-    transNo: v.transNo || `TRX${Math.floor(90000 + Math.random() * 9999)}`,
-    id: v.vendorId,
-    name: v.vendorName,
-    ownerName: v.ownerName || '-',
-    category: v.category,
-    verificationDateTime: v.verificationDateTime ? new Date(v.verificationDateTime).toLocaleString() : '-',
-    contactNo: v.contactNo || '-',
-    email: v.email || '-',
-    gstNo: v.gstin || '-',
-    address: v.completeAddress || '-',
-    pincode: v.pincode || '-',
-    status: v.status,
-    state: v.state || '-',
-    city: v.city || '-',
-    mappedCustomers: v.mappedCustomers ?? 0
-  })) : [];
+  const vendors = Array.isArray(apiVendors) ? apiVendors.map((v, idx) => {
+    let dateOnly = '-';
+    if (v.verificationDateTime) {
+      const d = new Date(v.verificationDateTime);
+      dateOnly = !isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : String(v.verificationDateTime).split(' ')[0];
+    }
+
+    const mobileNum = v.contactNo || v.mobile || v.phone || v.phoneNumber || v.mobileNumber || '-';
+
+    return {
+      _id: v._id,
+      srNo: v.srNo || String(idx + 1).padStart(2, '0'),
+      transNo: v.transNo || `TRX${Math.floor(90000 + Math.random() * 9999)}`,
+      vendorCode: v.vendorCode || v.vendorId || v.transNo || `VND${Math.floor(1000 + Math.random() * 9000)}`,
+      id: v.vendorId || v.vendorCode || v._id,
+      name: v.companyName || v.shopName || v.vendorName || '-',
+      companyName: v.companyName || v.shopName || v.vendorName || '-',
+      ownerName: v.ownerName || '-',
+      category: v.category || '-',
+      verificationDate: dateOnly,
+      contactNo: mobileNum,
+      mobile: mobileNum,
+      email: v.email || '-',
+      gstNo: v.gstin || '-',
+      address: v.completeAddress || '-',
+      pincode: v.pincode || '-',
+      status: v.status,
+      state: v.state || '-',
+      city: v.city || '-',
+      referId: v.referId || v.referralId || v.referrerId || '-',
+      referCode: v.referCode || v.referralCode || v.refCode || '-',
+      agentName: v.agentName || v.assignedAgent || v.agent || '-',
+      mappedCustomers: v.mappedCustomers ?? 0
+    };
+  }) : [];
 
   // Filter Logic
   const filteredVendors = vendors.filter((ven) => {
@@ -127,6 +222,19 @@ function VendorDatabase({ compact = false }) {
 
     return matchesSearch && matchesState && matchesCity;
   });
+
+  // Calculate pagination boundaries
+  const totalPages = Math.max(1, Math.ceil(filteredVendors.length / itemsPerPage));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  const indexOfLastItem = validCurrentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentDisplayedVendors = filteredVendors.slice(indexOfFirstItem, indexOfLastItem);
+
+  const handlePageChange = (newPage) => {
+    const pageNum = Math.max(1, Math.min(newPage, totalPages));
+    setCurrentPage(pageNum);
+    updateUrlParams({ search: searchTerm, state: selectedState, city: selectedCity, page: pageNum === 1 ? null : pageNum });
+  };
 
   // Submit Add Vendor Form
   const handleAddVendorSubmit = (e) => {
@@ -149,8 +257,8 @@ function VendorDatabase({ compact = false }) {
       city: newVendor.city,
       status: newVendor.status
     })).unwrap().then((res) => {
-      setIsAddModalOpen(false);
       setShowAddPassword(false);
+      setViewMode('table');
       setNewVendor({
         srNo: '',
         transNo: '',
@@ -168,6 +276,7 @@ function VendorDatabase({ compact = false }) {
         state: '',
         city: '',
         status: 'Active',
+        customData: {}
       });
       const emailSent = res?.data?.emailSent;
       const vendorName = res?.data?.vendor?.vendorName || newVendor.name;
@@ -454,6 +563,435 @@ function VendorDatabase({ compact = false }) {
       });
   };
 
+  // Dedicated Full-Page Add Vendor Screen
+  if (viewMode === 'add-vendor') {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
+        {/* Page Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setViewMode('table')}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-2"
+            >
+              <span>← Back to Vendor Directory</span>
+            </button>
+            <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+              <UserPlus size={18} className="text-[#f26522]" />
+              <span>Add New Vendor Record</span>
+            </h2>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsCustomFieldModalOpen(true)}
+              className="px-3.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-[#f26522] border border-orange-200/80 rounded-xl text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+            >
+              <Plus size={15} />
+              <span>+ Add Custom Field</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Full Page Add Vendor Form */}
+        <form onSubmit={handleAddVendorSubmit} className="space-y-6">
+          <div className="bg-slate-50/60 p-5 rounded-2xl border border-slate-200/70 space-y-4">
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">Primary Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1">Vendor Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Zenith Traders Pvt Ltd"
+                  value={newVendor.name}
+                  onChange={(e) => setNewVendor({ ...newVendor, name: e.target.value })}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Category *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Electronics / Medical / Grocery"
+                  value={newVendor.category}
+                  onChange={(e) => setNewVendor({ ...newVendor, category: e.target.value })}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Trans No.</label>
+                <input
+                  type="text"
+                  placeholder="e.g. TRX90106"
+                  value={newVendor.transNo}
+                  onChange={(e) => setNewVendor({ ...newVendor, transNo: e.target.value })}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Contact No.</label>
+                <input
+                  type="text"
+                  placeholder="e.g. +91 98765 43210"
+                  value={newVendor.contactNo}
+                  onChange={(e) => setNewVendor({ ...newVendor, contactNo: e.target.value })}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  placeholder="e.g. vendor@example.com"
+                  value={newVendor.email}
+                  onChange={(e) => setNewVendor({ ...newVendor, email: e.target.value })}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">State</label>
+                <select
+                  value={newVendor.state}
+                  onChange={(e) => setNewVendor({ ...newVendor, state: e.target.value, city: '' })}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 cursor-pointer"
+                >
+                  <option value="">-- Select State --</option>
+                  {allStates.map((st) => (
+                    <option key={st.isoCode} value={st.name}>{st.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">City</label>
+                <select
+                  value={newVendor.city}
+                  onChange={(e) => setNewVendor({ ...newVendor, city: e.target.value })}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 cursor-pointer"
+                >
+                  <option value="">-- Select City --</option>
+                  {(() => {
+                    const stObj = allStates.find((s) => s.name === newVendor.state);
+                    const cityList = stObj ? (City.getCitiesOfState('IN', stObj.isoCode) || []) : [];
+                    return cityList.map((ct) => (
+                      <option key={ct.name} value={ct.name}>{ct.name}</option>
+                    ));
+                  })()}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Status</label>
+                <select
+                  value={newVendor.status}
+                  onChange={(e) => setNewVendor({ ...newVendor, status: e.target.value })}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                >
+                  <option value="Active">Active</option>
+                  <option value="Pending">Pending</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
+                <div className="relative">
+                  <input
+                    type={showAddPassword ? "text" : "password"}
+                    placeholder="Enter vendor login password"
+                    value={newVendor.password}
+                    onChange={(e) => setNewVendor({ ...newVendor, password: e.target.value })}
+                    className="w-full px-3.5 py-2 pr-8 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPassword(!showAddPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showAddPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 mb-1">Verification Date & Time</label>
+                <input
+                  type="text"
+                  placeholder="e.g. 2026-07-31 10:30 AM"
+                  value={newVendor.verificationDateTime}
+                  onChange={(e) => setNewVendor({ ...newVendor, verificationDateTime: e.target.value })}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Custom Form Fields Section */}
+          <div className="bg-slate-50/60 p-5 rounded-2xl border border-slate-200/70 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-black text-[#f26522] uppercase tracking-wider">Custom Dynamic Form Fields</h3>
+                <p className="text-[11px] text-slate-400 mt-0.5">User configured input fields created dynamically</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCustomFieldModalOpen(true)}
+                className="px-3 py-1.5 bg-orange-100 hover:bg-[#f26522] text-[#f26522] hover:text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <Plus size={14} />
+                <span>+ Add Field</span>
+              </button>
+            </div>
+
+            {customFields.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {customFields.map((cf) => (
+                  <div key={cf.id} className={cf.type === 'textarea' ? 'md:col-span-2' : 'col-span-1'}>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-bold text-slate-700">
+                        {cf.label} {cf.required && <span className="text-rose-500">*</span>}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setCustomFields(customFields.filter(f => f.id !== cf.id))}
+                        className="text-[11px] text-slate-400 hover:text-rose-600 font-bold cursor-pointer"
+                      >
+                        ✕ Remove Field
+                      </button>
+                    </div>
+                    {cf.type === 'textarea' ? (
+                      <textarea
+                        rows={3}
+                        required={cf.required}
+                        placeholder={cf.placeholder || `Enter ${cf.label}`}
+                        value={newVendor.customData?.[cf.id] || ''}
+                        onChange={(e) => setNewVendor({
+                          ...newVendor,
+                          customData: { ...newVendor.customData, [cf.id]: e.target.value }
+                        })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 resize-none"
+                      />
+                    ) : cf.type === 'dropdown' ? (
+                      <select
+                        required={cf.required}
+                        value={newVendor.customData?.[cf.id] || ''}
+                        onChange={(e) => setNewVendor({
+                          ...newVendor,
+                          customData: { ...newVendor.customData, [cf.id]: e.target.value }
+                        })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                      >
+                        <option value="">-- Select {cf.label} --</option>
+                        {cf.options && cf.options.map((opt, idx) => (
+                          <option key={idx} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    ) : cf.type === 'checkbox' ? (
+                      <label className="flex items-center gap-2 py-2 cursor-pointer text-xs font-semibold text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={!!newVendor.customData?.[cf.id]}
+                          onChange={(e) => setNewVendor({
+                            ...newVendor,
+                            customData: { ...newVendor.customData, [cf.id]: e.target.checked }
+                          })}
+                          className="rounded border-slate-300 text-[#f26522] focus:ring-[#f26522]"
+                        />
+                        <span>Enable {cf.label}</span>
+                      </label>
+                    ) : (
+                      <input
+                        type={cf.type || 'text'}
+                        required={cf.required}
+                        placeholder={cf.placeholder || `Enter ${cf.label}`}
+                        value={newVendor.customData?.[cf.id] || ''}
+                        onChange={(e) => setNewVendor({
+                          ...newVendor,
+                          customData: { ...newVendor.customData, [cf.id]: e.target.value }
+                        })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 text-center border-2 border-dashed border-slate-200 rounded-xl bg-white">
+                <p className="text-xs text-slate-500 font-medium">No custom fields created yet.</p>
+                <button
+                  type="button"
+                  onClick={() => setIsCustomFieldModalOpen(true)}
+                  className="mt-2 text-xs font-extrabold text-[#f26522] hover:underline cursor-pointer"
+                >
+                  Click here to create a custom field
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Action Footer */}
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-6 py-2.5 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer shadow-md flex items-center gap-1.5 disabled:opacity-50"
+            >
+              <Plus size={15} />
+              <span>{isSaving ? 'Saving...' : 'Save Vendor Record'}</span>
+            </button>
+          </div>
+        </form>
+
+        {/* CREATE CUSTOM FIELD BUILDER MODAL */}
+        {isCustomFieldModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-900 text-white">
+                <div className="flex items-center gap-2">
+                  <Plus size={18} className="text-[#f26522]" />
+                  <h3 className="text-xs font-bold text-white">Create Custom Form Input Field</h3>
+                </div>
+                <button
+                  onClick={() => setIsCustomFieldModalOpen(false)}
+                  className="text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!newCustomField.label.trim()) return;
+                  const fieldId = 'custom_' + Date.now();
+                  const parsedOptions = newCustomField.options
+                    ? newCustomField.options.split(',').map(o => o.trim()).filter(Boolean)
+                    : [];
+                  setCustomFields([
+                    ...customFields,
+                    {
+                      id: fieldId,
+                      label: newCustomField.label.trim(),
+                      type: newCustomField.type || 'text',
+                      placeholder: newCustomField.placeholder ? newCustomField.placeholder.trim() : '',
+                      options: parsedOptions,
+                      required: newCustomField.required
+                    }
+                  ]);
+                  setNewCustomField({ label: '', type: 'text', placeholder: '', options: '', required: false });
+                  setIsCustomFieldModalOpen(false);
+                  setToastMsg(`Custom field "${newCustomField.label}" added to Vendor form!`);
+                  setTimeout(() => setToastMsg(''), 4000);
+                }}
+                className="p-5 space-y-3"
+              >
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Field Label Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Trade License Number / Bank Account No"
+                    value={newCustomField.label}
+                    onChange={(e) => setNewCustomField({ ...newCustomField, label: e.target.value })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">Input Field Type</label>
+                    <select
+                      value={newCustomField.type}
+                      onChange={(e) => setNewCustomField({ ...newCustomField, type: e.target.value })}
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                    >
+                      <option value="text">Short Text</option>
+                      <option value="number">Number</option>
+                      <option value="email">Email</option>
+                      <option value="date">Date</option>
+                      <option value="dropdown">Dropdown Select</option>
+                      <option value="checkbox">Checkbox Toggle</option>
+                      <option value="textarea">Long Text Area</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">Field Constraint</label>
+                    <label className="flex items-center gap-2 mt-2 cursor-pointer text-xs font-semibold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={newCustomField.required}
+                        onChange={(e) => setNewCustomField({ ...newCustomField, required: e.target.checked })}
+                        className="rounded border-slate-300 text-[#f26522] focus:ring-[#f26522]"
+                      />
+                      <span>Required Field</span>
+                    </label>
+                  </div>
+                </div>
+
+                {newCustomField.type === 'dropdown' ? (
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">Dropdown Options (comma separated) *</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Category A, Category B, Category C"
+                      value={newCustomField.options || ''}
+                      onChange={(e) => setNewCustomField({ ...newCustomField, options: e.target.value })}
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">Placeholder Guidance Text</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Enter registered trade license..."
+                      value={newCustomField.placeholder}
+                      onChange={(e) => setNewCustomField({ ...newCustomField, placeholder: e.target.value })}
+                      className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomFieldModalOpen(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                  >
+                    <Plus size={14} />
+                    <span>Add Custom Field</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs flex flex-col justify-between h-full">
       <div>
@@ -473,7 +1011,7 @@ function VendorDatabase({ compact = false }) {
             <div className="flex items-center gap-2 flex-wrap">
               {/* Add Vendor Button */}
               <button
-                onClick={() => setIsAddModalOpen(true)}
+                onClick={() => setViewMode('add-vendor')}
                 className="px-3.5 py-1.5 bg-[#f26522] hover:bg-[#e05411] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1.5"
                 title="Add New Vendor Record"
               >
@@ -489,16 +1027,50 @@ function VendorDatabase({ compact = false }) {
           )}
         </div>
 
-        {/* Search Bar */}
-        <div className="relative mb-3">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search vendor, sr no, trans no, category, verification date, city..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522] text-slate-700 placeholder:text-slate-400"
-          />
+        {/* Search & State/City Filter Bar ⭐ */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+          <div className="relative sm:col-span-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search vendor, sr no, trans no, category, verification date, city..."
+              value={searchTerm}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522] text-slate-700 placeholder:text-slate-400"
+            />
+          </div>
+
+          {/* State Filter Dropdown using country-state-city ⭐ */}
+          <div>
+            <select
+              value={selectedState}
+              onChange={(e) => handleStateFilterChange(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 text-slate-700 font-semibold cursor-pointer"
+            >
+              <option value="All">State: All States (India)</option>
+              {allStates.map((st) => (
+                <option key={st.isoCode} value={st.name}>
+                  {st.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* City Filter Dropdown ⭐ */}
+          <div>
+            <select
+              value={selectedCity}
+              onChange={(e) => handleCityFilterChange(e.target.value)}
+              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 text-slate-700 font-semibold cursor-pointer"
+            >
+              <option value="All">City: All Cities</option>
+              {availableCities.map((ct) => (
+                <option key={ct.name} value={ct.name}>
+                  {ct.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Toast Notification */}
@@ -509,56 +1081,39 @@ function VendorDatabase({ compact = false }) {
           </div>
         )}
 
-        {/* MANUAL SLIDING CONTROL BAR */}
-        <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 mb-2 text-xs">
-          <span className="text-[11px] font-bold text-slate-600">Manual Slide / Scroll View</span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => handleManualScroll('up')}
-              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2"
-              title="Slide Up"
-            >
-              <ChevronUp size={13} />
-              <span>Slide Up</span>
-            </button>
-            <button
-              onClick={() => handleManualScroll('down')}
-              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2"
-              title="Slide Down"
-            >
-              <ChevronDown size={13} />
-              <span>Slide Down</span>
-            </button>
-          </div>
-        </div>
-
-        {/* TABLE VIEW WITH MANUAL HORIZONTAL & VERTICAL SLIDING / SCROLLING */}
+        {/* TABLE VIEW */}
         <div
-          ref={manualScrollRef}
-          className="max-h-[320px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar"
+          className={`${
+            itemsPerPage === 5 ? 'h-[300px]' : 'h-[520px]'
+          } overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar transition-all duration-200`}
         >
-          <table className="w-full min-w-[880px] text-left border-collapse">
+          <table className="w-full min-w-[1250px] text-left border-collapse whitespace-nowrap">
             <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs z-10">
               <tr className="border-b border-slate-100 text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                 <th className="py-2.5 px-3">SR. NO.</th>
-                <th className="py-2.5 px-3">TRANS NO.</th>
-                <th className="py-2.5 px-3">VENDOR NAME</th>
-                <th className="py-2.5 px-3">CATEGORY</th>
-                <th className="py-2.5 px-3">VERIFICATION DATE & TIME</th>
+                <th className="py-2.5 px-3">VENDOR CODE</th>
+                <th className="py-2.5 px-3">COMPANY NAME</th>
+                <th className="py-2.5 px-3">MOBILE NUMBER</th>
+                <th className="py-2.5 px-3">VERIFICATION DATE</th>
                 <th className="py-2.5 px-3">STATE</th>
                 <th className="py-2.5 px-3">CITY</th>
+                <th className="py-2.5 px-3">REFER. ID</th>
+                <th className="py-2.5 px-3">REFER CODE</th>
+                <th className="py-2.5 px-3">AGENT NAME</th>
                 <th className="py-2.5 px-3">STATUS</th>
                 <th className="py-2.5 px-3 text-center">ACTIONS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium">
-              {filteredVendors.length > 0 ? (
-                filteredVendors.map((ven, idx) => (
+              {currentDisplayedVendors.length > 0 ? (
+                currentDisplayedVendors.map((ven, idx) => {
+                  const globalIdx = indexOfFirstItem + idx + 1;
+                  return (
                   <tr key={ven.id || ven._id || idx} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3 px-3 font-bold text-slate-800">{String(idx + 1).padStart(2, '0')}</td>
-                    <td className="py-3 px-3 font-bold text-[#f26522] font-mono text-[11px]">{ven.transNo || ven.id}</td>
+                    <td className="py-3 px-3 font-bold text-slate-800">{String(globalIdx).padStart(2, '0')}</td>
+                    <td className="py-3 px-3 font-bold text-[#f26522] font-mono text-[11px]">{ven.vendorCode || ven.id || ven.transNo}</td>
                     
-                    {/* Clickable Vendor Shop Name ⭐ */}
+                    {/* Clickable Company Name ⭐ */}
                     <td className="py-3 px-3">
                       <button
                         type="button"
@@ -566,14 +1121,17 @@ function VendorDatabase({ compact = false }) {
                         className="text-[#f26522] hover:text-[#e05411] font-black text-xs hover:underline flex items-center gap-1.5 cursor-pointer bg-orange-50/70 px-2 py-1 rounded-lg border border-orange-200/60 shadow-2xs"
                       >
                         <Building2 size={13} className="shrink-0 text-[#f26522]" />
-                        <span>{ven.name}</span>
+                        <span>{ven.companyName || ven.name}</span>
                       </button>
                     </td>
 
-                    <td className="py-3 px-3 text-slate-700 font-semibold">{ven.category}</td>
-                    <td className="py-3 px-3 text-slate-600 text-[11px] font-medium">{ven.verificationDateTime || '-'}</td>
+                    <td className="py-3 px-3 text-slate-700 font-semibold">{ven.contactNo || ven.mobile || '-'}</td>
+                    <td className="py-3 px-3 text-slate-600 text-[11px] font-medium">{ven.verificationDate || '-'}</td>
                     <td className="py-3 px-3 text-slate-600 font-medium">{ven.state}</td>
                     <td className="py-3 px-3 text-slate-600 font-medium">{ven.city}</td>
+                    <td className="py-3 px-3 text-slate-600 font-mono text-[11px]">{ven.referId || '-'}</td>
+                    <td className="py-3 px-3 text-slate-600 font-mono text-[11px]">{ven.referCode || '-'}</td>
+                    <td className="py-3 px-3 text-slate-700 font-semibold">{ven.agentName || '-'}</td>
                     <td className="py-3 px-3">
                       <span
                         className={`font-bold text-xs px-2.5 py-0.5 rounded-full border inline-block ${
@@ -637,10 +1195,11 @@ function VendorDatabase({ compact = false }) {
                       </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
-                  <td colSpan="9" className="py-6 text-center text-xs text-slate-400">
+                  <td colSpan="12" className="py-6 text-center text-xs text-slate-400">
                     No vendor records found matching search criteria.
                   </td>
                 </tr>
@@ -650,195 +1209,71 @@ function VendorDatabase({ compact = false }) {
         </div>
       </div>
 
-      {/* Footer Info Status */}
-      <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100">
-        <span>Showing {filteredVendors.length} of {vendors.length} total vendors</span>
-        <span className="font-semibold text-[#f26522]">Manual Sliding Table Enabled</span>
-      </div>
-
-      {/* ADD VENDOR MODAL (SUPER ADMIN & ADMIN) */}
-      {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
-              <div className="flex items-center gap-2">
-                <UserPlus size={18} className="text-[#f26522]" />
-                <h3 className="text-xs font-bold text-slate-800">Add New Vendor Record (Super Admin)</h3>
-              </div>
-              <button
-                onClick={() => {
-                  setIsAddModalOpen(false);
-                  setShowAddPassword(false);
-                }}
-                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleAddVendorSubmit} className="p-5 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                {/* Vendor Name */}
-                <div className="col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Vendor Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Zenith Traders Pvt Ltd"
-                    value={newVendor.name}
-                    onChange={(e) => setNewVendor({ ...newVendor, name: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Category */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Category *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Electronics / Medical / Grocery"
-                    value={newVendor.category}
-                    onChange={(e) => setNewVendor({ ...newVendor, category: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Trans No. */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Trans No.</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. TRX90106"
-                    value={newVendor.transNo}
-                    onChange={(e) => setNewVendor({ ...newVendor, transNo: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Contact No. */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Contact No.</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. +91 98765 43210"
-                    value={newVendor.contactNo}
-                    onChange={(e) => setNewVendor({ ...newVendor, contactNo: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Email Address */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    placeholder="e.g. vendor@example.com"
-                    value={newVendor.email}
-                    onChange={(e) => setNewVendor({ ...newVendor, email: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* State */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">State</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Maharashtra"
-                    value={newVendor.state}
-                    onChange={(e) => setNewVendor({ ...newVendor, state: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* City */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">City</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Pune"
-                    value={newVendor.city}
-                    onChange={(e) => setNewVendor({ ...newVendor, city: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Status */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Status</label>
-                  <select
-                    value={newVendor.status}
-                    onChange={(e) => setNewVendor({ ...newVendor, status: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Pending">Pending</option>
-                  </select>
-                </div>
-
-                {/* Password */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Password</label>
-                  <div className="relative">
-                    <input
-                      type={showAddPassword ? "text" : "password"}
-                      placeholder="Enter vendor login password"
-                      value={newVendor.password}
-                      onChange={(e) => setNewVendor({ ...newVendor, password: e.target.value })}
-                      className="w-full px-3 py-1.5 pr-8 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowAddPassword(!showAddPassword)}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                      title={showAddPassword ? "Hide password" : "Show password"}
-                    >
-                      {showAddPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Contact Verification Date & Time */}
-                <div className="col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Verification Date & Time</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 2026-07-31 10:30 AM"
-                    value={newVendor.verificationDateTime}
-                    onChange={(e) => setNewVendor({ ...newVendor, verificationDateTime: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAddModalOpen(false);
-                    setShowAddPassword(false);
-                  }}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
-                >
-                  <Plus size={14} />
-                  <span>Save Vendor</span>
-                </button>
-              </div>
-            </form>
+      {/* Modern Interactive Pagination & Footer Bar */}
+      <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs border-t border-slate-100">
+        <div className="flex items-center gap-3 text-slate-500 font-medium">
+          <span>
+            Showing <strong className="text-slate-800">{filteredVendors.length > 0 ? indexOfFirstItem + 1 : 0}</strong> to <strong className="text-slate-800">{Math.min(indexOfLastItem, filteredVendors.length)}</strong> of <strong className="text-slate-800">{filteredVendors.length}</strong> vendors
+          </span>
+          <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
+            <span className="text-[11px] text-slate-400">Per page:</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                handlePageChange(1);
+              }}
+              className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
           </div>
         </div>
-      )}
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={validCurrentPage === 1}
+            onClick={() => handlePageChange(validCurrentPage - 1)}
+            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Previous Page"
+          >
+            <ChevronLeft size={16} />
+          </button>
+
+          <div className="flex items-center gap-1 px-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+              <button
+                key={pageNum}
+                type="button"
+                onClick={() => handlePageChange(pageNum)}
+                className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  pageNum === validCurrentPage
+                    ? 'bg-[#f26522] text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {pageNum}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            disabled={validCurrentPage >= totalPages}
+            onClick={() => handlePageChange(validCurrentPage + 1)}
+            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Next Page"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      </div>
+
+
 
       {/* BULK CSV / EXCEL UPLOAD MODAL */}
       {isUploadModalOpen && (
@@ -1230,25 +1665,35 @@ function VendorDatabase({ compact = false }) {
                 {/* State */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">State</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Maharashtra"
+                  <select
                     value={editingVendor.state}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, state: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
+                    onChange={(e) => setEditingVendor({ ...editingVendor, state: e.target.value, city: '' })}
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 cursor-pointer"
+                  >
+                    <option value="">-- Select State --</option>
+                    {allStates.map((st) => (
+                      <option key={st.isoCode} value={st.name}>{st.name}</option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* City */}
                 <div>
                   <label className="block text-[11px] font-bold text-slate-700 mb-1">City</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Pune"
+                  <select
                     value={editingVendor.city}
                     onChange={(e) => setEditingVendor({ ...editingVendor, city: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
+                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 cursor-pointer"
+                  >
+                    <option value="">-- Select City --</option>
+                    {(() => {
+                      const stObj = allStates.find((s) => s.name === editingVendor.state);
+                      const cityList = stObj ? (City.getCitiesOfState('IN', stObj.isoCode) || []) : [];
+                      return cityList.map((ct) => (
+                        <option key={ct.name} value={ct.name}>{ct.name}</option>
+                      ));
+                    })()}
+                  </select>
                 </div>
 
                 {/* Status */}

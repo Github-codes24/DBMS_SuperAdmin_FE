@@ -1,51 +1,101 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import axios from 'axios';
 import { State, City } from 'country-state-city';
 import api from '../services/api';
-import { 
-  fetchCustomers, 
-  createCustomer, 
-  updateCustomer, 
-  bulkImportCustomers 
+import AddCustomer from './AddCustomer';
+import {
+  fetchCustomers,
+  createCustomer,
+  updateCustomer,
+  deleteCustomer,
+  bulkImportCustomers
 } from '../redux/slices/customerSlice';
-import { 
-  Search, 
-  Download, 
-  Lock, 
-  FileSpreadsheet, 
-  FileText, 
-  Upload, 
-  X, 
-  Check, 
-  FileDown, 
-  UserPlus, 
-  Plus, 
-  ChevronUp, 
+import {
+  Search,
+  Download,
+  Lock,
+  FileSpreadsheet,
+  FileText,
+  Upload,
+  X,
+  Check,
+  FileDown,
+  UserPlus,
+  Plus,
+  ChevronUp,
   ChevronDown,
   AlertCircle,
   Info,
-  Loader2
+  Loader2,
+  Eye,
+  Edit2,
+  Trash2,
+  Ban,
+  ChevronLeft,
+  ChevronRight,
+  Filter
 } from 'lucide-react';
 
 function CustomerDatabase({ compact = false }) {
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { customers: apiCustomers = [], loading = false, isSaving = false } = useSelector((state) => state.customer || {});
 
+  // Page View Mode: 'list' | 'add' | 'edit' | 'view'
+  const [viewMode, setViewMode] = useState('list');
+
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+
+  // Status Filter Sync with URL search params
+  const validStatuses = ['All', 'Active', 'Pending', 'Rejected', 'Blocked'];
+  const urlStatus = searchParams.get('status');
+  const initialStatus = urlStatus && validStatuses.map(s => s.toLowerCase()).includes(urlStatus.toLowerCase())
+    ? validStatuses.find(s => s.toLowerCase() === urlStatus.toLowerCase())
+    : 'All';
+
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
+
+  useEffect(() => {
+    const currentUrlStatus = searchParams.get('status');
+    if (currentUrlStatus && validStatuses.map(s => s.toLowerCase()).includes(currentUrlStatus.toLowerCase())) {
+      const matched = validStatuses.find(s => s.toLowerCase() === currentUrlStatus.toLowerCase());
+      if (matched !== statusFilter) {
+        setStatusFilter(matched);
+      }
+    } else if (!currentUrlStatus && statusFilter !== 'All') {
+      setStatusFilter('All');
+    }
+  }, [searchParams]);
+
+  const handleStatusFilterChange = (newStatus) => {
+    setStatusFilter(newStatus);
+    setCurrentPage(1);
+    const newParams = new URLSearchParams(searchParams);
+    if (newStatus === 'All') {
+      newParams.delete('status');
+    } else {
+      newParams.set('status', newStatus.toLowerCase());
+    }
+    setSearchParams(newParams);
+  };
   const [toastMsg, setToastMsg] = useState('');
+
+  // View, Edit & Delete Modal States
+  const [selectedCustomerDetail, setSelectedCustomerDetail] = useState(null);
+  const [editingCustomer, setEditingCustomer] = useState(null);
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, customer: null });
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Manual Scroll Ref & Control (No Automatic Timer)
   const manualScrollRef = useRef(null);
-  const handleManualScroll = (direction) => {
-    if (manualScrollRef.current) {
-      const scrollAmount = direction === 'up' ? -90 : 90;
-      manualScrollRef.current.scrollBy({ top: scrollAmount, behavior: 'smooth' });
-    }
-  };
+
 
   // Add Customer Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -175,34 +225,78 @@ function CustomerDatabase({ compact = false }) {
     dispatch(fetchCustomers());
   }, [dispatch]);
 
-  const customers = Array.isArray(apiCustomers) ? apiCustomers.map((cust, idx) => ({
-    _id: cust._id,
-    srNo: cust.srNo || String(idx + 1).padStart(2, '0'),
-    id: cust.customerId,
-    name: cust.name,
-    companyName: cust.companyName,
-    state: cust.state,
-    city: cust.city,
-    pincode: cust.pincode,
-    regDate: cust.registrationDate ? new Date(cust.registrationDate).toISOString().slice(0, 10) : '-',
-    status: cust.status,
-    telecaller: cust.assignedTelecaller || 'Unassigned',
-    email: cust.email || '-',
-    mobile: cust.mobile || '-',
-  })) : [];
+  const getDisplayNumber = (cust) => {
+    const candidates = [
+      cust.mobile,
+      cust.mobileNumber,
+      cust.phone,
+      cust.phoneNumber,
+      cust.contact,
+      cust.contactNumber,
+      cust.number
+    ];
+
+    for (const value of candidates) {
+      if (value !== undefined && value !== null) {
+        const number = String(value).trim();
+
+        if (
+          number &&
+          number !== '-' &&
+          number !== '—' &&
+          number !== 'null' &&
+          number !== 'undefined' &&
+          !number.toUpperCase().startsWith('CUST')
+        ) {
+          return number;
+        }
+      }
+    }
+
+    return '-';
+  };
+
+  const customers = Array.isArray(apiCustomers) ? apiCustomers.map((cust, idx) => {
+    const mobileNum = getDisplayNumber(cust);
+
+    return {
+      _id: cust._id,
+      srNo: cust.srNo || String(idx + 1).padStart(2, '0'),
+      id: cust.customerId || cust._id,
+      number: mobileNum,
+      name: cust.name || mobileNum || '-',
+      companyName: cust.companyName,
+      state: cust.state,
+      city: cust.city,
+      pincode: cust.pincode,
+      regDate: cust.registrationDate ? new Date(cust.registrationDate).toISOString().slice(0, 10) : '-',
+      status: cust.status,
+      telecaller: cust.assignedTelecaller || 'Unassigned',
+      email: cust.email || '-',
+      mobile: mobileNum,
+    };
+  }) : [];
 
   const filteredCustomers = customers.filter((cust) => {
     const matchesSearch =
-      cust.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (cust.name && cust.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (cust.number && cust.number.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (cust.companyName && cust.companyName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      cust.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (cust.id && cust.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (cust.state && cust.state.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (cust.city && cust.city.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (cust.pincode && cust.pincode.includes(searchTerm)) ||
-      cust.telecaller.toLowerCase().includes(searchTerm.toLowerCase());
+      (cust.telecaller && cust.telecaller.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesStatus = statusFilter === 'All' || cust.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  // Calculate pagination boundaries
+  const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / itemsPerPage));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  const indexOfLastItem = validCurrentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentDisplayedCustomers = filteredCustomers.slice(indexOfFirstItem, indexOfLastItem);
 
   // Submit New Customer Form (Super Admin Access)
   const handleAddCustomerSubmit = (e) => {
@@ -213,8 +307,10 @@ function CustomerDatabase({ compact = false }) {
     }
 
     dispatch(createCustomer({
-      name: newCustomer.name,
+      _isLocal: true,
+      name: newCustomer.companyName || newCustomer.name || 'Customer',
       companyName: newCustomer.companyName,
+      mobileNumber: newCustomer.mobileNumber || newCustomer.mobile || newCustomer.number,
       state: newCustomer.state,
       city: newCustomer.city,
       pincode: newCustomer.pincode,
@@ -251,6 +347,102 @@ function CustomerDatabase({ compact = false }) {
       setToastMsg(`Status for "${cust.name}" toggled successfully!`);
       setTimeout(() => setToastMsg(''), 4000);
     });
+  };
+
+  // View Customer Record
+  const handleViewCustomer = (cust) => {
+    setSelectedCustomerDetail(cust);
+    setViewMode('view');
+  };
+
+  // Edit Customer Record
+  const handleEditCustomer = (cust) => {
+    if (!hasAccessPermission) return;
+    setEditingCustomer({
+      _id: cust._id,
+      id: cust.id,
+      srNo: cust.srNo,
+      name: cust.name,
+      companyName: cust.companyName,
+      state: cust.state || '',
+      city: cust.city || '',
+      pincode: cust.pincode || '',
+      regDate: cust.regDate || new Date().toISOString().slice(0, 10),
+      status: cust.status || 'Active',
+      telecaller: cust.telecaller || 'TC014',
+      email: cust.email !== '-' ? cust.email : '',
+      mobile: cust.mobile !== '-' ? cust.mobile : '',
+    });
+    setViewMode('edit');
+  };
+
+  // Save Edited Customer
+  const handleEditCustomerSubmit = (e) => {
+    e.preventDefault();
+    if (!editingCustomer) return;
+
+    dispatch(updateCustomer({
+      customerId: editingCustomer._id || editingCustomer.id,
+      updateData: {
+        name: editingCustomer.name,
+        companyName: editingCustomer.companyName,
+        state: editingCustomer.state,
+        city: editingCustomer.city,
+        pincode: editingCustomer.pincode,
+        status: editingCustomer.status,
+        assignedTelecaller: editingCustomer.telecaller,
+        email: editingCustomer.email,
+        mobile: editingCustomer.mobile
+      }
+    })).unwrap().then(() => {
+      setViewMode('list');
+      setEditingCustomer(null);
+      dispatch(fetchCustomers());
+      setToastMsg(`Customer "${editingCustomer.name}" updated successfully!`);
+      setTimeout(() => setToastMsg(''), 4000);
+    }).catch((err) => {
+      console.error('Failed to update customer:', err);
+    });
+  };
+
+  // Open Block / Delete Confirmation Modal
+  const handleOpenConfirmModal = (type, cust) => {
+    setConfirmModal({ isOpen: true, type, customer: cust });
+  };
+
+  // Close Confirmation Modal
+  const handleCloseConfirmModal = () => {
+    setConfirmModal({ isOpen: false, type: null, customer: null });
+  };
+
+  // Execute Block / Delete Action
+  const handleConfirmAction = () => {
+    const { type, customer } = confirmModal;
+    if (!customer) return;
+
+    if (type === 'delete') {
+      const targetId = customer._id || customer.id;
+      dispatch(deleteCustomer(targetId)).unwrap().then(() => {
+        handleCloseConfirmModal();
+        dispatch(fetchCustomers());
+        setToastMsg(`Customer deleted successfully!`);
+        setTimeout(() => setToastMsg(''), 4000);
+      }).catch((err) => {
+        console.error('Delete failed:', err);
+        handleCloseConfirmModal();
+      });
+    } else if (type === 'block') {
+      const newStatus = customer.status === 'Blocked' ? 'Active' : 'Blocked';
+      dispatch(updateCustomer({
+        customerId: customer._id || customer.id,
+        updateData: { status: newStatus }
+      })).unwrap().then(() => {
+        handleCloseConfirmModal();
+        dispatch(fetchCustomers());
+        setToastMsg(`Customer "${customer.name}" has been ${newStatus.toLowerCase()}!`);
+        setTimeout(() => setToastMsg(''), 4000);
+      });
+    }
   };
 
   // Handle Export CSV
@@ -708,6 +900,190 @@ function CustomerDatabase({ compact = false }) {
     }
   };
 
+  if (viewMode === 'add') {
+    return (
+      <AddCustomer
+        onBack={() => setViewMode('list')}
+        onSuccess={(addedName) => {
+          setViewMode('list');
+          setToastMsg(`Customer "${addedName}" added successfully!`);
+          setTimeout(() => setToastMsg(''), 4000);
+        }}
+      />
+    );
+  }
+
+  // RENDER DEDICATED EDIT PAGE VIEW
+  if (viewMode === 'edit' && editingCustomer) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                setViewMode('list');
+                setEditingCustomer(null);
+              }}
+              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              title="Back to Customer Directory"
+            >
+              <X size={18} />
+            </button>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                <Edit2 size={20} className="text-[#f26522]" />
+                <span>Edit Customer Record</span>
+              </h2>
+              <p className="text-xs text-slate-500">Update customer details below and click save</p>
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={handleEditCustomerSubmit} className="space-y-6 max-w-4xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Customer Number / Name *</label>
+              <input
+                type="text"
+                required
+                value={editingCustomer.name}
+                onChange={(e) => setEditingCustomer({ ...editingCustomer, name: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Company Name *</label>
+              <input
+                type="text"
+                required
+                value={editingCustomer.companyName}
+                onChange={(e) => setEditingCustomer({ ...editingCustomer, companyName: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">State</label>
+              <input
+                type="text"
+                value={editingCustomer.state}
+                onChange={(e) => setEditingCustomer({ ...editingCustomer, state: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">City</label>
+              <input
+                type="text"
+                value={editingCustomer.city}
+                onChange={(e) => setEditingCustomer({ ...editingCustomer, city: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Status</label>
+              <select
+                value={editingCustomer.status}
+                onChange={(e) => setEditingCustomer({ ...editingCustomer, status: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 cursor-pointer"
+              >
+                <option value="Active">Active</option>
+                <option value="Pending">Pending</option>
+                <option value="Blocked">Blocked</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Telecaller</label>
+              <input
+                type="text"
+                value={editingCustomer.telecaller}
+                onChange={(e) => setEditingCustomer({ ...editingCustomer, telecaller: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('list');
+                setEditingCustomer(null);
+              }}
+              className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-6 py-2.5 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-all cursor-pointer shadow-xs flex items-center gap-2"
+            >
+              <Check size={15} />
+              <span>{isSaving ? 'Saving...' : 'Update Record'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // RENDER DEDICATED VIEW DETAIL PAGE VIEW
+  if (viewMode === 'view' && selectedCustomerDetail) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                setViewMode('list');
+                setSelectedCustomerDetail(null);
+              }}
+              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              title="Back to Customer Directory"
+            >
+              <X size={18} />
+            </button>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                <Eye size={20} className="text-[#f26522]" />
+                <span>Customer Profile Overview</span>
+              </h2>
+              <p className="text-xs text-slate-500">Comprehensive customer record information</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-slate-50 p-4 rounded-xl space-y-2">
+            <div className="text-xs text-slate-500 font-bold uppercase">Number / Name</div>
+            <div className="text-sm font-bold text-slate-900">{selectedCustomerDetail.name}</div>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl space-y-2">
+            <div className="text-xs text-slate-500 font-bold uppercase">Company Name</div>
+            <div className="text-sm font-bold text-[#f26522]">{selectedCustomerDetail.companyName || '-'}</div>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl space-y-2">
+            <div className="text-xs text-slate-500 font-bold uppercase">State</div>
+            <div className="text-sm font-semibold text-slate-800">{selectedCustomerDetail.state || '-'}</div>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl space-y-2">
+            <div className="text-xs text-slate-500 font-bold uppercase">City</div>
+            <div className="text-sm font-semibold text-slate-800">{selectedCustomerDetail.city || '-'}</div>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl space-y-2">
+            <div className="text-xs text-slate-500 font-bold uppercase">Reg. Date</div>
+            <div className="text-sm font-semibold text-slate-800">{selectedCustomerDetail.regDate || '-'}</div>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl space-y-2">
+            <div className="text-xs text-slate-500 font-bold uppercase">Status</div>
+            <div className={`text-sm font-bold ${selectedCustomerDetail.status === 'Active' ? 'text-emerald-600' : 'text-amber-600'}`}>
+              {selectedCustomerDetail.status}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs flex flex-col justify-between h-full">
       <div>
@@ -727,7 +1103,7 @@ function CustomerDatabase({ compact = false }) {
             <div className="flex items-center gap-2 flex-wrap">
               {/* Add Customer Button (Super Admin Access) */}
               <button
-                onClick={() => setIsAddModalOpen(true)}
+                onClick={() => setViewMode('add')}
                 className="px-3.5 py-1.5 bg-[#f26522] hover:bg-[#e05411] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1.5"
                 title="Add New Customer Record"
               >
@@ -792,7 +1168,7 @@ function CustomerDatabase({ compact = false }) {
           )}
         </div>
 
-        {/* Search Bar & Toolbar */}
+        {/* Search Bar & Status Filter Toolbar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
           <div className="relative w-full sm:max-w-md md:max-w-lg">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -804,6 +1180,25 @@ function CustomerDatabase({ compact = false }) {
               className="w-full pl-9 pr-4 py-2 text-xs bg-slate-50 border border-slate-200/80 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522] text-slate-700 placeholder:text-slate-400 font-medium transition-all"
             />
           </div>
+
+          {/* Status Filter Dropdown */}
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 whitespace-nowrap">
+              <Filter size={13} className="text-[#f26522]" />
+              <span>Status:</span>
+            </label>
+            <select
+              value={statusFilter}
+              onChange={(e) => handleStatusFilterChange(e.target.value)}
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522] cursor-pointer shadow-2xs transition-all"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Active">Active</option>
+              <option value="Pending">Pending</option>
+              <option value="Rejected">Rejected</option>
+              <option value="Blocked">Blocked</option>
+            </select>
+          </div>
         </div>
 
         {/* Toast Notification */}
@@ -814,73 +1209,101 @@ function CustomerDatabase({ compact = false }) {
           </div>
         )}
 
-        {/* MANUAL SLIDING CONTROL BAR */}
-        <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 mb-2 text-xs">
-          <span className="text-[11px] font-bold text-slate-600">Manual Slide / Scroll View</span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => handleManualScroll('up')}
-              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2"
-              title="Slide Up"
-            >
-              <ChevronUp size={13} />
-              <span>Slide Up</span>
-            </button>
-            <button
-              onClick={() => handleManualScroll('down')}
-              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2"
-              title="Slide Down"
-            >
-              <ChevronDown size={13} />
-              <span>Slide Down</span>
-            </button>
-          </div>
-        </div>
+
 
         {/* TABLE VIEW WITH MANUAL HORIZONTAL & VERTICAL SLIDING / SCROLLING */}
         <div
           ref={manualScrollRef}
           className="max-h-[320px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar"
         >
-          <table className="w-full min-w-[700px] text-left border-collapse">
+          <table className="w-full min-w-[750px] text-left border-collapse">
             <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs z-10">
               <tr className="border-b border-slate-100 text-[10px] font-bold uppercase text-slate-400 tracking-wider">
                 <th className="py-2.5 px-3">SR. NO.</th>
-                <th className="py-2.5 px-3">NAME</th>
+                <th className="py-2.5 px-3">MOBILE NUMBER</th>
                 <th className="py-2.5 px-3">COMPANY NAME</th>
                 <th className="py-2.5 px-3">STATE</th>
                 <th className="py-2.5 px-3">CITY</th>
-                <th className="py-2.5 px-3">PINCODE</th>
                 <th className="py-2.5 px-3">REG. DATE</th>
                 <th className="py-2.5 px-3">STATUS</th>
+                <th className="py-2.5 px-3 text-center">ACTIONS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium">
-              {filteredCustomers.length > 0 ? (
-                filteredCustomers.map((cust, idx) => (
-                  <tr key={cust.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3 px-3 font-bold text-slate-800">{String(idx + 1).padStart(2, '0')}</td>
-                    <td className="py-3 px-3 font-semibold text-slate-900">{cust.name}</td>
-                    <td className="py-3 px-3 font-bold text-[#f26522]">{cust.companyName || '-'}</td>
-                    <td className="py-3 px-3 text-slate-600 font-medium">{cust.state || '-'}</td>
-                    <td className="py-3 px-3 text-slate-600 font-medium">{cust.city || '-'}</td>
-                    <td className="py-3 px-3 text-slate-500 font-mono text-[11px] font-semibold">{cust.pincode || '-'}</td>
-                    <td className="py-3 px-3 text-slate-500 text-[11px]">{cust.regDate || '-'}</td>
-                    <td className="py-3 px-3">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleStatus(cust)}
-                        disabled={isSaving}
-                        className={`font-semibold text-xs transition-all hover:scale-105 active:scale-95 cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed ${
-                          cust.status === 'Active' ? 'text-emerald-600' : 'text-amber-600'
-                        }`}
-                        title="Click to toggle status"
-                      >
-                        {cust.status}
-                      </button>
-                    </td>
-                  </tr>
-                ))
+              {currentDisplayedCustomers.length > 0 ? (
+                currentDisplayedCustomers.map((cust, idx) => {
+                  const globalIdx = indexOfFirstItem + idx + 1;
+                  return (
+                    <tr key={cust.id || idx} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-3 px-3 font-bold text-slate-800">{String(globalIdx).padStart(2, '0')}</td>
+                      <td className="py-3 px-3 font-semibold text-slate-900">{cust.number}</td>
+                      <td className="py-3 px-3 font-bold text-[#f26522]">{cust.companyName || '-'}</td>
+                      <td className="py-3 px-3 text-slate-600 font-medium">{cust.state || '-'}</td>
+                      <td className="py-3 px-3 text-slate-600 font-medium">{cust.city || '-'}</td>
+                      <td className="py-3 px-3 text-slate-500 text-[11px]">{cust.regDate || '-'}</td>
+                      <td className="py-3 px-3">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(cust)}
+                          disabled={isSaving}
+                          className={`font-semibold text-xs transition-all hover:scale-105 active:scale-95 cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed ${
+                            cust.status === 'Active'
+                              ? 'text-emerald-600'
+                              : cust.status === 'Blocked' || cust.status === 'Rejected'
+                              ? 'text-rose-600'
+                              : 'text-amber-600'
+                          }`}
+                          title="Click to toggle status"
+                        >
+                          {cust.status}
+                        </button>
+                      </td>
+                      <td className="py-3 px-3">
+                        <div className="flex items-center justify-center gap-1">
+                          {/* View Action */}
+                          <button
+                            type="button"
+                            onClick={() => handleViewCustomer(cust)}
+                            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            title="View Profile"
+                          >
+                            <Eye size={15} />
+                          </button>
+                          {/* Edit Action */}
+                          <button
+                            type="button"
+                            onClick={() => handleEditCustomer(cust)}
+                            className="p-1.5 text-slate-400 hover:text-[#f26522] hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Customer"
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                          {/* Block / Unblock Action */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenConfirmModal('block', cust)}
+                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${cust.status === 'Blocked'
+                              ? 'text-emerald-600 hover:bg-emerald-50'
+                              : 'text-amber-500 hover:text-amber-700 hover:bg-amber-50'
+                              }`}
+                            title={cust.status === 'Blocked' ? 'Unblock Customer' : 'Block Customer'}
+                          >
+                            <Ban size={15} />
+                          </button>
+                          {/* Delete Action */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenConfirmModal('delete', cust)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Customer"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan="8" className="py-6 text-center text-xs text-slate-400">
@@ -893,172 +1316,147 @@ function CustomerDatabase({ compact = false }) {
         </div>
       </div>
 
-      {/* Footer Info Status */}
-      <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100">
-        <span>Showing {filteredCustomers.length} of {customers.length} total customer records</span>
-        <span className="font-semibold text-[#f26522]">Manual Sliding Table Enabled</span>
+      {/* Modern Interactive Pagination & Footer Bar */}
+      <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs border-t border-slate-100">
+        <div className="flex items-center gap-3 text-slate-500 font-medium">
+          <span>
+            Showing <strong className="text-slate-800">{filteredCustomers.length > 0 ? indexOfFirstItem + 1 : 0}</strong> to <strong className="text-slate-800">{Math.min(indexOfLastItem, filteredCustomers.length)}</strong> of <strong className="text-slate-800">{filteredCustomers.length}</strong> records
+          </span>
+          <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
+            <span className="text-[11px] text-slate-400">Per page:</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={validCurrentPage === 1}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Previous Page"
+          >
+            <ChevronLeft size={16} />
+          </button>
+
+          <div className="flex items-center gap-1 px-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+              <button
+                key={pageNum}
+                type="button"
+                onClick={() => setCurrentPage(pageNum)}
+                className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${pageNum === validCurrentPage
+                    ? 'bg-[#f26522] text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+              >
+                {pageNum}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            disabled={validCurrentPage === totalPages}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            title="Next Page"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
       </div>
 
-      {/* ADD CUSTOMER MODAL (SUPER ADMIN ACCESS) */}
-      {isAddModalOpen && (
+      {/* BLOCK / DELETE CONFIRMATION MODAL */}
+      {confirmModal.isOpen && confirmModal.customer && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
-              <div className="flex items-center gap-2">
-                <UserPlus size={18} className="text-[#f26522]" />
-                <h3 className="text-xs font-bold text-slate-800">Add New Customer Record (Super Admin)</h3>
-              </div>
-              <button
-                onClick={() => setIsAddModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleAddCustomerSubmit} className="p-5 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                {/* Sr. No. */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Sr. No.</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 06"
-                    value={newCustomer.srNo}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, srNo: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Name */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Customer Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Suresh Kumar"
-                    value={newCustomer.name}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Company Name */}
-                <div className="col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Company Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Global Trade Enterprises Pvt Ltd"
-                    value={newCustomer.companyName}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, companyName: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* State */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">State</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Maharashtra"
-                    value={newCustomer.state}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, state: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* City */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">City</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Nagpur"
-                    value={newCustomer.city}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, city: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Pincode */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Pincode</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 440001"
-                    value={newCustomer.pincode}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, pincode: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Registration Date */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Registration Date</label>
-                  <input
-                    type="date"
-                    value={newCustomer.regDate}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, regDate: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Status */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Status</label>
-                  <select
-                    value={newCustomer.status}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, status: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Pending">Pending</option>
-                  </select>
-                </div>
-
-                {/* Telecaller */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Assigned Telecaller</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. TC014"
-                    value={newCustomer.telecaller}
-                    onChange={(e) => setNewCustomer({ ...newCustomer, telecaller: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden">
+            <div className="p-6 text-center space-y-4">
+              <div className={`w-12 h-12 rounded-2xl mx-auto flex items-center justify-center ${confirmModal.type === 'delete'
+                ? 'bg-rose-50 text-rose-600 border border-rose-100'
+                : 'bg-amber-50 text-amber-600 border border-amber-100'
+                }`}>
+                {confirmModal.type === 'delete' ? <Trash2 size={24} /> : <Ban size={24} />}
               </div>
 
-              {/* Modal Footer */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  {confirmModal.type === 'delete'
+                    ? 'Delete Customer Record?'
+                    : confirmModal.customer.status === 'Blocked'
+                      ? 'Unblock Customer?'
+                      : 'Block Customer?'}
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  {confirmModal.type === 'delete'
+                    ? `Are you sure you want to permanently delete "${confirmModal.customer.name}"? This action cannot be undone.`
+                    : confirmModal.customer.status === 'Blocked'
+                      ? `Are you sure you want to unblock "${confirmModal.customer.name}"?`
+                      : `Are you sure you want to block "${confirmModal.customer.name}"?`}
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+                  onClick={handleCloseConfirmModal}
+                  disabled={isSaving}
+                  className="w-full py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  className="px-5 py-2 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                  type="button"
+                  onClick={handleConfirmAction}
+                  disabled={isSaving}
+                  className={`w-full py-2.5 px-4 text-xs font-bold text-white rounded-xl transition-colors cursor-pointer disabled:opacity-50 shadow-xs flex items-center justify-center gap-1.5 ${confirmModal.type === 'delete'
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : confirmModal.customer.status === 'Blocked'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-amber-600 hover:bg-amber-700'
+                    }`}
                 >
-                  <Plus size={14} />
-                  <span>Save Customer</span>
+                  {isSaving ? (
+                    <span>Processing...</span>
+                  ) : confirmModal.type === 'delete' ? (
+                    <>
+                      <Trash2 size={14} />
+                      <span>Yes, Delete</span>
+                    </>
+                  ) : confirmModal.customer.status === 'Blocked' ? (
+                    <span>Yes, Unblock</span>
+                  ) : (
+                    <>
+                      <Ban size={14} />
+                      <span>Yes, Block</span>
+                    </>
+                  )}
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
+
+
 
       {/* STEP 1: IMPORT CUSTOMERS MODAL */}
       {isUploadModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
-            
+
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
               <div className="flex items-center gap-2.5">
@@ -1084,7 +1482,7 @@ function CustomerDatabase({ compact = false }) {
 
             {/* Modal Body */}
             <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
-              
+
               {/* Category Dropdown */}
               <div className="space-y-1.5" ref={catDropdownRef}>
                 <label className="block text-xs font-bold text-slate-700">
@@ -1099,9 +1497,8 @@ function CustomerDatabase({ compact = false }) {
                       setIsStateDropdownOpen(false);
                       setIsCityDropdownOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs bg-slate-50 border rounded-xl transition-all font-medium text-left cursor-pointer hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 ${
-                      isCatDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : 'border-slate-200'
-                    }`}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs bg-slate-50 border rounded-xl transition-all font-medium text-left cursor-pointer hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 ${isCatDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : 'border-slate-200'
+                      }`}
                   >
                     <span className={selectedCatName ? 'text-slate-800 font-semibold truncate' : 'text-slate-400'}>
                       {selectedCatName || 'Select Category'}
@@ -1150,11 +1547,10 @@ function CustomerDatabase({ compact = false }) {
                                   key={c._id || name}
                                   type="button"
                                   onClick={() => handleSelectCategory(c)}
-                                  className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${
-                                    isSelected
-                                      ? 'bg-orange-50 font-bold text-[#f26522]'
-                                      : 'text-slate-700 hover:bg-slate-50 hover:text-[#f26522]'
-                                  }`}
+                                  className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${isSelected
+                                    ? 'bg-orange-50 font-bold text-[#f26522]'
+                                    : 'text-slate-700 hover:bg-slate-50 hover:text-[#f26522]'
+                                    }`}
                                 >
                                   <span className="truncate">{name}</span>
                                   {isSelected && <Check size={13} className="text-[#f26522] shrink-0" />}
@@ -1185,11 +1581,10 @@ function CustomerDatabase({ compact = false }) {
                       setIsStateDropdownOpen(false);
                       setIsCityDropdownOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs border rounded-xl transition-all font-medium text-left ${
-                      !selectedCatName
-                        ? 'bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed'
-                        : 'bg-slate-50 border-slate-200 hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 cursor-pointer'
-                    } ${isSubCatDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : ''}`}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs border rounded-xl transition-all font-medium text-left ${!selectedCatName
+                      ? 'bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'bg-slate-50 border-slate-200 hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 cursor-pointer'
+                      } ${isSubCatDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : ''}`}
                   >
                     <span className={selectedSubCatName ? 'text-slate-800 font-semibold truncate' : 'text-slate-400'}>
                       {!selectedCatName ? 'Select category first' : (selectedSubCatName || 'Select Sub-Category')}
@@ -1238,11 +1633,10 @@ function CustomerDatabase({ compact = false }) {
                                   key={sc._id || name}
                                   type="button"
                                   onClick={() => handleSelectSubCategory(sc)}
-                                  className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${
-                                    isSelected
-                                      ? 'bg-orange-50 font-bold text-[#f26522]'
-                                      : 'text-slate-700 hover:bg-slate-50 hover:text-[#f26522]'
-                                  }`}
+                                  className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${isSelected
+                                    ? 'bg-orange-50 font-bold text-[#f26522]'
+                                    : 'text-slate-700 hover:bg-slate-50 hover:text-[#f26522]'
+                                    }`}
                                 >
                                   <span className="truncate">{name}</span>
                                   {isSelected && <Check size={13} className="text-[#f26522] shrink-0" />}
@@ -1271,9 +1665,8 @@ function CustomerDatabase({ compact = false }) {
                       setIsSubCatDropdownOpen(false);
                       setIsCityDropdownOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs bg-slate-50 border rounded-xl transition-all font-medium text-left cursor-pointer hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 ${
-                      isStateDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : 'border-slate-200'
-                    }`}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs bg-slate-50 border rounded-xl transition-all font-medium text-left cursor-pointer hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 ${isStateDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : 'border-slate-200'
+                      }`}
                   >
                     <span className={selectedState ? 'text-slate-800 font-semibold truncate' : 'text-slate-400'}>
                       {selectedState || 'Select State'}
@@ -1315,11 +1708,10 @@ function CustomerDatabase({ compact = false }) {
                                 key={s.isoCode}
                                 type="button"
                                 onClick={() => handleSelectState(s)}
-                                className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${
-                                  isSelected
-                                    ? 'bg-orange-50 font-bold text-[#f26522]'
-                                    : 'text-slate-700 hover:bg-slate-50 hover:text-[#f26522]'
-                                }`}
+                                className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${isSelected
+                                  ? 'bg-orange-50 font-bold text-[#f26522]'
+                                  : 'text-slate-700 hover:bg-slate-50 hover:text-[#f26522]'
+                                  }`}
                               >
                                 <span className="truncate">{s.name}</span>
                                 {isSelected && <Check size={13} className="text-[#f26522] shrink-0" />}
@@ -1349,11 +1741,10 @@ function CustomerDatabase({ compact = false }) {
                       setIsSubCatDropdownOpen(false);
                       setIsStateDropdownOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs border rounded-xl transition-all font-medium text-left ${
-                      !selectedState
-                        ? 'bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed'
-                        : 'bg-slate-50 border-slate-200 hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 cursor-pointer'
-                    } ${isCityDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : ''}`}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs border rounded-xl transition-all font-medium text-left ${!selectedState
+                      ? 'bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed'
+                      : 'bg-slate-50 border-slate-200 hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 cursor-pointer'
+                      } ${isCityDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : ''}`}
                   >
                     <span className={selectedCity ? 'text-slate-800 font-semibold truncate' : 'text-slate-400'}>
                       {!selectedState ? 'Select state first' : (selectedCity || 'Select City')}
@@ -1395,11 +1786,10 @@ function CustomerDatabase({ compact = false }) {
                                 key={c.name}
                                 type="button"
                                 onClick={() => handleSelectCity(c)}
-                                className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${
-                                  isSelected
-                                    ? 'bg-orange-50 font-bold text-[#f26522]'
-                                    : 'text-slate-700 hover:bg-slate-50 hover:text-[#f26522]'
-                                }`}
+                                className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${isSelected
+                                  ? 'bg-orange-50 font-bold text-[#f26522]'
+                                  : 'text-slate-700 hover:bg-slate-50 hover:text-[#f26522]'
+                                  }`}
                               >
                                 <span className="truncate">{c.name}</span>
                                 {isSelected && <Check size={13} className="text-[#f26522] shrink-0" />}
@@ -1442,16 +1832,15 @@ function CustomerDatabase({ compact = false }) {
                     }
                   }}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${
-                    dragActive ? 'border-[#f26522] bg-orange-50/40' : 'border-slate-200 hover:border-[#f26522]/50 hover:bg-orange-50/20 bg-slate-50/40'
-                  }`}
+                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${dragActive ? 'border-[#f26522] bg-orange-50/40' : 'border-slate-200 hover:border-[#f26522]/50 hover:bg-orange-50/20 bg-slate-50/40'
+                    }`}
                 >
                   <Upload size={28} className="mx-auto text-slate-400 mb-2" />
                   <p className="text-xs font-semibold text-slate-700 mb-1">
                     Drag & Drop CSV or Excel file here
                   </p>
                   <p className="text-[11px] text-slate-400 mb-3">Supports .csv, .xlsx, .xls files up to 10MB</p>
-                  
+
                   <button
                     type="button"
                     className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#f26522] hover:bg-[#e05411] text-white text-xs font-bold rounded-xl transition-all shadow-xs pointer-events-none"
@@ -1560,7 +1949,7 @@ function CustomerDatabase({ compact = false }) {
       {isReviewModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
-            
+
             {/* Modal Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
               <div className="flex items-center gap-2.5">

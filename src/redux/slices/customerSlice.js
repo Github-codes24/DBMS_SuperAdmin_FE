@@ -47,6 +47,22 @@ export const updateCustomer = createAsyncThunk(
   }
 );
 
+export const deleteCustomer = createAsyncThunk(
+  'customer/deleteCustomer',
+  async (customerId, { dispatch, rejectWithValue }) => {
+    try {
+      const response = await api.delete(`/superadmin/customers/${customerId}`);
+      toast.success(response.data.message || 'Customer deleted successfully');
+      dispatch(fetchCustomers());
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to delete customer.';
+      toast.error(message);
+      return rejectWithValue(message);
+    }
+  }
+);
+
 export const bulkImportCustomers = createAsyncThunk(
   'customer/bulkImportCustomers',
   async (payload, { dispatch, rejectWithValue }) => {
@@ -107,8 +123,11 @@ const customerSlice = createSlice({
       })
       .addCase(fetchCustomers.fulfilled, (state, action) => {
         state.loading = false;
-        state.customers = action.payload.customers || [];
-        state.totalCustomers = action.payload.totalCustomers || 0;
+        const fetched = action.payload.customers || [];
+        // Preserve any local customers that have mobile number set if API didn't return them or stripped mobile
+        const localCreated = state.customers.filter((c) => c._isLocal || (c.mobile && !fetched.some((f) => f._id === c._id || f.customerId === c.customerId)));
+        state.customers = [...localCreated, ...fetched];
+        state.totalCustomers = action.payload.totalCustomers || state.customers.length;
         state.totalPages = action.payload.totalPages || 1;
         state.currentPage = action.payload.currentPage || 1;
       })
@@ -120,8 +139,15 @@ const customerSlice = createSlice({
       .addCase(createCustomer.pending, (state) => {
         state.isSaving = true;
       })
-      .addCase(createCustomer.fulfilled, (state) => {
+      .addCase(createCustomer.fulfilled, (state, action) => {
         state.isSaving = false;
+        const newCust = action.payload?.customer || action.payload?.data || action.meta?.arg;
+        if (newCust) {
+          const exists = state.customers.some((c) => (c._id && c._id === newCust._id) || (c.customerId && c.customerId === newCust.customerId));
+          if (!exists) {
+            state.customers = [newCust, ...state.customers];
+          }
+        }
       })
       .addCase(createCustomer.rejected, (state) => {
         state.isSaving = false;

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
 import api from '../services/api';
@@ -32,20 +33,35 @@ import {
   FileText,
   AlertCircle,
   Info,
-  Loader2
+  Loader2,
+  Eye,
+  Edit2,
+  Trash2,
+  Ban,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 function TelecallerManagement({ compact = false }) {
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { telecallers: apiTelecallers = [], loading = false, isSaving = false } = useSelector((state) => state.telecaller || {});
 
-  const [searchInput, setSearchInput] = useState('');
-  const [submittedSearch, setSubmittedSearch] = useState('');
-  const [hasSearched, setHasSearched] = useState(false);
+  // URL query params initialization
+  const initialSearch = searchParams.get('search') || searchParams.get('q') || '';
+  const initialPage = parseInt(searchParams.get('page') || '1', 10);
+
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [submittedSearch, setSubmittedSearch] = useState(initialSearch);
+  const [hasSearched, setHasSearched] = useState(Boolean(initialSearch));
   const [validationError, setValidationError] = useState('');
   const [selectedTc, setSelectedTc] = useState(null);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(isNaN(initialPage) || initialPage < 1 ? 1 : initialPage);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Step 1: Import Telecallers Modal State
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -83,18 +99,14 @@ function TelecallerManagement({ compact = false }) {
   const [updatedEmail, setUpdatedEmail] = useState('');
   const [toastMsg, setToastMsg] = useState('');
 
-  // Manual Scroll Ref & Control
-  const manualScrollRef = useRef(null);
-  const handleManualScroll = (direction) => {
-    if (manualScrollRef.current) {
-      const scrollAmount = direction === 'up' ? -90 : 90;
-      manualScrollRef.current.scrollBy({ top: scrollAmount, behavior: 'smooth' });
-    }
-  };
-
-  // Initial load: do NOT automatically fetch all telecallers
+  // Sync state if initialSearch exists on load
   useEffect(() => {
-    dispatch(clearTelecallers());
+    if (initialSearch) {
+      dispatch(fetchTelecallers({ search: initialSearch }));
+    } else {
+      dispatch(clearTelecallers());
+    }
+
     const handleClickOutside = (event) => {
       if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target)) {
         setIsExportDropdownOpen(false);
@@ -105,6 +117,19 @@ function TelecallerManagement({ compact = false }) {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [dispatch]);
+
+  // URL updater helper
+  const updateUrlParams = (updates) => {
+    const newParams = new URLSearchParams(searchParams);
+    Object.entries(updates).forEach(([key, value]) => {
+      if (!value || value === '1' && key === 'page') {
+        newParams.delete(key);
+      } else {
+        newParams.set(key, value);
+      }
+    });
+    setSearchParams(newParams);
+  };
 
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
@@ -117,6 +142,8 @@ function TelecallerManagement({ compact = false }) {
     setValidationError('');
     setSubmittedSearch(trimmed);
     setHasSearched(true);
+    setCurrentPage(1);
+    updateUrlParams({ search: trimmed, page: null });
     dispatch(fetchTelecallers({ search: trimmed }));
   };
 
@@ -125,6 +152,8 @@ function TelecallerManagement({ compact = false }) {
     setValidationError('');
     setSubmittedSearch('');
     setHasSearched(false);
+    setCurrentPage(1);
+    updateUrlParams({ search: null, page: null });
     dispatch(clearTelecallers());
   };
 
@@ -149,6 +178,19 @@ function TelecallerManagement({ compact = false }) {
       (tc.area && tc.area.toLowerCase().includes(search))
     );
   }) : [];
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredTelecallers.length / itemsPerPage));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  const indexOfLastItem = validCurrentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentDisplayedTelecallers = filteredTelecallers.slice(indexOfFirstItem, indexOfLastItem);
+
+  const handlePageChange = (newPage) => {
+    const pageNum = Math.max(1, Math.min(newPage, totalPages));
+    setCurrentPage(pageNum);
+    updateUrlParams({ search: submittedSearch, page: pageNum === 1 ? null : pageNum });
+  };
 
   const handleOpenManage = (tc) => {
     setSelectedTc(tc);
@@ -182,6 +224,29 @@ function TelecallerManagement({ compact = false }) {
       setTimeout(() => setToastMsg(''), 3500);
       setIsManageModalOpen(false);
     });
+  };
+
+  const handleToggleStatus = (tc) => {
+    const newStatus = tc.status === 'Active' ? 'Inactive' : 'Active';
+    dispatch(updateTelecaller({
+      userId: tc.id,
+      updateData: { status: newStatus }
+    })).unwrap().then(() => {
+      setToastMsg(`Status for "${tc.name}" set to ${newStatus}`);
+      setTimeout(() => setToastMsg(''), 3500);
+    });
+  };
+
+  const handleDeleteTc = (tc) => {
+    if (window.confirm(`Are you sure you want to delete telecaller "${tc.name}"?`)) {
+      dispatch(updateTelecaller({
+        userId: tc.id,
+        updateData: { status: 'Deleted' }
+      })).unwrap().then(() => {
+        setToastMsg(`Telecaller "${tc.name}" deleted successfully.`);
+        setTimeout(() => setToastMsg(''), 3500);
+      });
+    }
   };
 
   const handleAddTcSubmit = (e) => {
@@ -675,94 +740,54 @@ function TelecallerManagement({ compact = false }) {
           </div>
         )}
 
-        {/* MANUAL SLIDING CONTROL BAR */}
-        <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 mb-3 text-xs">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-black text-slate-700">Manual Slide Controls</span>
-            <span className="text-[10px] text-slate-400 font-medium">Scroll table view vertically</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => handleManualScroll('up')}
-              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 active:scale-95 shadow-2xs"
-              title="Slide Up"
-            >
-              <ChevronUp size={13} />
-              <span>Slide Up</span>
-            </button>
-            <button
-              onClick={() => handleManualScroll('down')}
-              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 active:scale-95 shadow-2xs"
-              title="Slide Down"
-            >
-              <ChevronDown size={13} />
-              <span>Slide Down</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Table View with Mobile Number & Email Columns */}
+        {/* Table View with required columns: Sr.No, Telecaller Name, Email, Mobile Number, Status, Action */}
         <div
-          ref={manualScrollRef}
           className="max-h-[360px] overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200/80 mb-4 scroll-smooth custom-scrollbar"
         >
           <table className="w-full text-left border-collapse min-w-[720px]">
             <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-md z-10">
               <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                <th className="py-3 px-4">TC ID</th>
-                <th className="py-3 px-4">Name</th>
+                <th className="py-3 px-4">Sr.No</th>
+                <th className="py-3 px-4">Telecaller Name</th>
+                <th className="py-3 px-4">Email</th>
                 <th className="py-3 px-4">Mobile Number</th>
-                <th className="py-3 px-4">Email Address</th>
-                <th className="py-3 px-4">Region</th>
-                <th className="py-3 px-4">Customers</th>
                 <th className="py-3 px-4">Status</th>
                 <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-semibold">
-              {filteredTelecallers.length > 0 ? (
-                filteredTelecallers.map((tc) => (
-                  <tr key={tc.id} className="hover:bg-slate-50/80 transition-colors">
+              {currentDisplayedTelecallers.length > 0 ? (
+                currentDisplayedTelecallers.map((tc, idx) => {
+                  const globalIdx = indexOfFirstItem + idx + 1;
+                  return (
+                  <tr key={tc.id || idx} className="hover:bg-slate-50/80 transition-colors">
                     
-                    {/* ID */}
+                    {/* Sr.No */}
                     <td className="py-3 px-4">
-                      <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-900 font-black text-xs tracking-wide">
-                        {tc.id}
+                      <span className="font-extrabold text-slate-800 text-xs">
+                        {String(globalIdx).padStart(2, '0')}
                       </span>
                     </td>
 
-                    {/* Name */}
+                    {/* Telecaller Name */}
                     <td className="py-3 px-4 font-extrabold text-slate-900">
                       {tc.name}
+                    </td>
+
+                    {/* Email */}
+                    <td className="py-3 px-4 text-slate-600">
+                      <div className="flex items-center gap-1.5 font-semibold">
+                        <Mail size={13} className="text-slate-400 shrink-0" />
+                        <span>{tc.email || '-'}</span>
+                      </div>
                     </td>
 
                     {/* Mobile Number */}
                     <td className="py-3 px-4 text-slate-700">
                       <div className="flex items-center gap-1.5 font-bold">
                         <Phone size={13} className="text-[#f26522] shrink-0" />
-                        <span>{tc.mobile || '+91 98765 00000'}</span>
+                        <span>{tc.mobile || '-'}</span>
                       </div>
-                    </td>
-
-                    {/* Email Address */}
-                    <td className="py-3 px-4 text-slate-600">
-                      <div className="flex items-center gap-1.5 font-semibold">
-                        <Mail size={13} className="text-slate-400 shrink-0" />
-                        <span>{tc.email}</span>
-                      </div>
-                    </td>
-
-                    {/* Region / Area */}
-                    <td className="py-3 px-4">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
-                        <Globe size={11} className="text-slate-400" />
-                        {tc.area}
-                      </span>
-                    </td>
-
-                    {/* Customers Count */}
-                    <td className="py-3 px-4 text-slate-800 font-extrabold">
-                      {tc.customers}
                     </td>
 
                     {/* Status */}
@@ -779,17 +804,57 @@ function TelecallerManagement({ compact = false }) {
                       </span>
                     </td>
 
-                    {/* Action */}
+                    {/* Action Icon Buttons: View, Edit, Block, Delete */}
                     <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => handleOpenManage(tc)}
-                        className="px-3 py-1 bg-orange-50 text-[#f26522] hover:bg-[#f26522] hover:text-white rounded-lg border border-orange-200 transition-all font-bold text-xs cursor-pointer shadow-2xs"
-                      >
-                        Manage
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* View Action */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenManage(tc)}
+                          title="View Details"
+                          className="p-1.5 rounded-lg text-slate-600 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+                        >
+                          <Eye size={13} />
+                        </button>
+
+                        {/* Edit Action */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenManage(tc)}
+                          title="Edit Settings"
+                          className="p-1.5 rounded-lg text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors cursor-pointer"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+
+                        {/* Block / Unblock Action */}
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(tc)}
+                          title={tc.status === 'Active' ? 'Block Telecaller' : 'Unblock Telecaller'}
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                            tc.status === 'Active'
+                              ? 'text-amber-600 border-amber-200 hover:bg-amber-50'
+                              : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50'
+                          }`}
+                        >
+                          {tc.status === 'Active' ? <Ban size={13} /> : <UserCheck size={13} />}
+                        </button>
+
+                        {/* Delete Action */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTc(tc)}
+                          title="Delete Telecaller"
+                          className="p-1.5 rounded-lg text-rose-600 border border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
                   <td colSpan="8" className="py-12 text-center text-xs text-slate-400 font-medium">
@@ -817,6 +882,72 @@ function TelecallerManagement({ compact = false }) {
             </tbody>
           </table>
         </div>
+
+        {/* Modern Interactive Pagination & Footer Bar */}
+        {hasSearched && filteredTelecallers.length > 0 && (
+          <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs border-t border-slate-100">
+            <div className="flex items-center gap-3 text-slate-500 font-medium">
+              <span>
+                Showing <strong className="text-slate-800">{filteredTelecallers.length > 0 ? indexOfFirstItem + 1 : 0}</strong> to <strong className="text-slate-800">{Math.min(indexOfLastItem, filteredTelecallers.length)}</strong> of <strong className="text-slate-800">{filteredTelecallers.length}</strong> telecallers
+              </span>
+              <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
+                <span className="text-[11px] text-slate-400">Per page:</span>
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    handlePageChange(1);
+                  }}
+                  className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                disabled={validCurrentPage === 1}
+                onClick={() => handlePageChange(validCurrentPage - 1)}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                title="Previous Page"
+              >
+                <ChevronLeft size={16} />
+              </button>
+
+              <div className="flex items-center gap-1 px-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                  <button
+                    key={pageNum}
+                    type="button"
+                    onClick={() => handlePageChange(pageNum)}
+                    className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                      pageNum === validCurrentPage
+                        ? 'bg-[#f26522] text-white shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                disabled={validCurrentPage >= totalPages}
+                onClick={() => handlePageChange(validCurrentPage + 1)}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                title="Next Page"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Manage Telecaller Modal with Mobile Number & Email */}

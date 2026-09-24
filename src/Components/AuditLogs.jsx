@@ -12,14 +12,6 @@ function AuditLogs({ compact = false }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMsg, setToastMsg] = useState('');
 
-  // Manual Scroll Ref & Control (Same as Customer Database)
-  const manualScrollRef = useRef(null);
-  const handleManualScroll = (direction) => {
-    if (manualScrollRef.current) {
-      const scrollAmount = direction === 'up' ? -90 : 90;
-      manualScrollRef.current.scrollBy({ top: scrollAmount, behavior: 'smooth' });
-    }
-  };
 
   // Role Access Check: Only Super Admin and Admin have access to Export
   const userRole = (localStorage.getItem('userRole') || 'Super Admin').trim();
@@ -157,32 +149,8 @@ function AuditLogs({ compact = false }) {
           </div>
         )}
 
-        {/* MANUAL SLIDING CONTROL BAR (Same as Customer Database) */}
-        <div className="flex items-center justify-between bg-slate-50 border border-slate-200/80 rounded-xl px-3 py-1.5 mb-2 text-xs">
-          <span className="text-[11px] font-bold text-slate-600">Manual Slide / Scroll View</span>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => handleManualScroll('up')}
-              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2"
-              title="Slide Up"
-            >
-              <ChevronUp size={13} />
-              <span>Slide Up</span>
-            </button>
-            <button
-              onClick={() => handleManualScroll('down')}
-              className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2"
-              title="Slide Down"
-            >
-              <ChevronDown size={13} />
-              <span>Slide Down</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Table View with manual sliding */}
+        {/* Table View */}
         <div
-          ref={manualScrollRef}
           className="max-h-[300px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar"
         >
           <table className="w-full text-left border-collapse">
@@ -219,7 +187,6 @@ function AuditLogs({ compact = false }) {
       {/* Footer Info Status */}
       <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100">
         <span>Showing {filteredLogs.length} audit records</span>
-        <span className="font-semibold text-[#f26522]">Manual Sliding Table Enabled</span>
       </div>
     </div>
   );

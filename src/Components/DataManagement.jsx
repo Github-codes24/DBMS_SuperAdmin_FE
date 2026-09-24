@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
+import { State, City } from 'country-state-city';
 import api from '../services/api';
 import {
   lookupVendors,
@@ -24,10 +25,29 @@ function DataManagement({ compact = false }) {
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
 
   const exportDropdownRef = useRef(null);
-  const manualScrollRef = useRef(null);
 
-  const stateList = ['All', ...availableStates];
-  const cityList = ['All', ...availableCities];
+  const allIndianStates = (State && typeof State.getStatesOfCountry === 'function') ? State.getStatesOfCountry('IN') : [];
+  const libraryStateNames = allIndianStates.map(s => s.name);
+  const stateList = ['All', ...Array.from(new Set([...libraryStateNames, ...availableStates]))];
+
+  const handleStateChange = (stateName) => {
+    setSelectedState(stateName);
+    setSelectedCity('All');
+  };
+
+  const getDynamicCities = () => {
+    if (selectedState === 'All') {
+      return ['All', ...availableCities];
+    }
+    const stObj = allIndianStates.find(s => s.name.toLowerCase() === selectedState.toLowerCase());
+    if (stObj) {
+      const libCities = (City.getCitiesOfState('IN', stObj.isoCode) || []).map(c => c.name);
+      return ['All', ...Array.from(new Set([...libCities, ...availableCities]))];
+    }
+    return ['All', ...availableCities];
+  };
+
+  const cityList = getDynamicCities();
 
   // Debounced search / filter query dispatch
   useEffect(() => {
@@ -86,13 +106,6 @@ function DataManagement({ compact = false }) {
 
   const filteredVendors = masterVendorList;
 
-  // Manual Scroll
-  const handleManualScroll = (direction) => {
-    if (manualScrollRef.current) {
-      const scrollAmount = direction === 'up' ? -90 : 90;
-      manualScrollRef.current.scrollBy({ top: scrollAmount, behavior: 'smooth' });
-    }
-  };
 
   // Export CSV Report
   const handleExportCSV = async () => {
@@ -229,7 +242,7 @@ function DataManagement({ compact = false }) {
           <div>
             <select
               value={selectedState}
-              onChange={(e) => setSelectedState(e.target.value)}
+              onChange={(e) => handleStateChange(e.target.value)}
               className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-bold text-slate-700 cursor-pointer"
             >
               <option value="All">State: All States</option>
@@ -275,26 +288,9 @@ function DataManagement({ compact = false }) {
                   • Click any Vendor to view complete profile & details
                 </span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => handleManualScroll('up')}
-                  className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2"
-                >
-                  <ChevronUp size={13} />
-                  <span>Slide Up</span>
-                </button>
-                <button
-                  onClick={() => handleManualScroll('down')}
-                  className="p-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-bold px-2"
-                >
-                  <ChevronDown size={13} />
-                  <span>Slide Down</span>
-                </button>
-              </div>
             </div>
 
             <div
-              ref={manualScrollRef}
               className="max-h-[350px] overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200/80 scroll-smooth custom-scrollbar shadow-2xs"
             >
               <table className="w-full text-left border-collapse min-w-[850px]">
