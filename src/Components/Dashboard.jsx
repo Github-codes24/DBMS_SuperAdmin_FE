@@ -1238,20 +1238,27 @@ function Dashboard({ initialTab = 'dashboard' }) {
     }
   };
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   return (
     <div className="h-screen bg-[#f4f6f9] flex flex-col font-sans text-slate-800 overflow-hidden">
       
       {/* Top Navbar */}
-      <Navbar />
+      <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
       {/* Main Layout Area */}
-      <div className="flex-1 flex flex-col md:flex-row p-4 md:px-6 md:py-4 gap-6 w-full max-w-full overflow-hidden">
+      <div className="flex-1 flex p-3 md:p-4 md:px-6 md:py-4 gap-4 md:gap-6 w-full max-w-full overflow-hidden relative">
         
         {/* Left Sidebar */}
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+        />
 
         {/* Dynamic Main Content */}
-        <main className="flex-1 space-y-4 min-w-0 overflow-y-auto pr-1 custom-scrollbar">
+        <main className="flex-1 space-y-4 min-w-0 overflow-y-auto pr-0 md:pr-1 custom-scrollbar">
           
           {activeTab === 'usermanagement' ? (
             <UserManagement />

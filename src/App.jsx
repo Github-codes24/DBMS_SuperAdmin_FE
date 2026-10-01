@@ -85,6 +85,38 @@ function App() {
         }
       />
       <Route
+        path="/vendor-db/add"
+        element={
+          <ProtectedRoute>
+            <Dashboard initialTab="vendor-db" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendor-db/view/:id"
+        element={
+          <ProtectedRoute>
+            <Dashboard initialTab="vendor-db" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendor-db/edit/:id"
+        element={
+          <ProtectedRoute>
+            <Dashboard initialTab="vendor-db" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vendor-db/change-password/:id"
+        element={
+          <ProtectedRoute>
+            <Dashboard initialTab="vendor-db" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/telecaller-mgmt"
         element={
           <ProtectedRoute>
