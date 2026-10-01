@@ -25,10 +25,11 @@ import {
   Sliders,
   BellRing,
   Shield,
-  User
+  User,
+  Menu
 } from 'lucide-react';
 
-function Navbar() {
+function Navbar({ isMobileMenuOpen, setIsMobileMenuOpen }) {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -148,17 +149,30 @@ function Navbar() {
       {/* Main Navbar with Gradient & Glassmorphism */}
       <div className="w-full bg-gradient-to-r from-[#c84302] via-[#f26522] to-[#fa7c3e] text-white px-4 md:px-8 py-2.5 flex items-center justify-between shadow-lg shadow-orange-500/10 backdrop-blur-md">
         
-        {/* Left Side: Official LTS Brand Logo */}
-        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate('/dashboard')}>
-          <div className="bg-white px-3 py-1.5 rounded-2xl border border-white/60 shadow-md flex items-center group-hover:scale-105 group-hover:shadow-lg transition-all duration-200">
-            <img src={logo} alt="Local Trade Street" className="h-7 w-auto object-contain" />
-          </div>
+        {/* Left Side: Mobile Menu Button & Official LTS Brand Logo */}
+        <div className="flex items-center gap-2">
+          {setIsMobileMenuOpen && (
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="md:hidden p-1.5 text-white hover:bg-white/20 rounded-xl transition-colors cursor-pointer shrink-0"
+              title="Toggle Navigation Menu"
+            >
+              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+          )}
 
-          <div className="hidden lg:flex items-center gap-2">
-            <span className="text-[10px] font-black text-slate-900 bg-amber-300 px-2.5 py-1 rounded-lg shadow-xs tracking-wider uppercase flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-              SUPER ADMIN DBMS
-            </span>
+          <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate('/dashboard')}>
+            <div className="bg-white px-3 py-1.5 rounded-2xl border border-white/60 shadow-md flex items-center group-hover:scale-105 group-hover:shadow-lg transition-all duration-200">
+              <img src={logo} alt="Local Trade Street" className="h-7 w-auto object-contain" />
+            </div>
+
+            <div className="hidden lg:flex items-center gap-2">
+              <span className="text-[10px] font-black text-slate-900 bg-amber-300 px-2.5 py-1 rounded-lg shadow-xs tracking-wider uppercase flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                SUPER ADMIN DBMS
+              </span>
+            </div>
           </div>
         </div>
 

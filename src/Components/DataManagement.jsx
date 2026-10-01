@@ -8,7 +8,7 @@ import {
   lookupVendorDetail,
   clearSelectedVendor
 } from '../redux/slices/dataManagementSlice';
-import { Search, MapPin, Building2, Filter, Database, Check, ChevronUp, ChevronDown, Download, FileSpreadsheet, FileText, X, Plus, Phone, Mail, Eye, ShieldCheck, Tag } from 'lucide-react';
+import { Search, MapPin, Building2, Filter, Database, Check, ChevronUp, ChevronDown, Download, FileSpreadsheet, FileText, X, Plus, Phone, Mail, Eye, ShieldCheck, Tag, ChevronLeft, User } from 'lucide-react';
 
 function DataManagement({ compact = false }) {
   const dispatch = useDispatch();
@@ -18,36 +18,59 @@ function DataManagement({ compact = false }) {
   const [vendorCodeFilter, setVendorCodeFilter] = useState('');
   const [selectedState, setSelectedState] = useState('All');
   const [selectedCity, setSelectedCity] = useState('All');
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'view-vendor'
 
-  // Selected Vendor Detail Modal State
+  // Selected Vendor Detail State
   const [selectedVendorDetail, setSelectedVendorDetail] = useState(null);
   const [toastMsg, setToastMsg] = useState('');
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
 
   const exportDropdownRef = useRef(null);
 
+  const [stateSearch, setStateSearch] = useState('');
+  const [citySearch, setCitySearch] = useState('');
+  const [isStateOpen, setIsStateOpen] = useState(false);
+  const [isCityOpen, setIsCityOpen] = useState(false);
+
+  const stateDropdownRef = useRef(null);
+  const cityDropdownRef = useRef(null);
+
   const allIndianStates = (State && typeof State.getStatesOfCountry === 'function') ? State.getStatesOfCountry('IN') : [];
-  const libraryStateNames = allIndianStates.map(s => s.name);
-  const stateList = ['All', ...Array.from(new Set([...libraryStateNames, ...availableStates]))];
+  const stateList = ['All', ...allIndianStates.map(s => s.name)];
+
+  const filteredStates = stateList.filter(s =>
+    s.toLowerCase().includes(stateSearch.toLowerCase())
+  );
 
   const handleStateChange = (stateName) => {
     setSelectedState(stateName);
     setSelectedCity('All');
+    setStateSearch('');
+    setIsStateOpen(false);
   };
 
   const getDynamicCities = () => {
     if (selectedState === 'All') {
-      return ['All', ...availableCities];
+      return ['All'];
     }
     const stObj = allIndianStates.find(s => s.name.toLowerCase() === selectedState.toLowerCase());
     if (stObj) {
       const libCities = (City.getCitiesOfState('IN', stObj.isoCode) || []).map(c => c.name);
-      return ['All', ...Array.from(new Set([...libCities, ...availableCities]))];
+      return ['All', ...libCities];
     }
-    return ['All', ...availableCities];
+    return ['All'];
   };
 
   const cityList = getDynamicCities();
+  const filteredCities = cityList.filter(c =>
+    c.toLowerCase().includes(citySearch.toLowerCase())
+  );
+
+  const handleCityChange = (cityName) => {
+    setSelectedCity(cityName);
+    setCitySearch('');
+    setIsCityOpen(false);
+  };
 
   // Debounced search / filter query dispatch
   useEffect(() => {
@@ -63,18 +86,34 @@ function DataManagement({ compact = false }) {
   }, [dispatch, vendorCodeFilter, vendorSearch, selectedState, selectedCity]);
 
   useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (stateDropdownRef.current && !stateDropdownRef.current.contains(e.target)) {
+        setIsStateOpen(false);
+      }
+      if (cityDropdownRef.current && !cityDropdownRef.current.contains(e.target)) {
+        setIsCityOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
     if (selectedVendor) {
       setSelectedVendorDetail(selectedVendor);
     }
   }, [selectedVendor]);
 
-  // Clean up selected vendor detail state when modal closes
+  // Clean up selected vendor detail state when exiting full page view
   const handleCloseDetail = () => {
     setSelectedVendorDetail(null);
+    setViewMode('table');
     dispatch(clearSelectedVendor());
   };
 
   const handleViewDetails = (v) => {
+    setSelectedVendorDetail(v);
+    setViewMode('view-vendor');
     dispatch(lookupVendorDetail(v.id));
   };
 
@@ -142,6 +181,146 @@ function DataManagement({ compact = false }) {
       toast.error('Failed to export PDF.');
     }
   };
+
+  // Full-Page View Vendor Screen
+  if (viewMode === 'view-vendor') {
+    const v = selectedVendorDetail || {};
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-6 animate-in fade-in duration-150 text-left">
+        {/* Page Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleCloseDetail}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-2"
+            >
+              <ChevronLeft size={14} />
+              <span>Back to Vendor Lookup</span>
+            </button>
+            <div>
+              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Building2 size={18} className="text-[#f26522]" />
+                <span>Vendor Details: {v.name || 'Vendor Profile'}</span>
+                <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-300 uppercase">
+                  {v.status || 'Active'}
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500 font-medium">
+                Vendor Code: <strong className="font-mono text-[#f26522]">{v.id || '-'}</strong> • Trans #: <strong className="font-mono text-slate-700">{v.transNo || 'TRX90101'}</strong>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Details Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Business & Owner Info Card */}
+          <div className="bg-slate-50/60 p-5 rounded-2xl border border-slate-200/70 space-y-4">
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <Building2 size={15} className="text-[#f26522]" />
+              Business & Owner Profile
+            </h3>
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between py-2 border-b border-slate-200/50">
+                <span className="font-semibold text-slate-500">Shop / Company Name:</span>
+                <span className="font-extrabold text-slate-900">{v.name || '-'}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-200/50">
+                <span className="font-semibold text-slate-500">Vendor Code:</span>
+                <span className="font-mono font-extrabold text-[#f26522]">{v.id || '-'}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-200/50">
+                <span className="font-semibold text-slate-500">Owner / Contact Person:</span>
+                <span className="font-extrabold text-slate-900">{v.ownerName || '-'}</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="font-semibold text-slate-500">GSTIN / Tax Registration:</span>
+                <span className="font-mono font-bold text-slate-800">{v.gstNo || '27AAAAA0000A1Z5'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Location & Address Section */}
+          <div className="bg-slate-50/60 p-5 rounded-2xl border border-slate-200/70 space-y-4">
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <MapPin size={15} className="text-[#f26522]" />
+              Location & Address Details
+            </h3>
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between py-2 border-b border-slate-200/50">
+                <span className="font-semibold text-slate-500">State:</span>
+                <span className="font-bold text-slate-900">{v.state || '-'}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-200/50">
+                <span className="font-semibold text-slate-500">City:</span>
+                <span className="font-bold text-slate-900">{v.city || '-'}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-200/50">
+                <span className="font-semibold text-slate-500">Pincode Area:</span>
+                <span className="font-mono font-black text-slate-700">{v.pincode || '-'}</span>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="font-semibold text-slate-500">Complete Address:</span>
+                <span className="font-bold text-slate-800 max-w-xs text-right">{v.address || '-'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Contact Information */}
+          <div className="bg-slate-50/60 p-5 rounded-2xl border border-slate-200/70 space-y-4">
+            <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+              <Phone size={15} className="text-[#f26522]" />
+              Contact Information
+            </h3>
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between py-2 border-b border-slate-200/50">
+                <span className="font-semibold text-slate-500">Contact Number:</span>
+                <div className="flex items-center gap-1.5 font-extrabold text-slate-900">
+                  <Phone size={13} className="text-[#f26522]" />
+                  <span>{v.contactNo || '-'}</span>
+                </div>
+              </div>
+              <div className="flex justify-between py-2">
+                <span className="font-semibold text-slate-500">Email Address:</span>
+                <div className="flex items-center gap-1.5 font-extrabold text-slate-900">
+                  <Mail size={13} className="text-[#f26522]" />
+                  <span>{v.email || '-'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Verification Banner */}
+          <div className="bg-slate-900 text-white rounded-2xl p-5 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Verification Date & Time</div>
+              <div className="text-xs font-bold text-slate-200 mt-0.5">
+                {v.verificationDateTime || '-'}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Mapped Customers</div>
+              <div className="text-sm font-black text-[#f26522] mt-0.5">
+                {v.mappedCustomers || 0} Customers
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Footer */}
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={handleCloseDetail}
+            className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+          >
+            Back to Vendor Lookup
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs space-y-5">
@@ -238,28 +417,92 @@ function DataManagement({ compact = false }) {
             />
           </div>
 
-          {/* Select State Dropdown (e.g. Maharashtra) ⭐ */}
-          <div>
-            <select
-              value={selectedState}
-              onChange={(e) => handleStateChange(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-bold text-slate-700 cursor-pointer"
+          {/* Searchable State Dropdown ⭐ */}
+          <div className="relative" ref={stateDropdownRef}>
+            <div
+              onClick={() => { setIsStateOpen(!isStateOpen); setIsCityOpen(false); }}
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-bold text-slate-700 cursor-pointer flex items-center justify-between"
             >
-              <option value="All">State: All States</option>
-              {stateList.filter(s => s !== 'All').map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+              <span className="truncate">{selectedState === 'All' ? 'State: All States' : selectedState}</span>
+              <ChevronDown size={14} className={`text-slate-400 transition-transform ${isStateOpen ? 'rotate-180' : ''}`} />
+            </div>
+
+            {isStateOpen && (
+              <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-2 animate-in fade-in duration-150">
+                <div className="relative mb-2">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search state..."
+                    value={stateSearch}
+                    onChange={(e) => setStateSearch(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-0.5 text-left">
+                  {filteredStates.length > 0 ? (
+                    filteredStates.map((s) => (
+                      <div
+                        key={s}
+                        onClick={() => handleStateChange(s)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                          selectedState === s ? 'bg-orange-50 text-[#f26522] font-bold' : 'text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {s === 'All' ? 'All States' : s}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-xs text-slate-400 text-center">No state found</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Select City Dropdown ⭐ */}
-          <div>
-            <select
-              value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-bold text-slate-700 cursor-pointer"
+          {/* Searchable City Dropdown ⭐ */}
+          <div className="relative" ref={cityDropdownRef}>
+            <div
+              onClick={() => { setIsCityOpen(!isCityOpen); setIsStateOpen(false); }}
+              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-bold text-slate-700 cursor-pointer flex items-center justify-between"
             >
-              <option value="All">City: All Cities</option>
-              {cityList.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+              <span className="truncate">{selectedCity === 'All' ? 'City: All Cities' : selectedCity}</span>
+              <ChevronDown size={14} className={`text-slate-400 transition-transform ${isCityOpen ? 'rotate-180' : ''}`} />
+            </div>
+
+            {isCityOpen && (
+              <div className="absolute left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-2 animate-in fade-in duration-150">
+                <div className="relative mb-2">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search city..."
+                    value={citySearch}
+                    onChange={(e) => setCitySearch(e.target.value)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full pl-8 pr-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                  />
+                </div>
+                <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-0.5 text-left">
+                  {filteredCities.length > 0 ? (
+                    filteredCities.map((c) => (
+                      <div
+                        key={c}
+                        onClick={() => handleCityChange(c)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
+                          selectedCity === c ? 'bg-orange-50 text-[#f26522] font-bold' : 'text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {c === 'All' ? 'All Cities' : c}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-xs text-slate-400 text-center">No city found</div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -353,10 +596,10 @@ function DataManagement({ compact = false }) {
                               e.stopPropagation();
                               handleViewDetails(v);
                             }}
-                            className="px-3 py-1 bg-orange-50 group-hover:bg-[#f26522] text-[#f26522] group-hover:text-white border border-orange-200 group-hover:border-[#f26522] font-bold text-[11px] rounded-lg transition-all flex items-center gap-1 mx-auto cursor-pointer"
+                            title="View Info"
+                            className="p-1.5 rounded-lg text-slate-600 border border-slate-200 hover:bg-orange-50 hover:text-[#f26522] hover:border-orange-200 transition-colors cursor-pointer inline-flex items-center justify-center"
                           >
-                            <Eye size={12} />
-                            <span>View Info</span>
+                            <Eye size={14} />
                           </button>
                         </td>
                       </tr>
@@ -396,146 +639,7 @@ function DataManagement({ compact = false }) {
         </div>
       )}
 
-      {/* VENDOR SHOP FULL INFORMATION MODAL ⭐ */}
-      {selectedVendorDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden flex flex-col text-left">
-            
-            {/* Modal Header */}
-            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-[#f26522] text-white flex items-center justify-center font-bold shadow-md">
-                  <Building2 size={20} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-black tracking-tight">{selectedVendorDetail.name}</h3>
-                    <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/40 uppercase">
-                      {selectedVendorDetail.status || 'Active'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-300 font-mono mt-0.5">
-                    Vendor Code: {selectedVendorDetail.id} • Trans #: {selectedVendorDetail.transNo || 'TRX90101'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={handleCloseDetail}
-                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
 
-            {/* Modal Body */}
-            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto custom-scrollbar text-xs">
-              
-              {/* Business & Owner Info Card */}
-              <div className="bg-orange-50/50 border border-orange-200/80 rounded-2xl p-4 space-y-2.5">
-                <h4 className="text-[11px] font-black uppercase text-[#f26522] tracking-wider flex items-center gap-1.5">
-                  <Building2 size={13} />
-                  <span>Business & Owner Profile</span>
-                </h4>
-                <div className="grid grid-cols-2 gap-3 text-slate-800 font-medium">
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">Shop / Company Name</span>
-                    <span className="font-extrabold text-slate-900 text-sm">{selectedVendorDetail.name}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">Vendor Code</span>
-                    <span className="font-mono font-extrabold text-[#f26522] text-sm">{selectedVendorDetail.id}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">Owner / Contact Person</span>
-                    <span className="font-extrabold text-slate-900">{selectedVendorDetail.ownerName || 'Rajesh Patel'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">GSTIN / Tax Registration</span>
-                    <span className="font-mono font-bold text-slate-800">{selectedVendorDetail.gstNo || '27AAAAA0000A1Z5'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Location & Address Section ⭐ */}
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2.5">
-                <h4 className="text-[11px] font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
-                  <MapPin size={13} className="text-[#f26522]" />
-                  <span>Location & Address Details</span>
-                </h4>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">State</span>
-                    <span className="font-extrabold text-slate-900">{selectedVendorDetail.state}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">City</span>
-                    <span className="font-extrabold text-slate-900">{selectedVendorDetail.city}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">Pincode Area</span>
-                    <span className="font-mono font-black text-slate-700">{selectedVendorDetail.pincode || '440001'}</span>
-                  </div>
-                  <div className="col-span-3">
-                    <span className="text-[10px] text-slate-500 block font-bold">Complete Shop Address</span>
-                    <span className="font-bold text-slate-800">
-                      {selectedVendorDetail.address || 'Shop No. 12, Main Commercial Complex, MG Road'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact Information */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-1">
-                  <span className="text-[10px] text-slate-500 block font-bold">Vendor Contact Number</span>
-                  <div className="flex items-center gap-1.5 font-extrabold text-slate-900">
-                    <Phone size={13} className="text-[#f26522]" />
-                    <span>{selectedVendorDetail.contactNo || '+91 98920 11223'}</span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-1">
-                  <span className="text-[10px] text-slate-500 block font-bold">Vendor Email Address</span>
-                  <div className="flex items-center gap-1.5 font-extrabold text-slate-900 truncate">
-                    <Mail size={13} className="text-[#f26522]" />
-                    <span className="truncate">{selectedVendorDetail.email || 'contact@vendor.com'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Verification Banner */}
-              <div className="bg-slate-900 text-white rounded-2xl p-4 flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Verification Date & Time</div>
-                  <div className="text-xs font-bold text-slate-200 mt-0.5">
-                    {selectedVendorDetail.verificationDateTime || '2026-07-30 10:30 AM'}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Mapped Customers</div>
-                  <div className="text-sm font-black text-[#f26522] mt-0.5">
-                    {selectedVendorDetail.mappedCustomers || 520} Customers
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-400">LTS Verified Enterprise Vendor Profile</span>
-              <button
-                onClick={handleCloseDetail}
-                className="px-5 py-2 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer shadow-2xs"
-              >
-                Close Profile
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
 
       {/* Footer Info Status */}
       <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100">

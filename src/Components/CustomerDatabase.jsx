@@ -226,30 +226,59 @@ function CustomerDatabase({ compact = false }) {
   }, [dispatch]);
 
   const getDisplayNumber = (cust) => {
+    if (!cust) return '-';
+
     const candidates = [
-      cust.mobile,
       cust.mobileNumber,
+      cust.mobile,
+      cust.mobile_number,
+      cust.mobileNo,
+      cust.mobile_no,
       cust.phone,
       cust.phoneNumber,
+      cust.phone_number,
+      cust.phoneNo,
+      cust.phone_no,
       cust.contact,
       cust.contactNumber,
-      cust.number
+      cust.contact_number,
+      cust.contactNo,
+      cust.contact_no,
+      cust.number,
+      cust.userMobile,
+      cust.userPhone,
+      cust.userContact,
+      cust.primaryMobile,
+      cust.cell,
+      cust.phone1,
+      cust.customerPhone,
+      cust.customerMobile,
+      cust.customerNumber
     ];
 
     for (const value of candidates) {
       if (value !== undefined && value !== null) {
-        const number = String(value).trim();
+        const strVal = String(value).trim();
+        const cleanDigits = strVal.replace(/\D/g, '');
 
         if (
-          number &&
-          number !== '-' &&
-          number !== '—' &&
-          number !== 'null' &&
-          number !== 'undefined' &&
-          !number.toUpperCase().startsWith('CUST')
+          strVal &&
+          strVal !== '-' &&
+          strVal !== '—' &&
+          strVal !== 'null' &&
+          strVal !== 'undefined' &&
+          !strVal.toUpperCase().startsWith('CUST') &&
+          cleanDigits.length >= 7
         ) {
-          return number;
+          return strVal;
         }
+      }
+    }
+
+    if (cust.name) {
+      const cleanDigits = String(cust.name).replace(/\D/g, '');
+      if (cleanDigits.length >= 7) {
+        return String(cust.name).trim();
       }
     }
 
@@ -382,7 +411,7 @@ function CustomerDatabase({ compact = false }) {
     if (!editingCustomer) return;
 
     dispatch(updateCustomer({
-      customerId: editingCustomer._id || editingCustomer.id,
+      customerId: editingCustomer._id || editingCustomer.id || editingCustomer.companyName,
       updateData: {
         name: editingCustomer.name,
         companyName: editingCustomer.companyName,
@@ -392,7 +421,17 @@ function CustomerDatabase({ compact = false }) {
         status: editingCustomer.status,
         assignedTelecaller: editingCustomer.telecaller,
         email: editingCustomer.email,
-        mobile: editingCustomer.mobile
+        mobile: editingCustomer.mobile,
+        mobileNumber: editingCustomer.mobile,
+        mobileNo: editingCustomer.mobile,
+        mobile_number: editingCustomer.mobile,
+        phone: editingCustomer.mobile,
+        phoneNumber: editingCustomer.mobile,
+        phoneNo: editingCustomer.mobile,
+        contact: editingCustomer.mobile,
+        contactNo: editingCustomer.mobile,
+        contactNumber: editingCustomer.mobile,
+        number: editingCustomer.mobile
       }
     })).unwrap().then(() => {
       setViewMode('list');
@@ -942,12 +981,33 @@ function CustomerDatabase({ compact = false }) {
         <form onSubmit={handleEditCustomerSubmit} className="space-y-6 max-w-4xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Customer Number / Name *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Mobile Number *</label>
+              <input
+                type="text"
+                required
+                placeholder="e.g. +91 98765 43210"
+                value={editingCustomer.mobile}
+                onChange={(e) => setEditingCustomer({ ...editingCustomer, mobile: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Customer / Contact Name *</label>
               <input
                 type="text"
                 required
                 value={editingCustomer.name}
                 onChange={(e) => setEditingCustomer({ ...editingCustomer, name: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+              <input
+                type="email"
+                placeholder="e.g. customer@example.com"
+                value={editingCustomer.email}
+                onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
                 className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
               />
             </div>
@@ -1054,12 +1114,20 @@ function CustomerDatabase({ compact = false }) {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-slate-50 p-4 rounded-xl space-y-2">
-            <div className="text-xs text-slate-500 font-bold uppercase">Number / Name</div>
+            <div className="text-xs text-slate-500 font-bold uppercase">Mobile Number</div>
+            <div className="text-sm font-bold text-slate-900">{selectedCustomerDetail.number || selectedCustomerDetail.mobile || '-'}</div>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl space-y-2">
+            <div className="text-xs text-slate-500 font-bold uppercase">Customer / Contact Name</div>
             <div className="text-sm font-bold text-slate-900">{selectedCustomerDetail.name}</div>
           </div>
           <div className="bg-slate-50 p-4 rounded-xl space-y-2">
             <div className="text-xs text-slate-500 font-bold uppercase">Company Name</div>
             <div className="text-sm font-bold text-[#f26522]">{selectedCustomerDetail.companyName || '-'}</div>
+          </div>
+          <div className="bg-slate-50 p-4 rounded-xl space-y-2">
+            <div className="text-xs text-slate-500 font-bold uppercase">Email Address</div>
+            <div className="text-sm font-semibold text-slate-800">{selectedCustomerDetail.email || '-'}</div>
           </div>
           <div className="bg-slate-50 p-4 rounded-xl space-y-2">
             <div className="text-xs text-slate-500 font-bold uppercase">State</div>

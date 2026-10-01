@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { State, City } from 'country-state-city';
 import api from '../services/api';
@@ -8,22 +8,43 @@ import {
   fetchVendors,
   fetchVendorDetail,
   createVendor,
+  activateVendor,
   updateVendor,
   deleteVendor,
   bulkImportVendors,
-  clearSelectedVendor
+  fetchVendorFormFields,
+  createVendorFormField,
+  updateVendorFormField,
+  deleteVendorFormField,
+  clearSelectedVendor,
+  changeVendorPassword
 } from '../redux/slices/vendorSlice';
 import {
   Search, Download, Lock, FileSpreadsheet, FileText, Upload, X, Check,
   FileDown, UserPlus, Plus, ChevronUp, ChevronDown, Building2, MapPin,
   Eye, EyeOff, Phone, Mail, Edit2, Trash2, Ban, UserCheck, AlertTriangle,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, ArrowLeft, Save, Key
 } from 'lucide-react';
 
 function VendorDatabase({ compact = false }) {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const params = useParams();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { vendors: apiVendors = [], selectedVendor = null, loading = false, isSaving = false } = useSelector((state) => state.vendor || {});
+
+  // Determine current view mode based on URL route path or search params
+  let activeViewMode = 'table'; // 'table' | 'add-vendor' | 'view-vendor' | 'edit-vendor' | 'change-password-vendor'
+  if (location.pathname.includes('/vendor-db/add') || searchParams.get('action') === 'add' || searchParams.get('mode') === 'add') {
+    activeViewMode = 'add-vendor';
+  } else if (location.pathname.includes('/vendor-db/view/')) {
+    activeViewMode = 'view-vendor';
+  } else if (location.pathname.includes('/vendor-db/edit/')) {
+    activeViewMode = 'edit-vendor';
+  } else if (location.pathname.includes('/vendor-db/change-password/')) {
+    activeViewMode = 'change-password-vendor';
+  }
 
   const allStates = (State && typeof State.getStatesOfCountry === 'function') ? State.getStatesOfCountry('IN') : [];
 
@@ -60,7 +81,7 @@ function VendorDatabase({ compact = false }) {
   // Update URL helper function
   const updateUrlParams = (updates) => {
     const newParams = new URLSearchParams(searchParams);
-    
+
     Object.entries(updates).forEach(([key, value]) => {
       if (!value || value === 'All') {
         newParams.delete(key);
@@ -106,6 +127,23 @@ function VendorDatabase({ compact = false }) {
   // View Mode State: 'table' | 'add-vendor'
   const [viewMode, setViewMode] = useState('table');
 
+  const handleOpenAddVendor = () => {
+    setViewMode('add-vendor');
+    navigate('/vendor-db/add' + location.search);
+  };
+
+  const handleCloseAddVendor = () => {
+    setViewMode('table');
+    if (location.pathname.includes('/vendor-db/add')) {
+      navigate('/vendor-db' + location.search);
+    } else if (searchParams.get('action') === 'add' || searchParams.get('mode') === 'add') {
+      const newParams = new URLSearchParams(searchParams);
+      newParams.delete('action');
+      newParams.delete('mode');
+      setSearchParams(newParams);
+    }
+  };
+
   // Custom Fields State
   const [customFields, setCustomFields] = useState([
     { id: 'field-1', label: 'GSTIN / Tax ID', type: 'text', placeholder: 'e.g. 27AAAAA0000A1Z5', required: false },
@@ -119,11 +157,14 @@ function VendorDatabase({ compact = false }) {
   const [showAddPassword, setShowAddPassword] = useState(false);
   const [newVendor, setNewVendor] = useState({
     srNo: '',
-    transNo: '',
+    vendorCode: '',
     id: '',
     name: '',
     ownerName: '',
     category: '',
+    referId: '',
+    referCode: '',
+    agentName: '',
     verificationDateTime: new Date().toISOString().slice(0, 10) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     contactNo: '',
     email: '',
@@ -151,6 +192,13 @@ function VendorDatabase({ compact = false }) {
   // Edit Vendor Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingVendor, setEditingVendor] = useState(null);
+
+  // Change Password Vendor Screen State
+  const [passwordVendor, setPasswordVendor] = useState(null);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [notifyVendorEmail, setNotifyVendorEmail] = useState(true);
+  const [passwordError, setPasswordError] = useState('');
 
   // Confirmation Popup Modal State (for Block / Delete)
   const [confirmModal, setConfirmModal] = useState({
@@ -180,8 +228,7 @@ function VendorDatabase({ compact = false }) {
     return {
       _id: v._id,
       srNo: v.srNo || String(idx + 1).padStart(2, '0'),
-      transNo: v.transNo || `TRX${Math.floor(90000 + Math.random() * 9999)}`,
-      vendorCode: v.vendorCode || v.vendorId || v.transNo || `VND${Math.floor(1000 + Math.random() * 9000)}`,
+      vendorCode: v.vendorCode || v.vendorId || `VND${Math.floor(1000 + Math.random() * 9000)}`,
       id: v.vendorId || v.vendorCode || v._id,
       name: v.companyName || v.shopName || v.vendorName || '-',
       companyName: v.companyName || v.shopName || v.vendorName || '-',
@@ -208,7 +255,7 @@ function VendorDatabase({ compact = false }) {
   const filteredVendors = vendors.filter((ven) => {
     const matchesSearch =
       (ven.srNo && ven.srNo.includes(searchTerm)) ||
-      (ven.transNo && ven.transNo.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (ven.vendorCode && ven.vendorCode.toLowerCase().includes(searchTerm.toLowerCase())) ||
       ven.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (ven.ownerName && ven.ownerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
       ven.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -246,9 +293,12 @@ function VendorDatabase({ compact = false }) {
 
     dispatch(createVendor({
       srNo: newVendor.srNo || String(vendors.length + 1).padStart(2, '0'),
-      transNo: newVendor.transNo || `TRX${Math.floor(90000 + Math.random() * 9999)}`,
+      vendorCode: newVendor.vendorCode || `VND${Math.floor(1000 + Math.random() * 9000)}`,
       vendorName: newVendor.name,
       category: newVendor.category,
+      referId: newVendor.referId,
+      referCode: newVendor.referCode,
+      agentName: newVendor.agentName,
       verificationDateTime: new Date().toISOString(),
       contactNo: newVendor.contactNo,
       email: newVendor.email,
@@ -258,7 +308,7 @@ function VendorDatabase({ compact = false }) {
       status: newVendor.status
     })).unwrap().then((res) => {
       setShowAddPassword(false);
-      setViewMode('table');
+      handleCloseAddVendor();
       setNewVendor({
         srNo: '',
         transNo: '',
@@ -266,6 +316,9 @@ function VendorDatabase({ compact = false }) {
         name: '',
         ownerName: '',
         category: '',
+        referId: '',
+        referCode: '',
+        agentName: '',
         verificationDateTime: new Date().toISOString().slice(0, 10) + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         contactNo: '',
         email: '',
@@ -293,29 +346,42 @@ function VendorDatabase({ compact = false }) {
 
   const handleToggleStatus = (ven) => {
     if (!hasAccessPermission) return;
-    const newStatus = ven.status === 'Active' ? 'Pending' : 'Active';
-    dispatch(updateVendor({
-      vendorId: ven._id || ven.id,
-      updateData: { status: newStatus }
-    })).unwrap().then(() => {
-      setToastMsg(`Status for "${ven.name}" toggled successfully!`);
-      setTimeout(() => setToastMsg(''), 4000);
-      if (selectedVendorDetail && (selectedVendorDetail._id === ven._id || selectedVendorDetail.id === ven.id)) {
-        setSelectedVendorDetail({ ...selectedVendorDetail, status: newStatus });
-      }
-    });
+    const isActivating = ven.status !== 'Active';
+    const identifier = ven.vendorCode || ven.vendorId || ven._id || ven.id;
+
+    if (isActivating) {
+      dispatch(activateVendor(identifier)).unwrap().then(() => {
+        setToastMsg(`Vendor "${ven.name}" activated and credentials sent successfully!`);
+        setTimeout(() => setToastMsg(''), 4000);
+      });
+    } else {
+      dispatch(updateVendor({
+        vendorId: ven._id || ven.id,
+        updateData: { status: 'Pending' }
+      })).unwrap().then(() => {
+        setToastMsg(`Status for "${ven.name}" set to Pending!`);
+        setTimeout(() => setToastMsg(''), 4000);
+      });
+    }
   };
 
-  // Open Edit Vendor Modal
-  const handleOpenEditModal = (ven) => {
+  // Navigation Helpers for View and Edit
+  const handleViewVendor = (ven) => {
+    const targetId = ven._id || ven.id;
+    setSelectedVendorDetail(ven);
+    navigate(`/vendor-db/view/${targetId}`);
+  };
+
+  const handleEditVendor = (ven) => {
     if (!hasAccessPermission) return;
+    const targetId = ven._id || ven.id;
     setEditingVendor({
       _id: ven._id,
       id: ven.id,
+      vendorCode: ven.vendorCode || ven.id || '',
       name: ven.name || '',
       ownerName: ven.ownerName !== '-' ? ven.ownerName : '',
       category: ven.category || '',
-      transNo: ven.transNo || '',
       contactNo: ven.contactNo !== '-' ? ven.contactNo : '',
       email: ven.email !== '-' ? ven.email : '',
       state: ven.state !== '-' ? ven.state : '',
@@ -325,7 +391,110 @@ function VendorDatabase({ compact = false }) {
       address: ven.address !== '-' ? ven.address : '',
       pincode: ven.pincode !== '-' ? ven.pincode : '',
     });
-    setIsEditModalOpen(true);
+    navigate(`/vendor-db/edit/${targetId}`);
+  };
+
+  const handleChangePasswordVendor = (ven) => {
+    if (!hasAccessPermission) return;
+    const targetId = ven._id || ven.id;
+    setPasswordVendor({
+      _id: ven._id,
+      id: ven.id,
+      vendorCode: ven.vendorCode || ven.id || '',
+      name: ven.name || ven.companyName || '',
+      companyName: ven.name || ven.companyName || '',
+      ownerName: ven.ownerName !== '-' ? ven.ownerName : '',
+      category: ven.category || '',
+      contactNo: ven.contactNo !== '-' ? ven.contactNo : '',
+      email: ven.email !== '-' ? ven.email : '',
+      state: ven.state !== '-' ? ven.state : '',
+      city: ven.city !== '-' ? ven.city : '',
+      status: ven.status || 'Active',
+      newPassword: '',
+      confirmPassword: '',
+    });
+    setPasswordError('');
+    navigate(`/vendor-db/change-password/${targetId}`);
+  };
+
+  // Sync route params with selected vendor or editing vendor
+  useEffect(() => {
+    if (params.id && vendors.length > 0) {
+      const match = vendors.find(v => (v._id === params.id || v.id === params.id));
+      if (match) {
+        if (activeViewMode === 'view-vendor' && (!selectedVendorDetail || selectedVendorDetail._id !== match._id)) {
+          setSelectedVendorDetail(match);
+        } else if (activeViewMode === 'edit-vendor' && (!editingVendor || editingVendor._id !== match._id)) {
+          setEditingVendor({
+            _id: match._id,
+            id: match.id,
+            vendorCode: match.vendorCode || match.id || '',
+            name: match.name || '',
+            ownerName: match.ownerName !== '-' ? match.ownerName : '',
+            category: match.category || '',
+            contactNo: match.contactNo !== '-' ? match.contactNo : '',
+            email: match.email !== '-' ? match.email : '',
+            state: match.state !== '-' ? match.state : '',
+            city: match.city !== '-' ? match.city : '',
+            status: match.status || 'Active',
+            gstNo: match.gstNo !== '-' ? match.gstNo : '',
+            address: match.address !== '-' ? match.address : '',
+            pincode: match.pincode !== '-' ? match.pincode : '',
+          });
+        } else if (activeViewMode === 'change-password-vendor' && (!passwordVendor || (passwordVendor._id !== match._id && passwordVendor.id !== match.id))) {
+          setPasswordVendor({
+            _id: match._id,
+            id: match.id,
+            vendorCode: match.vendorCode || match.id || '',
+            name: match.name || match.companyName || '',
+            companyName: match.name || match.companyName || '',
+            ownerName: match.ownerName !== '-' ? match.ownerName : '',
+            category: match.category || '',
+            contactNo: match.contactNo !== '-' ? match.contactNo : '',
+            email: match.email !== '-' ? match.email : '',
+            state: match.state !== '-' ? match.state : '',
+            city: match.city !== '-' ? match.city : '',
+            status: match.status || 'Active',
+            newPassword: '',
+            confirmPassword: '',
+          });
+        }
+      }
+    }
+  }, [params.id, vendors, activeViewMode]);
+
+  const handleChangePasswordSubmit = (e) => {
+    e.preventDefault();
+    if (!passwordVendor) return;
+    setPasswordError('');
+
+    if (!passwordVendor.newPassword) {
+      setPasswordError('Please enter a new password.');
+      return;
+    }
+
+    if (passwordVendor.newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters long.');
+      return;
+    }
+
+    if (passwordVendor.newPassword !== passwordVendor.confirmPassword) {
+      setPasswordError('New password and confirm password do not match.');
+      return;
+    }
+
+    const targetId = passwordVendor._id || passwordVendor.id;
+    dispatch(changeVendorPassword({
+      vendorId: targetId,
+      password: passwordVendor.newPassword,
+      notifyVendor: notifyVendorEmail
+    })).unwrap().then(() => {
+      setToastMsg(`Password for vendor "${passwordVendor.name}" updated successfully!`);
+      setTimeout(() => setToastMsg(''), 4000);
+      navigate('/vendor-db');
+    }).catch((err) => {
+      setPasswordError(typeof err === 'string' ? err : 'Failed to update password.');
+    });
   };
 
   // Submit Edit Vendor Form
@@ -339,10 +508,10 @@ function VendorDatabase({ compact = false }) {
 
     const targetId = editingVendor._id || editingVendor.id;
     const updatePayload = {
+      vendorCode: editingVendor.vendorCode,
       vendorName: editingVendor.name,
       ownerName: editingVendor.ownerName,
       category: editingVendor.category,
-      transNo: editingVendor.transNo,
       contactNo: editingVendor.contactNo,
       email: editingVendor.email,
       state: editingVendor.state,
@@ -367,6 +536,7 @@ function VendorDatabase({ compact = false }) {
         });
       }
       setEditingVendor(null);
+      navigate('/vendor-db');
     });
   };
 
@@ -564,14 +734,14 @@ function VendorDatabase({ compact = false }) {
   };
 
   // Dedicated Full-Page Add Vendor Screen
-  if (viewMode === 'add-vendor') {
+  if (viewMode === 'add-vendor' || activeViewMode === 'add-vendor') {
     return (
       <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
         {/* Page Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setViewMode('table')}
+              onClick={handleCloseAddVendor}
               className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-2"
             >
               <span>← Back to Vendor Directory</span>
@@ -624,12 +794,12 @@ function VendorDatabase({ compact = false }) {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Trans No.</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">VENDOR CODE</label>
                 <input
                   type="text"
-                  placeholder="e.g. TRX90106"
-                  value={newVendor.transNo}
-                  onChange={(e) => setNewVendor({ ...newVendor, transNo: e.target.value })}
+                  placeholder="e.g. VEN941539"
+                  value={newVendor.vendorCode}
+                  onChange={(e) => setNewVendor({ ...newVendor, vendorCode: e.target.value })}
                   className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
                 />
               </div>
@@ -721,10 +891,10 @@ function VendorDatabase({ compact = false }) {
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-700 mb-1">Verification Date & Time</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">Verification Date </label>
                 <input
                   type="text"
-                  placeholder="e.g. 2026-07-31 10:30 AM"
+                  placeholder="e.g. 2026-07-31"
                   value={newVendor.verificationDateTime}
                   onChange={(e) => setNewVendor({ ...newVendor, verificationDateTime: e.target.value })}
                   className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
@@ -840,7 +1010,7 @@ function VendorDatabase({ compact = false }) {
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
             <button
               type="button"
-              onClick={() => setViewMode('table')}
+              onClick={handleCloseAddVendor}
               className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
             >
               Cancel
@@ -992,6 +1162,601 @@ function VendorDatabase({ compact = false }) {
     );
   }
 
+  // Dedicated Full-Page Change Password Screen ⭐
+  if (activeViewMode === 'change-password-vendor') {
+    const ven = passwordVendor || selectedVendorDetail || vendors.find(v => v._id === params.id || v.id === params.id);
+    if (!ven) {
+      return (
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4">
+          <p className="text-sm font-bold text-slate-600">Vendor record not found.</p>
+          <button
+            onClick={() => navigate('/vendor-db')}
+            className="px-4 py-2 bg-[#f26522] text-white text-xs font-bold rounded-xl"
+          >
+            Back to Directory
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/vendor-db')}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-2"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to Vendor Directory</span>
+            </button>
+            <div>
+              <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                <Key size={18} className="text-[#f26522]" />
+                <span>Change Password — {ven.name || ven.companyName}</span>
+              </h2>
+              <p className="text-xs text-slate-500 font-mono mt-0.5">
+                VENDOR CODE: <span className="font-extrabold text-[#f26522]">{ven.vendorCode || ven.id}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Vendor Summary Card */}
+        <div className="bg-orange-50/50 border border-orange-200/80 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#f26522]/10 border border-[#f26522]/20 flex items-center justify-center text-[#f26522] font-black text-sm">
+              <Building2 size={20} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-900">{ven.name || ven.companyName}</h3>
+              <p className="text-xs text-slate-500">{ven.email || 'No email provided'} • {ven.contactNo || 'No phone'}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="bg-white border border-slate-200 px-3 py-1.5 rounded-xl font-bold text-slate-700">
+              Category: <span className="text-[#f26522]">{ven.category || 'N/A'}</span>
+            </span>
+            <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border uppercase ${
+              ven.status === 'Active'
+                ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                : ven.status === 'Blocked'
+                  ? 'bg-rose-50 text-rose-600 border-rose-200'
+                  : 'bg-amber-50 text-amber-600 border-amber-200'
+            }`}>
+              {ven.status || 'Active'}
+            </span>
+          </div>
+        </div>
+
+        {/* Password Form */}
+        <form onSubmit={handleChangePasswordSubmit} className="max-w-xl space-y-5 bg-slate-50/60 p-6 rounded-2xl border border-slate-200/80">
+          <div className="flex items-center gap-2 text-xs font-black text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-200/60">
+            <Lock size={15} className="text-[#f26522]" />
+            <span>Set New Account Password</span>
+          </div>
+
+          {passwordError && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-2">
+              <AlertTriangle size={15} className="shrink-0 text-rose-500" />
+              <span>{passwordError}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">New Password *</label>
+            <div className="relative">
+              <input
+                type={showNewPassword ? "text" : "password"}
+                required
+                placeholder="Enter new password (min. 6 characters)"
+                value={passwordVendor?.newPassword || ''}
+                onChange={(e) => setPasswordVendor({ ...passwordVendor, newPassword: e.target.value })}
+                className="w-full px-3.5 py-2.5 pr-10 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword(!showNewPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Confirm New Password *</label>
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                required
+                placeholder="Re-enter new password to confirm"
+                value={passwordVendor?.confirmPassword || ''}
+                onChange={(e) => setPasswordVendor({ ...passwordVendor, confirmPassword: e.target.value })}
+                className="w-full px-3.5 py-2.5 pr-10 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {passwordVendor?.confirmPassword && passwordVendor?.newPassword !== passwordVendor?.confirmPassword && (
+              <p className="text-[11px] text-rose-500 font-semibold mt-1">Passwords do not match</p>
+            )}
+          </div>
+
+          <div className="pt-2">
+            <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+              <input
+                type="checkbox"
+                checked={notifyVendorEmail}
+                onChange={(e) => setNotifyVendorEmail(e.target.checked)}
+                className="rounded border-slate-300 text-[#f26522] focus:ring-[#f26522]"
+              />
+              <span>Send notification & updated credentials email to vendor ({ven.email || 'registered email'})</span>
+            </label>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200/60">
+            <button
+              type="button"
+              onClick={() => navigate('/vendor-db')}
+              className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-6 py-2.5 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer shadow-md flex items-center gap-2 disabled:opacity-50"
+            >
+              <Key size={15} />
+              <span>{isSaving ? 'Updating Password...' : 'Update Vendor Password'}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  // Dedicated Full-Page View Vendor Screen ⭐
+  if (activeViewMode === 'view-vendor') {
+    const ven = selectedVendorDetail || vendors.find(v => v._id === params.id || v.id === params.id);
+    if (!ven) {
+      return (
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4">
+          <p className="text-sm font-bold text-slate-600">Vendor record not found.</p>
+          <button
+            onClick={() => navigate('/vendor-db')}
+            className="px-4 py-2 bg-[#f26522] text-white text-xs font-bold rounded-xl"
+          >
+            Back to Directory
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/vendor-db')}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-2"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to Vendor Directory</span>
+            </button>
+            <div>
+              <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                <Building2 size={20} className="text-[#f26522]" />
+                <span>{ven.name || ven.companyName}</span>
+                <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border uppercase ${ven.status === 'Active'
+                  ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+                  : ven.status === 'Blocked'
+                    ? 'bg-rose-50 text-rose-600 border-rose-200'
+                    : 'bg-amber-50 text-amber-600 border-amber-200'
+                  }`}>
+                  {ven.status || 'Active'}
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500 font-mono mt-0.5">
+                VENDOR CODE: <span className="font-extrabold text-[#f26522]">{ven.vendorCode || ven.id}</span>
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleChangePasswordVendor(ven)}
+              className="px-4 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 font-bold text-xs rounded-xl border border-amber-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Key size={14} />
+              <span>Change Password</span>
+            </button>
+            <button
+              onClick={() => handleEditVendor(ven)}
+              className="px-4 py-2 bg-blue-50 text-blue-600 hover:bg-blue-100 font-bold text-xs rounded-xl border border-blue-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Edit2 size={14} />
+              <span>Edit Vendor Details</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Detailed Sections Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Business Profile */}
+          <div className="bg-orange-50/50 border border-orange-200/80 rounded-2xl p-5 space-y-3">
+            <h3 className="text-xs font-black uppercase text-[#f26522] tracking-wider flex items-center gap-2">
+              <Building2 size={15} />
+              <span>Business & Owner Profile</span>
+            </h3>
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <span className="text-[10px] text-slate-500 block font-bold uppercase">Company Name</span>
+                <span className="font-extrabold text-slate-900 text-sm">{ven.name}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 block font-bold uppercase">Owner Name</span>
+                <span className="font-extrabold text-slate-900 text-sm">{ven.ownerName || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 block font-bold uppercase">Category</span>
+                <span className="font-extrabold text-[#f26522]">{ven.category}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 block font-bold uppercase">GSTIN / Tax ID</span>
+                <span className="font-mono font-bold text-slate-800">{ven.gstNo || 'N/A'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Location Details */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-3">
+            <h3 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-2">
+              <MapPin size={15} className="text-[#f26522]" />
+              <span>Location & Address Details</span>
+            </h3>
+            <div className="grid grid-cols-3 gap-3 text-xs">
+              <div>
+                <span className="text-[10px] text-slate-500 block font-bold uppercase">State</span>
+                <span className="font-extrabold text-slate-900">{ven.state}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 block font-bold uppercase">City</span>
+                <span className="font-extrabold text-slate-900">{ven.city}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 block font-bold uppercase">Pincode</span>
+                <span className="font-mono font-extrabold text-[#f26522]">{ven.pincode || 'N/A'}</span>
+              </div>
+              <div className="col-span-3 pt-1 border-t border-slate-200/60">
+                <span className="text-[10px] text-slate-500 block font-bold uppercase">Complete Address</span>
+                <span className="font-semibold text-slate-800">{ven.address || 'N/A'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Contact Details */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-3">
+            <h3 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-2">
+              <Phone size={15} className="text-[#f26522]" />
+              <span>Contact Information</span>
+            </h3>
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <span className="text-[10px] text-slate-500 block font-bold uppercase">Mobile Number</span>
+                <span className="font-extrabold text-slate-900">{ven.contactNo || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 block font-bold uppercase">Email Address</span>
+                <span className="font-bold text-slate-900 truncate block">{ven.email || 'N/A'}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Referral & Operations */}
+          <div className="bg-slate-900 text-white rounded-2xl p-5 space-y-3">
+            <h3 className="text-xs font-black uppercase text-[#f26522] tracking-wider">
+              System & Operations Metadata
+            </h3>
+            <div className="grid grid-cols-2 gap-4 text-xs">
+              <div>
+                <span className="text-[10px] text-slate-400 block font-bold uppercase">Assigned Agent</span>
+                <span className="font-extrabold text-slate-100">{ven.agentName || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 block font-bold uppercase">Verification Date</span>
+                <span className="font-bold text-slate-200">{ven.verificationDate || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 block font-bold uppercase">Referral Code</span>
+                <span className="font-mono font-bold text-[#f26522]">{ven.referCode || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-400 block font-bold uppercase">Mapped Customers</span>
+                <span className="font-extrabold text-emerald-400">{ven.mappedCustomers || 0}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Dedicated Full-Page Edit Vendor Screen ⭐
+  if (activeViewMode === 'edit-vendor') {
+    if (!editingVendor) {
+      return (
+        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-4">
+          <p className="text-sm font-bold text-slate-600">Loading vendor details for edit...</p>
+          <button
+            onClick={() => navigate('/vendor-db')}
+            className="px-4 py-2 bg-[#f26522] text-white text-xs font-bold rounded-xl"
+          >
+            Back to Directory
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => navigate('/vendor-db')}
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition-colors cursor-pointer flex items-center gap-2"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to Directory</span>
+            </button>
+            <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+              <Edit2 size={18} className="text-[#f26522]" />
+              <span>Edit Vendor Details — {editingVendor.name}</span>
+            </h2>
+          </div>
+        </div>
+
+        {/* Form Body */}
+        <form onSubmit={handleEditVendorSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Vendor / Company Name *</label>
+              <input
+                type="text"
+                required
+                value={editingVendor.name}
+                onChange={(e) => setEditingVendor({ ...editingVendor, name: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Owner Name</label>
+              <input
+                type="text"
+                value={editingVendor.ownerName}
+                onChange={(e) => setEditingVendor({ ...editingVendor, ownerName: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Category *</label>
+              <input
+                type="text"
+                required
+                value={editingVendor.category}
+                onChange={(e) => setEditingVendor({ ...editingVendor, category: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">VENDOR CODE</label>
+              <input
+                type="text"
+                value={editingVendor.vendorCode}
+                onChange={(e) => setEditingVendor({ ...editingVendor, vendorCode: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Contact Number</label>
+              <input
+                type="text"
+                value={editingVendor.contactNo}
+                onChange={(e) => setEditingVendor({ ...editingVendor, contactNo: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
+              <input
+                type="email"
+                value={editingVendor.email}
+                onChange={(e) => setEditingVendor({ ...editingVendor, email: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">State</label>
+              <select
+                value={editingVendor.state}
+                onChange={(e) => setEditingVendor({ ...editingVendor, state: e.target.value, city: '' })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              >
+                <option value="">-- Select State --</option>
+                {allStates.map((st) => (
+                  <option key={st.isoCode} value={st.name}>{st.name}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">City</label>
+              <select
+                value={editingVendor.city}
+                onChange={(e) => setEditingVendor({ ...editingVendor, city: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              >
+                <option value="">-- Select City --</option>
+                {(() => {
+                  const stObj = allStates.find((s) => s.name === editingVendor.state);
+                  const cityList = stObj ? (City.getCitiesOfState('IN', stObj.isoCode) || []) : [];
+                  return cityList.map((ct) => (
+                    <option key={ct.name} value={ct.name}>{ct.name}</option>
+                  ));
+                })()}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">GSTIN / Tax ID</label>
+              <input
+                type="text"
+                value={editingVendor.gstNo}
+                onChange={(e) => setEditingVendor({ ...editingVendor, gstNo: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Status</label>
+              <select
+                value={editingVendor.status}
+                onChange={(e) => setEditingVendor({ ...editingVendor, status: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              >
+                <option value="Active">Active</option>
+                <option value="Pending">Pending</option>
+                <option value="Blocked">Blocked</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Pincode</label>
+              <input
+                type="text"
+                value={editingVendor.pincode}
+                onChange={(e) => setEditingVendor({ ...editingVendor, pincode: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 mb-1">Complete Address</label>
+              <input
+                type="text"
+                value={editingVendor.address}
+                onChange={(e) => setEditingVendor({ ...editingVendor, address: e.target.value })}
+                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => navigate('/vendor-db')}
+              className="px-5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="px-6 py-2.5 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer shadow-md flex items-center gap-2 disabled:opacity-50"
+            >
+              <Save size={15} />
+              <span>{isSaving ? 'Saving Changes...' : 'Save Vendor Changes'}</span>
+            </button>
+          </div>
+        </form>
+
+        {/* Confirmation Modal inside edit view */}
+        {confirmModal.isOpen && confirmModal.vendor && (
+          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl text-center space-y-4">
+              <h3 className="text-base font-bold text-slate-900">
+                {confirmModal.type === 'delete' ? 'Delete Vendor' : confirmModal.vendor.status === 'Blocked' ? 'Unblock Vendor' : 'Block Vendor'}
+              </h3>
+              <p className="text-xs text-slate-500">Are you sure you want to proceed with this action?</p>
+              {/* Vendor Info Card */}
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-left text-xs mb-5 space-y-1.5">
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-400 font-medium">Vendor ID:</span>
+                  <span className="font-mono font-bold text-slate-700">{confirmModal.vendor.vendorCode || confirmModal.vendor.id}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-slate-100">
+                  <span className="text-slate-400 font-medium">Category:</span>
+                  <span className="font-semibold text-slate-700">{confirmModal.vendor.category}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-slate-400 font-medium">Current Status:</span>
+                  <span className="font-bold text-slate-800">{confirmModal.vendor.status}</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleCloseConfirmModal}
+                  disabled={isSaving}
+                  className="w-full py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAction}
+                  disabled={isSaving}
+                  className={`w-full py-2.5 px-4 text-xs font-bold text-white rounded-xl transition-colors cursor-pointer disabled:opacity-50 shadow-xs flex items-center justify-center gap-1.5 ${confirmModal.type === 'delete'
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : confirmModal.vendor.status === 'Blocked'
+                      ? 'bg-emerald-600 hover:bg-emerald-700'
+                      : 'bg-amber-600 hover:bg-amber-700'
+                    }`}
+                >
+                  {isSaving ? (
+                    <span>Processing...</span>
+                  ) : confirmModal.type === 'delete' ? (
+                    <>
+                      <Trash2 size={14} />
+                      <span>Yes, Delete</span>
+                    </>
+                  ) : confirmModal.vendor.status === 'Blocked' ? (
+                    <>
+                      <UserCheck size={14} />
+                      <span>Yes, Unblock</span>
+                    </>
+                  ) : (
+                    <>
+                      <Ban size={14} />
+                      <span>Yes, Block</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs flex flex-col justify-between h-full">
       <div>
@@ -1011,7 +1776,7 @@ function VendorDatabase({ compact = false }) {
             <div className="flex items-center gap-2 flex-wrap">
               {/* Add Vendor Button */}
               <button
-                onClick={() => setViewMode('add-vendor')}
+                onClick={handleOpenAddVendor}
                 className="px-3.5 py-1.5 bg-[#f26522] hover:bg-[#e05411] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1.5"
                 title="Add New Vendor Record"
               >
@@ -1083,9 +1848,8 @@ function VendorDatabase({ compact = false }) {
 
         {/* TABLE VIEW */}
         <div
-          className={`${
-            itemsPerPage === 5 ? 'h-[300px]' : 'h-[520px]'
-          } overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar transition-all duration-200`}
+          className={`${itemsPerPage === 5 ? 'h-[300px]' : 'h-[520px]'
+            } overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar transition-all duration-200`}
         >
           <table className="w-full min-w-[1250px] text-left border-collapse whitespace-nowrap">
             <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs z-10">
@@ -1109,92 +1873,100 @@ function VendorDatabase({ compact = false }) {
                 currentDisplayedVendors.map((ven, idx) => {
                   const globalIdx = indexOfFirstItem + idx + 1;
                   return (
-                  <tr key={ven.id || ven._id || idx} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-3 px-3 font-bold text-slate-800">{String(globalIdx).padStart(2, '0')}</td>
-                    <td className="py-3 px-3 font-bold text-[#f26522] font-mono text-[11px]">{ven.vendorCode || ven.id || ven.transNo}</td>
-                    
-                    {/* Clickable Company Name ⭐ */}
-                    <td className="py-3 px-3">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedVendorDetail(ven)}
-                        className="text-[#f26522] hover:text-[#e05411] font-black text-xs hover:underline flex items-center gap-1.5 cursor-pointer bg-orange-50/70 px-2 py-1 rounded-lg border border-orange-200/60 shadow-2xs"
-                      >
-                        <Building2 size={13} className="shrink-0 text-[#f26522]" />
-                        <span>{ven.companyName || ven.name}</span>
-                      </button>
-                    </td>
+                    <tr key={ven.id || ven._id || idx} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-3 px-3 font-bold text-slate-800">{String(globalIdx).padStart(2, '0')}</td>
+                      <td className="py-3 px-3 font-bold text-[#f26522] font-mono text-[11px]">{ven.vendorCode || ven.id}</td>
 
-                    <td className="py-3 px-3 text-slate-700 font-semibold">{ven.contactNo || ven.mobile || '-'}</td>
-                    <td className="py-3 px-3 text-slate-600 text-[11px] font-medium">{ven.verificationDate || '-'}</td>
-                    <td className="py-3 px-3 text-slate-600 font-medium">{ven.state}</td>
-                    <td className="py-3 px-3 text-slate-600 font-medium">{ven.city}</td>
-                    <td className="py-3 px-3 text-slate-600 font-mono text-[11px]">{ven.referId || '-'}</td>
-                    <td className="py-3 px-3 text-slate-600 font-mono text-[11px]">{ven.referCode || '-'}</td>
-                    <td className="py-3 px-3 text-slate-700 font-semibold">{ven.agentName || '-'}</td>
-                    <td className="py-3 px-3">
-                      <span
-                        className={`font-bold text-xs px-2.5 py-0.5 rounded-full border inline-block ${
-                          ven.status === 'Active'
+                      {/* Clickable Company Name ⭐ */}
+                      <td className="py-3 px-3">
+                        <button
+                          type="button"
+                          onClick={() => handleViewVendor(ven)}
+                          className="text-[#f26522] hover:text-[#e05411] font-black text-xs hover:underline flex items-center gap-1.5 cursor-pointer bg-orange-50/70 px-2 py-1 rounded-lg border border-orange-200/60 shadow-2xs"
+                        >
+                          <Building2 size={13} className="shrink-0 text-[#f26522]" />
+                          <span>{ven.companyName || ven.name}</span>
+                        </button>
+                      </td>
+
+                      <td className="py-3 px-3 text-slate-700 font-semibold">{ven.contactNo || ven.mobile || '-'}</td>
+                      <td className="py-3 px-3 text-slate-600 text-[11px] font-medium">{ven.verificationDate || '-'}</td>
+                      <td className="py-3 px-3 text-slate-600 font-medium">{ven.state}</td>
+                      <td className="py-3 px-3 text-slate-600 font-medium">{ven.city}</td>
+                      <td className="py-3 px-3 text-slate-600 font-mono text-[11px]">{ven.referId || '-'}</td>
+                      <td className="py-3 px-3 text-slate-600 font-mono text-[11px]">{ven.referCode || '-'}</td>
+                      <td className="py-3 px-3 text-slate-700 font-semibold">{ven.agentName || '-'}</td>
+                      <td className="py-3 px-3">
+                        <span
+                          className={`font-bold text-xs px-2.5 py-0.5 rounded-full border inline-block ${ven.status === 'Active'
                             ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
                             : ven.status === 'Blocked'
-                            ? 'bg-rose-50 text-rose-600 border-rose-200'
-                            : 'bg-amber-50 text-amber-600 border-amber-200'
-                        }`}
-                      >
-                        {ven.status}
-                      </span>
-                    </td>
-
-                    {/* Actions Column: View, Edit, Block, Delete */}
-                    <td className="py-3 px-3 text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {/* View Action */}
-                        <button
-                          type="button"
-                          onClick={() => setSelectedVendorDetail(ven)}
-                          title="View Details"
-                          className="p-1.5 rounded-lg text-slate-600 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+                              ? 'bg-rose-50 text-rose-600 border-rose-200'
+                              : 'bg-amber-50 text-amber-600 border-amber-200'
+                            }`}
                         >
-                          <Eye size={13} />
-                        </button>
+                          {ven.status}
+                        </span>
+                      </td>
 
-                        {/* Edit Action */}
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEditModal(ven)}
-                          title="Edit Vendor"
-                          className="p-1.5 rounded-lg text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors cursor-pointer"
-                        >
-                          <Edit2 size={13} />
-                        </button>
+                      {/* Actions Column: View, Edit, Block, Delete */}
+                      <td className="py-3 px-3 text-center">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {/* View Action */}
+                          <button
+                            type="button"
+                            onClick={() => handleViewVendor(ven)}
+                            title="View Details"
+                            className="p-1.5 rounded-lg text-slate-600 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
+                          >
+                            <Eye size={13} />
+                          </button>
 
-                        {/* Block / Unblock Action */}
-                        <button
-                          type="button"
-                          onClick={() => handlePromptBlock(ven)}
-                          title={ven.status === 'Blocked' ? 'Unblock Vendor' : 'Block Vendor'}
-                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
-                            ven.status === 'Blocked'
+                          {/* Edit Action */}
+                          <button
+                            type="button"
+                            onClick={() => handleEditVendor(ven)}
+                            title="Edit Vendor"
+                            className="p-1.5 rounded-lg text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors cursor-pointer"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+
+                          {/* Change Password Action */}
+                          <button
+                            type="button"
+                            onClick={() => handleChangePasswordVendor(ven)}
+                            title="Change Password"
+                            className="p-1.5 rounded-lg text-amber-600 border border-amber-200 hover:bg-amber-50 transition-colors cursor-pointer"
+                          >
+                            <Key size={13} />
+                          </button>
+
+                          {/* Block / Unblock Action */}
+                          <button
+                            type="button"
+                            onClick={() => handlePromptBlock(ven)}
+                            title={ven.status === 'Blocked' ? 'Unblock Vendor' : 'Block Vendor'}
+                            className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${ven.status === 'Blocked'
                               ? 'text-emerald-600 border-emerald-200 hover:bg-emerald-50'
                               : 'text-amber-600 border-amber-200 hover:bg-amber-50'
-                          }`}
-                        >
-                          {ven.status === 'Blocked' ? <UserCheck size={13} /> : <Ban size={13} />}
-                        </button>
+                              }`}
+                          >
+                            {ven.status === 'Blocked' ? <UserCheck size={13} /> : <Ban size={13} />}
+                          </button>
 
-                        {/* Delete Action */}
-                        <button
-                          type="button"
-                          onClick={() => handlePromptDelete(ven)}
-                          title="Delete Vendor"
-                          className="p-1.5 rounded-lg text-rose-600 border border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
+                          {/* Delete Action */}
+                          <button
+                            type="button"
+                            onClick={() => handlePromptDelete(ven)}
+                            title="Delete Vendor"
+                            className="p-1.5 rounded-lg text-rose-600 border border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   );
                 })
               ) : (
@@ -1250,11 +2022,10 @@ function VendorDatabase({ compact = false }) {
                 key={pageNum}
                 type="button"
                 onClick={() => handlePageChange(pageNum)}
-                className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  pageNum === validCurrentPage
-                    ? 'bg-[#f26522] text-white shadow-xs'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
+                className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${pageNum === validCurrentPage
+                  ? 'bg-[#f26522] text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100'
+                  }`}
               >
                 {pageNum}
               </button>
@@ -1279,7 +2050,7 @@ function VendorDatabase({ compact = false }) {
       {isUploadModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
-            
+
             {/* Modal Header */}
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
               <div className="flex items-center gap-2">
@@ -1296,7 +2067,7 @@ function VendorDatabase({ compact = false }) {
 
             {/* Modal Body */}
             <div className="p-5 space-y-4">
-              
+
               {/* Sample Template Bar */}
               <div className="flex items-center justify-between bg-orange-50/60 border border-orange-200/70 rounded-xl p-3 text-xs">
                 <div>
@@ -1324,16 +2095,15 @@ function VendorDatabase({ compact = false }) {
                     handleFileSelect(e.dataTransfer.files[0]);
                   }
                 }}
-                className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${
-                  dragActive ? 'border-[#f26522] bg-orange-50/40' : 'border-slate-200 hover:border-slate-300 bg-slate-50/40'
-                }`}
+                className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${dragActive ? 'border-[#f26522] bg-orange-50/40' : 'border-slate-200 hover:border-slate-300 bg-slate-50/40'
+                  }`}
               >
                 <Upload size={28} className="mx-auto text-slate-400 mb-2" />
                 <p className="text-xs font-semibold text-slate-700 mb-1">
                   Drag & Drop CSV or Excel file here
                 </p>
                 <p className="text-[11px] text-slate-400 mb-3">Supports .csv, .xlsx files up to 10MB</p>
-                
+
                 <label className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#f26522] hover:bg-[#e05411] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer">
                   <span>Browse File</span>
                   <input
@@ -1415,475 +2185,6 @@ function VendorDatabase({ compact = false }) {
           </div>
         </div>
       )}
-
-      {/* VENDOR FULL INFORMATION MODAL ⭐ */}
-      {selectedVendorDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-xl overflow-hidden flex flex-col">
-            
-            {/* Modal Header */}
-            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-[#f26522] text-white flex items-center justify-center font-bold shadow-md">
-                  <Building2 size={20} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-black tracking-tight">{selectedVendorDetail.name}</h3>
-                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-full border uppercase ${
-                      selectedVendorDetail.status === 'Active'
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                        : selectedVendorDetail.status === 'Blocked'
-                        ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                        : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                    }`}>
-                      {selectedVendorDetail.status || 'Active'}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-300 font-mono mt-0.5">
-                    Vendor ID: {selectedVendorDetail.id} • Trans #: {selectedVendorDetail.transNo || 'TRX90101'}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedVendorDetail(null)}
-                className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto custom-scrollbar text-left text-xs">
-              
-              {/* Business & Owner Info Card */}
-              <div className="bg-orange-50/50 border border-orange-200/80 rounded-2xl p-4 space-y-2.5">
-                <h4 className="text-[11px] font-black uppercase text-[#f26522] tracking-wider flex items-center gap-1.5">
-                  <Building2 size={13} />
-                  <span>Business & Owner Profile</span>
-                </h4>
-                <div className="grid grid-cols-2 gap-3 text-slate-800 font-medium">
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">Shop / Company Name</span>
-                    <span className="font-extrabold text-slate-900 text-sm">{selectedVendorDetail.name}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">Owner / Contact Person</span>
-                    <span className="font-extrabold text-slate-900">{selectedVendorDetail.ownerName || 'Rajesh Patel'}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">Category / Business Type</span>
-                    <span className="font-extrabold text-[#f26522]">{selectedVendorDetail.category}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">GSTIN / Tax Registration</span>
-                    <span className="font-mono font-bold text-slate-800">{selectedVendorDetail.gstNo || '27AAAAA0000A1Z5'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Location & Address Section */}
-              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 space-y-2.5">
-                <h4 className="text-[11px] font-black uppercase text-slate-700 tracking-wider flex items-center gap-1.5">
-                  <MapPin size={13} className="text-[#f26522]" />
-                  <span>Location & Address Details</span>
-                </h4>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">State</span>
-                    <span className="font-extrabold text-slate-900">{selectedVendorDetail.state}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">City</span>
-                    <span className="font-extrabold text-slate-900">{selectedVendorDetail.city}</span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-slate-500 block font-bold">Pincode Area</span>
-                    <span className="font-mono font-black text-[#f26522]">{selectedVendorDetail.pincode || '440001'}</span>
-                  </div>
-                  <div className="col-span-3">
-                    <span className="text-[10px] text-slate-500 block font-bold">Complete Shop Address</span>
-                    <span className="font-bold text-slate-800">
-                      {selectedVendorDetail.address || 'Shop No. 12, Main Commercial Complex, MG Road'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact Information */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-1">
-                  <span className="text-[10px] text-slate-500 block font-bold">Vendor Contact Number</span>
-                  <div className="flex items-center gap-1.5 font-extrabold text-slate-900">
-                    <Phone size={13} className="text-[#f26522]" />
-                    <span>{selectedVendorDetail.contactNo || '+91 98920 11223'}</span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-1">
-                  <span className="text-[10px] text-slate-500 block font-bold">Vendor Email Address</span>
-                  <div className="flex items-center gap-1.5 font-extrabold text-slate-900 truncate">
-                    <Mail size={13} className="text-[#f26522]" />
-                    <span className="truncate">{selectedVendorDetail.email || 'contact@vendor.com'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Verification & Operations Banner */}
-              <div className="bg-slate-900 text-white rounded-2xl p-4 flex items-center justify-between">
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Verification Date & Time</div>
-                  <div className="text-xs font-bold text-slate-200 mt-0.5">
-                    {selectedVendorDetail.verificationDateTime || '2026-07-30 10:30 AM'}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Mapped Customers</div>
-                  <div className="text-sm font-black text-[#f26522] mt-0.5">
-                    {selectedVendorDetail.mappedCustomers || 520} Customers
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-              <span className="text-[11px] font-bold text-slate-400">LTS Verified Enterprise Vendor Profile</span>
-              <button
-                onClick={() => setSelectedVendorDetail(null)}
-                className="px-5 py-2 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer shadow-2xs"
-              >
-                Close Profile
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* EDIT VENDOR MODAL ⭐ */}
-      {isEditModalOpen && editingVendor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
-              <div className="flex items-center gap-2">
-                <Edit2 size={18} className="text-[#f26522]" />
-                <h3 className="text-xs font-bold text-slate-800">Edit Vendor Record</h3>
-              </div>
-              <button
-                onClick={() => {
-                  setIsEditModalOpen(false);
-                  setEditingVendor(null);
-                }}
-                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Form */}
-            <form onSubmit={handleEditVendorSubmit} className="p-5 space-y-3">
-              <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto custom-scrollbar pr-1">
-                {/* Vendor Name */}
-                <div className="col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Vendor Name *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Zenith Traders Pvt Ltd"
-                    value={editingVendor.name}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, name: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Owner Name */}
-                <div className="col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Owner Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Rajesh Patel"
-                    value={editingVendor.ownerName}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, ownerName: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Category */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Category *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Electronics / Medical / Grocery"
-                    value={editingVendor.category}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, category: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Trans No. */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Trans No.</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. TRX90106"
-                    value={editingVendor.transNo}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, transNo: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Contact No. */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Contact No.</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. +91 98765 43210"
-                    value={editingVendor.contactNo}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, contactNo: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Email Address */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    placeholder="e.g. vendor@example.com"
-                    value={editingVendor.email}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, email: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* State */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">State</label>
-                  <select
-                    value={editingVendor.state}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, state: e.target.value, city: '' })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 cursor-pointer"
-                  >
-                    <option value="">-- Select State --</option>
-                    {allStates.map((st) => (
-                      <option key={st.isoCode} value={st.name}>{st.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* City */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">City</label>
-                  <select
-                    value={editingVendor.city}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, city: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 cursor-pointer"
-                  >
-                    <option value="">-- Select City --</option>
-                    {(() => {
-                      const stObj = allStates.find((s) => s.name === editingVendor.state);
-                      const cityList = stObj ? (City.getCitiesOfState('IN', stObj.isoCode) || []) : [];
-                      return cityList.map((ct) => (
-                        <option key={ct.name} value={ct.name}>{ct.name}</option>
-                      ));
-                    })()}
-                  </select>
-                </div>
-
-                {/* Status */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Status</label>
-                  <select
-                    value={editingVendor.status}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, status: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Blocked">Blocked</option>
-                  </select>
-                </div>
-
-                {/* GSTIN No */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">GSTIN / Tax No</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 27AAAAA0000A1Z5"
-                    value={editingVendor.gstNo}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, gstNo: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Pincode */}
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Pincode</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 440001"
-                    value={editingVendor.pincode}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, pincode: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-
-                {/* Complete Address */}
-                <div className="col-span-2">
-                  <label className="block text-[11px] font-bold text-slate-700 mb-1">Complete Address</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Shop No. 12, Main Commercial Complex, MG Road"
-                    value={editingVendor.address}
-                    onChange={(e) => setEditingVendor({ ...editingVendor, address: e.target.value })}
-                    className="w-full px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditModalOpen(false);
-                    setEditingVendor(null);
-                  }}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving}
-                  className="px-5 py-2 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors cursor-pointer shadow-xs flex items-center gap-1.5 disabled:opacity-50"
-                >
-                  <Check size={14} />
-                  <span>{isSaving ? 'Updating...' : 'Update Vendor'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* CONFIRMATION POPUP MODAL (FOR BLOCK & DELETE) ⭐ */}
-      {confirmModal.isOpen && confirmModal.vendor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-150">
-            <div className="p-6 text-center">
-              {/* Icon */}
-              <div className={`w-12 h-12 rounded-full mx-auto flex items-center justify-center mb-4 ${
-                confirmModal.type === 'delete'
-                  ? 'bg-rose-100 text-rose-600'
-                  : confirmModal.vendor.status === 'Blocked'
-                  ? 'bg-emerald-100 text-emerald-600'
-                  : 'bg-amber-100 text-amber-600'
-              }`}>
-                {confirmModal.type === 'delete' ? (
-                  <Trash2 size={24} />
-                ) : confirmModal.vendor.status === 'Blocked' ? (
-                  <UserCheck size={24} />
-                ) : (
-                  <Ban size={24} />
-                )}
-              </div>
-
-              {/* Title */}
-              <h3 className="text-base font-bold text-slate-900 mb-1">
-                {confirmModal.type === 'delete'
-                  ? 'Delete Vendor Record'
-                  : confirmModal.vendor.status === 'Blocked'
-                  ? 'Unblock Vendor'
-                  : 'Block Vendor'}
-              </h3>
-
-              {/* Description */}
-              <p className="text-xs text-slate-500 mb-4 px-2">
-                {confirmModal.type === 'delete' ? (
-                  <>
-                    Are you sure you want to delete vendor <strong className="text-slate-800 font-semibold">{confirmModal.vendor.name}</strong>? This action cannot be undone and will permanently remove this record.
-                  </>
-                ) : confirmModal.vendor.status === 'Blocked' ? (
-                  <>
-                    Are you sure you want to unblock vendor <strong className="text-slate-800 font-semibold">{confirmModal.vendor.name}</strong>? This vendor will regain full access to the portal.
-                  </>
-                ) : (
-                  <>
-                    Are you sure you want to block vendor <strong className="text-slate-800 font-semibold">{confirmModal.vendor.name}</strong>? This vendor will be restricted from accessing the portal.
-                  </>
-                )}
-              </p>
-
-              {/* Vendor Info Card */}
-              <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-left text-xs mb-5 space-y-1.5">
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-400 font-medium">Vendor ID:</span>
-                  <span className="font-mono font-bold text-slate-700">{confirmModal.vendor.transNo || confirmModal.vendor.id}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-100">
-                  <span className="text-slate-400 font-medium">Category:</span>
-                  <span className="font-semibold text-slate-700">{confirmModal.vendor.category}</span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-slate-400 font-medium">Current Status:</span>
-                  <span className="font-bold text-slate-800">{confirmModal.vendor.status}</span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={handleCloseConfirmModal}
-                  disabled={isSaving}
-                  className="w-full py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmAction}
-                  disabled={isSaving}
-                  className={`w-full py-2.5 px-4 text-xs font-bold text-white rounded-xl transition-colors cursor-pointer disabled:opacity-50 shadow-xs flex items-center justify-center gap-1.5 ${
-                    confirmModal.type === 'delete'
-                      ? 'bg-rose-600 hover:bg-rose-700'
-                      : confirmModal.vendor.status === 'Blocked'
-                      ? 'bg-emerald-600 hover:bg-emerald-700'
-                      : 'bg-amber-600 hover:bg-amber-700'
-                  }`}
-                >
-                  {isSaving ? (
-                    <span>Processing...</span>
-                  ) : confirmModal.type === 'delete' ? (
-                    <>
-                      <Trash2 size={14} />
-                      <span>Yes, Delete</span>
-                    </>
-                  ) : confirmModal.vendor.status === 'Blocked' ? (
-                    <>
-                      <UserCheck size={14} />
-                      <span>Yes, Unblock</span>
-                    </>
-                  ) : (
-                    <>
-                      <Ban size={14} />
-                      <span>Yes, Block</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }

@@ -37,7 +37,6 @@ export const updateCustomer = createAsyncThunk(
     try {
       const response = await api.patch(`/superadmin/customers/${customerId}`, updateData);
       toast.success(response.data.message || 'Customer updated successfully');
-      dispatch(fetchCustomers());
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to update customer.';
@@ -123,13 +122,39 @@ const customerSlice = createSlice({
       })
       .addCase(fetchCustomers.fulfilled, (state, action) => {
         state.loading = false;
-        const fetched = action.payload.customers || [];
-        // Preserve any local customers that have mobile number set if API didn't return them or stripped mobile
-        const localCreated = state.customers.filter((c) => c._isLocal || (c.mobile && !fetched.some((f) => f._id === c._id || f.customerId === c.customerId)));
-        state.customers = [...localCreated, ...fetched];
-        state.totalCustomers = action.payload.totalCustomers || state.customers.length;
-        state.totalPages = action.payload.totalPages || 1;
-        state.currentPage = action.payload.currentPage || 1;
+        const fetched = action.payload?.customers || action.payload?.data || (Array.isArray(action.payload) ? action.payload : []);
+
+        const mergedFetched = fetched.map((f) => {
+          const match = state.customers.find(
+            (c) =>
+              (c._id && c._id === f._id) ||
+              (c.customerId && c.customerId === f.customerId) ||
+              (c.companyName && f.companyName && c.companyName.toLowerCase() === f.companyName.toLowerCase())
+          );
+          if (match) {
+            const existingNum = match.mobileNumber || match.mobile || match.phone || match.number;
+            const validNum = String(existingNum || '').replace(/\D/g, '').length >= 7 ? String(existingNum).trim() : null;
+            if (validNum && (!f.mobile || f.mobile === '-' || String(f.mobile).replace(/\D/g, '').length < 7)) {
+              return {
+                ...f,
+                mobile: validNum,
+                mobileNumber: validNum,
+                phone: validNum,
+                contact: validNum,
+                number: validNum,
+              };
+            }
+          }
+          return f;
+        });
+
+        const localCreated = state.customers.filter(
+          (c) => c._isLocal || ((c.mobile || c.mobileNumber) && !mergedFetched.some((f) => f._id === c._id || f.customerId === c.customerId))
+        );
+        state.customers = [...localCreated, ...mergedFetched];
+        state.totalCustomers = action.payload?.totalCustomers || state.customers.length;
+        state.totalPages = action.payload?.totalPages || 1;
+        state.currentPage = action.payload?.currentPage || 1;
       })
       .addCase(fetchCustomers.rejected, (state, action) => {
         state.loading = false;
@@ -156,8 +181,35 @@ const customerSlice = createSlice({
       .addCase(updateCustomer.pending, (state) => {
         state.isSaving = true;
       })
-      .addCase(updateCustomer.fulfilled, (state) => {
+      .addCase(updateCustomer.fulfilled, (state, action) => {
         state.isSaving = false;
+        const arg = action.meta?.arg;
+        const targetId = arg?.customerId;
+        const updateData = arg?.updateData || {};
+        const apiCustomer = action.payload?.customer || action.payload?.data || {};
+
+        state.customers = state.customers.map((c) => {
+          const isMatch =
+            (targetId && (c._id === targetId || c.customerId === targetId || c.id === targetId)) ||
+            (updateData.companyName && c.companyName && c.companyName.trim().toLowerCase() === updateData.companyName.trim().toLowerCase()) ||
+            (updateData.name && c.name && c.name.trim().toLowerCase() === updateData.name.trim().toLowerCase());
+
+          if (isMatch) {
+            const newMobile = updateData.mobile || updateData.mobileNumber || apiCustomer.mobile || apiCustomer.mobileNumber || c.mobile;
+            return {
+              ...c,
+              ...apiCustomer,
+              ...updateData,
+              mobile: newMobile,
+              mobileNumber: newMobile,
+              phone: newMobile,
+              contact: newMobile,
+              number: newMobile,
+              _isLocalUpdated: true,
+            };
+          }
+          return c;
+        });
       })
       .addCase(updateCustomer.rejected, (state) => {
         state.isSaving = false;
