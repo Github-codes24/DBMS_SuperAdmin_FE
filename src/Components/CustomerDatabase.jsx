@@ -285,7 +285,11 @@ function CustomerDatabase({ compact = false }) {
     return '-';
   };
 
-  const customers = Array.isArray(apiCustomers) ? apiCustomers.map((cust, idx) => {
+  const activeApiCustomers = Array.isArray(apiCustomers) ? apiCustomers.filter(
+    (c) => !c.isDeleted && c.status !== 'Deleted'
+  ) : [];
+
+  const customers = activeApiCustomers.map((cust, idx) => {
     const mobileNum = getDisplayNumber(cust);
 
     return {
@@ -304,7 +308,7 @@ function CustomerDatabase({ compact = false }) {
       email: cust.email || '-',
       mobile: mobileNum,
     };
-  }) : [];
+  });
 
   const filteredCustomers = customers.filter((cust) => {
     const matchesSearch =
@@ -460,11 +464,13 @@ function CustomerDatabase({ compact = false }) {
     if (!customer) return;
 
     if (type === 'delete') {
-      const targetId = customer._id || customer.id;
-      dispatch(deleteCustomer(targetId)).unwrap().then(() => {
+      const payload = {
+        primaryId: customer._id || customer.id || customer.customerId || customer.customerCode,
+        secondaryId: customer._id || customer.id
+      };
+      dispatch(deleteCustomer(payload)).unwrap().then((res) => {
         handleCloseConfirmModal();
-        dispatch(fetchCustomers());
-        setToastMsg(`Customer deleted successfully!`);
+        setToastMsg(res?.message || `Customer deleted successfully!`);
         setTimeout(() => setToastMsg(''), 4000);
       }).catch((err) => {
         console.error('Delete failed:', err);
@@ -1282,7 +1288,7 @@ function CustomerDatabase({ compact = false }) {
         {/* TABLE VIEW WITH MANUAL HORIZONTAL & VERTICAL SLIDING / SCROLLING */}
         <div
           ref={manualScrollRef}
-          className="max-h-[320px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar"
+          className="max-h-[calc(100vh-280px)] min-h-[350px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar"
         >
           <table className="w-full min-w-[750px] text-left border-collapse">
             <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs z-10">

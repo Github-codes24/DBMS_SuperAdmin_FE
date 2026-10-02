@@ -112,13 +112,18 @@ export const updateVendor = createAsyncThunk(
 
 export const changeVendorPassword = createAsyncThunk(
   'vendor/changeVendorPassword',
-  async ({ vendorId, password, notifyVendor }, { dispatch, rejectWithValue }) => {
+  async ({ vendorId, password, newPassword, notifyVendor }, { dispatch, rejectWithValue }) => {
+    const pwdToSet = newPassword || password;
     try {
       let response;
       try {
-        response = await api.patch(`/superadmin/vendors/${vendorId}/change-password`, { password, notifyVendor });
+        response = await api.patch(`/superadmin/vendors/${vendorId}/password`, { newPassword: pwdToSet });
       } catch (err) {
-        response = await api.patch(`/superadmin/vendors/${vendorId}`, { password, notifyVendor });
+        try {
+          response = await api.patch(`/superadmin/vendors/${vendorId}/change-password`, { password: pwdToSet, newPassword: pwdToSet, notifyVendor });
+        } catch (err2) {
+          response = await api.patch(`/superadmin/vendors/${vendorId}`, { password: pwdToSet, newPassword: pwdToSet, notifyVendor });
+        }
       }
       toast.success(response.data?.message || 'Vendor password changed successfully');
       dispatch(fetchVendors());
@@ -133,17 +138,52 @@ export const changeVendorPassword = createAsyncThunk(
 
 export const deleteVendor = createAsyncThunk(
   'vendor/deleteVendor',
-  async (vendorId, { dispatch, rejectWithValue }) => {
-    try {
-      const response = await api.delete(`/superadmin/vendors/${vendorId}`);
-      toast.success(response.data?.message || 'Vendor deleted successfully');
-      dispatch(fetchVendors());
-      return response.data;
-    } catch (error) {
-      const message = error.response?.data?.message || 'Failed to delete vendor.';
-      toast.error(message);
-      return rejectWithValue(message);
+  async (vendorIdParam, { dispatch, rejectWithValue }) => {
+    const primaryId = typeof vendorIdParam === 'object' ? (vendorIdParam.primaryId || vendorIdParam.vendorId) : vendorIdParam;
+    const secondaryId = typeof vendorIdParam === 'object' ? vendorIdParam.secondaryId : null;
+
+    const idsToTry = Array.from(new Set([primaryId, secondaryId].filter(Boolean)));
+
+    // Generate potential requests to try in sequence
+    const attempts = [];
+    for (const id of idsToTry) {
+      attempts.push(() => api.delete(`/superadmin/vendors/${id}`));
+      attempts.push(() => api.patch(`/superadmin/vendors/${id}`, { status: 'Deleted', isDeleted: true }));
+      attempts.push(() => api.delete(`/superadmin/vendor/${id}`));
+      attempts.push(() => api.delete(`/vendors/${id}`));
+      attempts.push(() => api.delete(`/superadmin/vendors/delete/${id}`));
+      attempts.push(() => api.patch(`/superadmin/vendors/${id}/delete`));
+      attempts.push(() => api.post(`/superadmin/vendors/${id}/delete`));
+      attempts.push(() => api.delete(`/superadmin/vendors`, { data: { vendorId: id } }));
+      attempts.push(() => api.delete(`/superadmin/vendors`, { data: { id } }));
     }
+
+    let lastError = null;
+    for (const makeAttempt of attempts) {
+      try {
+        const response = await makeAttempt();
+        if (response.status >= 200 && response.status < 300) {
+          toast.success(response.data?.message || 'Vendor deleted successfully');
+          dispatch(fetchVendors());
+          return response.data;
+        }
+      } catch (err) {
+        lastError = err;
+        if (err.response && err.response.status !== 404) {
+          const msg = err.response?.data?.message || 'Failed to delete vendor.';
+          toast.error(msg);
+          return rejectWithValue(msg);
+        }
+      }
+    }
+
+    const message = lastError?.response?.data?.message ||
+      (typeof lastError?.response?.data === 'string' && lastError.response.data.includes('Cannot')
+        ? 'Backend route DELETE /api/v1/superadmin/vendors/:id is not mounted on backend server.'
+        : 'Failed to delete vendor (404 Route Not Found).');
+
+    toast.error(message);
+    return rejectWithValue(message);
   }
 );
 
@@ -330,8 +370,28 @@ const vendorSlice = createSlice({
       .addCase(deleteVendor.pending, (state) => {
         state.isSaving = true;
       })
-      .addCase(deleteVendor.fulfilled, (state) => {
+      .addCase(deleteVendor.fulfilled, (state, action) => {
         state.isSaving = false;
+        const resData = action.payload?.data;
+        const arg = action.meta.arg;
+        const primaryId = typeof arg === 'object' ? (arg.primaryId || arg.vendorId) : arg;
+        const secondaryId = typeof arg === 'object' ? arg.secondaryId : null;
+        const deletedVendorId = resData?.vendorId;
+
+        if (state.vendors && Array.isArray(state.vendors)) {
+          state.vendors = state.vendors.filter((v) => {
+            if (deletedVendorId && (v.vendorId === deletedVendorId || v.vendorCode === deletedVendorId || v._id === deletedVendorId || v.id === deletedVendorId)) {
+              return false;
+            }
+            if (primaryId && (v._id === primaryId || v.vendorId === primaryId || v.id === primaryId || v.vendorCode === primaryId)) {
+              return false;
+            }
+            if (secondaryId && (v._id === secondaryId || v.vendorId === secondaryId || v.id === secondaryId || v.vendorCode === secondaryId)) {
+              return false;
+            }
+            return true;
+          });
+        }
       })
       .addCase(deleteVendor.rejected, (state) => {
         state.isSaving = false;

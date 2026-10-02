@@ -58,6 +58,51 @@ export const updateTelecaller = createAsyncThunk(
   }
 );
 
+export const deleteTelecaller = createAsyncThunk(
+  'telecaller/deleteTelecaller',
+  async (telecallerParam, { dispatch, rejectWithValue }) => {
+    let mongoId = null;
+    let userId = null;
+
+    if (typeof telecallerParam === 'object' && telecallerParam !== null) {
+      mongoId = telecallerParam._id || telecallerParam.mongoId;
+      userId = telecallerParam.userId || telecallerParam.id;
+    } else if (typeof telecallerParam === 'string') {
+      if (/^[0-9a-fA-F]{24}$/.test(telecallerParam)) {
+        mongoId = telecallerParam;
+      } else {
+        userId = telecallerParam;
+      }
+    }
+
+    const idsToTry = Array.from(new Set([mongoId, userId, telecallerParam?.id, telecallerParam?._id].filter(Boolean)));
+
+    let lastError = null;
+    for (const id of idsToTry) {
+      try {
+        const response = await api.delete(`/users/${id}`);
+        toast.success(response.data?.message || 'Telecaller deleted successfully');
+        dispatch(fetchTelecallers());
+        return { mongoId, userId, targetId: id, data: response.data };
+      } catch (err) {
+        lastError = err;
+        try {
+          const response = await api.delete(`/superadmin/telecallers/${id}`);
+          toast.success(response.data?.message || 'Telecaller deleted successfully');
+          dispatch(fetchTelecallers());
+          return { mongoId, userId, targetId: id, data: response.data };
+        } catch (err2) {
+          lastError = err2;
+        }
+      }
+    }
+
+    const message = lastError?.response?.data?.message || 'Failed to delete telecaller.';
+    toast.error(message);
+    return rejectWithValue(message);
+  }
+);
+
 export const bulkImportTelecallers = createAsyncThunk(
   'telecaller/bulkImportTelecallers',
   async (file, { dispatch, rejectWithValue }) => {
@@ -114,9 +159,12 @@ const telecallerSlice = createSlice({
       })
       .addCase(fetchTelecallers.fulfilled, (state, action) => {
         state.loading = false;
-        state.telecallers = action.payload.telecallers || [];
-        state.totalTelecallers = action.payload.totalTelecallers || 0;
-        state.activeTelecallersCount = action.payload.activeTelecallersCount || 0;
+        const rawList = action.payload.telecallers || action.payload.data || [];
+        state.telecallers = Array.isArray(rawList)
+          ? rawList.filter((tc) => tc.status !== 'Deleted' && !tc.isDeleted)
+          : [];
+        state.totalTelecallers = action.payload.totalTelecallers || state.telecallers.length;
+        state.activeTelecallersCount = action.payload.activeTelecallersCount || state.telecallers.filter(t => t.status === 'Active').length;
         state.totalPages = action.payload.totalPages || 1;
         state.currentPage = action.payload.currentPage || 1;
       })
@@ -142,6 +190,29 @@ const telecallerSlice = createSlice({
         state.isSaving = false;
       })
       .addCase(updateTelecaller.rejected, (state) => {
+        state.isSaving = false;
+      })
+      // Delete Telecaller
+      .addCase(deleteTelecaller.pending, (state) => {
+        state.isSaving = true;
+      })
+      .addCase(deleteTelecaller.fulfilled, (state, action) => {
+        state.isSaving = false;
+        const { mongoId, userId } = action.payload || {};
+        const arg = action.meta?.arg;
+        const argId = typeof arg === 'object' ? (arg._id || arg.id || arg.userId) : arg;
+
+        if (state.telecallers && Array.isArray(state.telecallers)) {
+          state.telecallers = state.telecallers.filter((tc) => {
+            if (tc.status === 'Deleted' || tc.isDeleted) return false;
+            if (mongoId && tc._id === mongoId) return false;
+            if (userId && (tc.userId === userId || tc.id === userId)) return false;
+            if (argId && (tc._id === argId || tc.userId === argId || tc.id === argId)) return false;
+            return true;
+          });
+        }
+      })
+      .addCase(deleteTelecaller.rejected, (state) => {
         state.isSaving = false;
       })
       // Bulk Import

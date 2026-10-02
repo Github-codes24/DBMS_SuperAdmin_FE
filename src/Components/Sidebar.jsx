@@ -176,12 +176,12 @@ function Sidebar({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpe
         <div className="md:hidden fixed inset-0 z-50 flex">
           {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
             onClick={() => setIsMobileMenuOpen && setIsMobileMenuOpen(false)}
           />
 
           {/* Drawer Body */}
-          <aside className="relative z-50 w-72 max-w-[85vw] bg-white h-full p-4 shadow-2xl flex flex-col justify-between transform transition-all duration-300 ease-in-out">
+          <aside className="relative z-50 w-72 max-w-[85vw] bg-white h-full p-4 shadow-2xl flex flex-col justify-between transform transition-all duration-300 ease-in-out animate-in slide-in-from-left duration-300">
             {renderNavContent(true)}
           </aside>
         </div>
