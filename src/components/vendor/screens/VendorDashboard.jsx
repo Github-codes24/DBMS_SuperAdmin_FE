@@ -127,8 +127,22 @@ export const VendorDashboard = ({ onNavigate , fiscalYear }) => {
     setSubCategorySearch('');
   };
 
+  const INDIAN_STATES = [
+    'Andaman and Nicobar Islands', 'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 
+    'Chandigarh', 'Chhattisgarh', 'Dadra and Nagar Haveli and Daman and Diu', 'Delhi', 'Goa', 
+    'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jammu and Kashmir', 'Jharkhand', 'Karnataka', 
+    'Kerala', 'Ladakh', 'Lakshadweep', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 'Meghalaya', 
+    'Mizoram', 'Nagaland', 'Odisha', 'Puducherry', 'Punjab', 'Rajasthan', 'Sikkim', 'Tamil Nadu', 
+    'Telangana', 'Tripura', 'Uttar Pradesh', 'Uttarakhand', 'West Bengal'
+  ];
+  
+  const mergedStates = INDIAN_STATES.map(stateName => {
+    const existing = states.find(s => s.name?.toLowerCase() === stateName.toLowerCase());
+    return { name: stateName, vendorCount: existing ? (existing.vendorCount || 0) : 0 };
+  });
+
   // Filtered lists for columns
-  const filteredStates = states.filter(s => s.name?.toLowerCase().includes(stateSearch.toLowerCase()));
+  const filteredStates = mergedStates.filter(s => s.name?.toLowerCase().includes(stateSearch.toLowerCase()));
   const filteredCategories = categories.filter(c => c.name?.toLowerCase().includes(categorySearch.toLowerCase()));
   const filteredSubCategories = availableSubCategories.filter(s => s.name?.toLowerCase().includes(subCategorySearch.toLowerCase()));
 
@@ -317,61 +331,30 @@ export const VendorDashboard = ({ onNavigate , fiscalYear }) => {
                 <MapPin className="w-4 h-4 text-[#F97316]" />
                 <span className="text-xs font-extrabold text-[#172033]">States</span>
                 <span className="bg-[#FFF7ED] text-[#EA580C] font-extrabold text-[10px] px-2 py-0.5 rounded-md border border-orange-200">
-                  {states.length} Total
+                  {mergedStates.length} Total
                 </span>
                 <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
               </div>
-              <button
-                onClick={() => {
-                  setNewItemName('');
-                  setNewItemCount('');
-                  setActiveModal('state');
-                }}
-                className="bg-[#F97316] hover:bg-orange-600 text-white font-bold text-xs px-3 py-1 rounded-lg flex items-center space-x-1 shadow-xs transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add</span>
-              </button>
             </div>
 
             <p className="text-[11px] text-slate-400 font-bold">Active: <span className="text-[#F97316]">{selectedState}</span></p>
-
-            <div className="flex items-center justify-between text-[10px] font-extrabold text-slate-400 uppercase tracking-wider border-b border-slate-100 pb-2">
-              <span>STATE (CLICK TO FILTER)</span>
-              <span>VENDORS</span>
-            </div>
-
-            <div className="space-y-1.5 text-xs font-bold text-[#172033] max-h-52 overflow-y-auto pr-1">
-              {cascadeLoading ? (
-                <div className="flex items-center justify-center py-8 text-slate-400">
-                  <Loader2 className="w-5 h-5 animate-spin text-[#F97316]" />
-                </div>
-              ) : filteredStates.length === 0 ? (
-                <p className="text-center py-4 text-slate-400 text-xs font-medium">No states found</p>
-              ) : (
-                filteredStates.map((st) => {
-                  const isSelected = selectedState === st.name;
-                  return (
-                    <div
-                      key={st._id || st.name}
-                      onClick={() => setSelectedState(st.name)}
-                      className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-all ${
-                        isSelected
-                          ? 'bg-orange-50 text-[#F97316] font-extrabold border border-orange-400 shadow-xs'
-                          : 'hover:bg-slate-50 text-[#172033]'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2 truncate">
-                        <span className={isSelected ? 'text-[#F97316]' : 'text-slate-400'}>•</span>
-                        <span className="truncate">{st.name}</span>
-                      </div>
-                      <span className={`font-extrabold ${isSelected ? 'text-[#F97316]' : 'text-slate-600'}`}>
-                        {typeof st.vendorCount === 'number' ? st.vendorCount.toLocaleString() : (st.vendorCount || 0)}
-                      </span>
-                    </div>
-                  );
-                })
-              )}
+            
+            <div className="mt-3">
+              <label className="block text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">
+                SELECT STATE TO FILTER
+              </label>
+              <select
+                value={selectedState}
+                onChange={(e) => setSelectedState(e.target.value)}
+                className="w-full px-3 py-2.5 bg-[#F8FAFC] border border-slate-200 rounded-xl text-xs font-semibold text-[#172033] focus:outline-none focus:ring-2 focus:ring-[#F97316] cursor-pointer"
+              >
+                <option value="All">All States</option>
+                {mergedStates.map((st) => (
+                  <option key={st.name} value={st.name}>
+                    {st.name} ({typeof st.vendorCount === 'number' ? st.vendorCount.toLocaleString() : (st.vendorCount || 0)} Vendors)
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>

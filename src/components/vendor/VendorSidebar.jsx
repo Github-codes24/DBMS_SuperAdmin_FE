@@ -30,7 +30,7 @@ export const sidebarMenuItems = [
   },
   { id: '05 Orders', label: 'Orders', icon: ShoppingBag },
   { id: '06 Customers', label: 'Customer Database', icon: Users },
-  { id: '07 Inventory', label: 'Vendor Database', icon: Boxes },
+  // { id: '07 Inventory', label: 'Vendor Database', icon: Boxes },
   { id: '08 Sales Reports', label: 'Sales Reports', icon: BarChart3 },
   { id: '09 Profile & Settings', label: 'Profile & Settings', icon: UserCheck },
   { id: '10 Notifications', label: 'Notifications', icon: Bell },
