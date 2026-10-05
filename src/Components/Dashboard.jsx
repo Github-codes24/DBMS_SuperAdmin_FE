@@ -7,6 +7,8 @@ import {
   addDashboardCategory, 
   addDashboardSubcategory 
 } from '../redux/slices/dashboardSlice';
+import { fetchVendors } from '../redux/slices/vendorSlice';
+import { fetchCustomers } from '../redux/slices/customerSlice';
 import { ChevronUp, ChevronDown, Plus, X, Layers, MapPin, Filter, Check, Building2, Users, FileText, HelpCircle, ShieldCheck, Activity, Search, Ban, UserCheck, AlertTriangle } from 'lucide-react';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
@@ -807,20 +809,30 @@ function Dashboard({ initialTab = 'dashboard' }) {
 
   const dispatch = useDispatch();
   const { stats, cascadeData, loading, error } = useSelector((state) => state.dashboard);
+  const { vendors = [] } = useSelector((state) => state.vendor || {});
+  const { customers = [] } = useSelector((state) => state.customer || {});
 
   useEffect(() => {
     dispatch(fetchDashboardOverview());
+    dispatch(fetchVendors());
+    dispatch(fetchCustomers());
   }, [dispatch]);
 
   // Default Stats fallback
   const dStats = stats || {
-    newVendors: { count: 0, badgePercentage: '0%', totalVendors: '0/0' },
+    newVendors: { count: 0, badgePercentage: '0%', totalVendors: 0 },
     newCustomers: { count: 0, badgePercentage: '0%', totalCustomers: 0 },
     newVendorRequests: { count: 0, totalFYRequests: 0 },
     newCustomerQueries: { count: 0, totalQueries: 0 },
     todaysVendorAudit: { count: 0, pendingQuality: 0 },
     onlineUsersDMS: { count: 0, badgePercentage: '0%', totalUserCount: 0 }
   };
+
+  // Live Database Counts computed from actual records
+  const liveTotalVendors = vendors.length > 0 ? vendors.length : Number(dStats.newVendors?.totalVendors) || 0;
+  const liveActiveVendors = vendors.length > 0 ? vendors.filter(v => (v.status || '').toLowerCase() === 'active').length : Number(dStats.newCustomers?.totalCustomers) || 0;
+  const liveRejectedVendors = vendors.length > 0 ? vendors.filter(v => (v.status || '').toLowerCase() === 'pending' || (v.status || '').toLowerCase() === 'rejected').length : Number(dStats.newVendorRequests?.totalFYRequests) || 0;
+  const liveBlockedVendors = vendors.length > 0 ? vendors.filter(v => (v.status || '').toLowerCase() === 'blocked' || (v.status || '').toLowerCase() === 'inactive' || v.isBlocked === true).length : Number(dStats.newCustomerQueries?.totalQueries) || 0;
 
 
 
@@ -894,6 +906,39 @@ function Dashboard({ initialTab = 'dashboard' }) {
     }
   ];
 
+  // Live State & Category count aggregation from actual vendors database ⭐
+  const liveVendorStateCounts = React.useMemo(() => {
+    const counts = {};
+    if (Array.isArray(vendors)) {
+      vendors.forEach((v) => {
+        if (!v.isDeleted && v.status !== 'Deleted') {
+          const st = String(v.state || v.rawVendor?.state || '').trim();
+          if (st) {
+            const lower = st.toLowerCase();
+            counts[lower] = (counts[lower] || 0) + 1;
+          }
+        }
+      });
+    }
+    return counts;
+  }, [vendors]);
+
+  const liveVendorCategoryCounts = React.useMemo(() => {
+    const counts = {};
+    if (Array.isArray(vendors)) {
+      vendors.forEach((v) => {
+        if (!v.isDeleted && v.status !== 'Deleted') {
+          const cat = String(v.category || v.rawVendor?.category || '').trim();
+          if (cat) {
+            const lower = cat.toLowerCase();
+            counts[lower] = (counts[lower] || 0) + 1;
+          }
+        }
+      });
+    }
+    return counts;
+  }, [vendors]);
+
   // Load all 36 Indian States and Union Territories dynamically using country-state-city library ⭐
   const rawStates = (State && typeof State.getStatesOfCountry === 'function')
     ? State.getStatesOfCountry('IN')
@@ -936,74 +981,18 @@ function Dashboard({ initialTab = 'dashboard' }) {
     { name: 'Andaman and Nicobar Islands', isoCode: 'AN' },
     { name: 'Dadra and Nagar Haveli and Daman and Diu', isoCode: 'DH' },
     { name: 'Lakshadweep', isoCode: 'LD' },
-  ]).map((st, idx) => {
-    const baseVendorCounts = {
-      'Maharashtra': 1950958,
-      'Uttar Pradesh': 1280656,
-      'Tamil Nadu': 1175749,
-      'Gujarat': 1014905,
-      'Karnataka': 914058,
-      'Rajasthan': 737685,
-      'West Bengal': 680200,
-      'Telangana': 540100,
-      'Madhya Pradesh': 510200,
-      'Delhi': 490300,
-      'Kerala': 450100,
-      'Bihar': 420800,
-      'Punjab': 380400,
-      'Haryana': 350200,
-      'Andhra Pradesh': 340100,
-      'Odisha': 290500,
-      'Jharkhand': 240100,
-      'Assam': 210300,
-      'Chhattisgarh': 190400,
-      'Jammu and Kashmir': 160200,
-      'Uttarakhand': 140100,
-      'Himachal Pradesh': 110500,
-      'Goa': 95000,
-      'Puducherry': 75000,
-      'Chandigarh': 68000,
-      'Tripura': 52000,
-      'Meghalaya': 48000,
-      'Manipur': 42000,
-      'Nagaland': 38000,
-      'Arunachal Pradesh': 31000,
-      'Mizoram': 28000,
-      'Sikkim': 22000,
-      'Ladakh': 18000,
-      'Andaman and Nicobar Islands': 15000,
-      'Dadra and Nagar Haveli and Daman and Diu': 12000,
-      'Lakshadweep': 8000,
-    };
-
+  ]).map((st) => {
     const name = st.name;
-    const count = baseVendorCounts[name] || Math.max(10000, 50000 - idx * 1200);
+    const realCount = liveVendorStateCounts[name.toLowerCase()] || 0;
     return {
       state: name,
       code: st.isoCode,
-      count
+      count: realCount
     };
   });
 
-  // Dynamic States Table Data using standard Indian states library ⭐
-  const statesData = (() => {
-    const backendStates = (cascadeData?.states && cascadeData.states.length > 0)
-      ? cascadeData.states.map((s) => ({ state: s.name || s.state, count: s.vendorCount ?? s.count ?? 0 }))
-      : [];
-
-    // Map of existing backend states for quick lookup
-    const backendStateMap = new Map();
-    backendStates.forEach(s => backendStateMap.set((s.state || '').trim().toLowerCase(), s.count));
-
-    // Only return official Indian states/UTs from the library
-    return allIndianStatesFromLibrary.map(st => {
-      const lower = st.state.toLowerCase();
-      if (backendStateMap.has(lower)) {
-        return { state: st.state, count: backendStateMap.get(lower) };
-      }
-      return st;
-    });
-  })();
+  // Dynamic States Table Data computed strictly from real live vendors database ⭐
+  const statesData = allIndianStatesFromLibrary;
 
   // Calculate State Multiplier based on selected state's vendor share
   const totalStatesVendors = statesData.reduce((acc, curr) => acc + (Number(curr.count) || 0), 0) || 1;
@@ -1016,11 +1005,11 @@ function Dashboard({ initialTab = 'dashboard' }) {
   const metrics = [
     {
       title: 'Total Vendors',
-      value: String(Math.round((dStats.newVendors?.count ?? 582) * stateMultiplier)),
-      badge: dStats.newVendors?.badgePercentage || '+12.5%',
+      value: String(Math.round(liveTotalVendors * stateMultiplier)),
+      badge: dStats.newVendors?.badgePercentage || '+10%',
       progress: 'w-[65%]',
       progressBg: 'bg-[#f26522]',
-      subText: selectedState !== 'All' ? `Filtered for ${selectedState}` : `Total Vendors : ${dStats.newVendors?.totalVendors ?? '1,950/2,400'}`,
+      subText: selectedState !== 'All' ? `Filtered for ${selectedState}` : `Total Vendors : ${liveTotalVendors}`,
       icon: Building2,
       bgGlow: 'from-orange-500/10 to-transparent',
       iconBg: 'bg-orange-50 text-[#f26522] border-orange-200/60',
@@ -1028,11 +1017,11 @@ function Dashboard({ initialTab = 'dashboard' }) {
     },
     {
       title: 'Active Vendor',
-      value: String(Math.round((dStats.newCustomers?.count ?? 1240) * stateMultiplier)),
-      badge: dStats.newCustomers?.badgePercentage || '+18.2%',
+      value: String(Math.round(liveActiveVendors * stateMultiplier)),
+      badge: dStats.newCustomers?.badgePercentage || '+10%',
       progress: 'w-[80%]',
       progressBg: 'bg-emerald-500',
-      subText: selectedState !== 'All' ? `Active Vendors in ${selectedState}` : `Total Active Vendors : ${dStats.newCustomers?.totalCustomers ?? 12400}`,
+      subText: selectedState !== 'All' ? `Active Vendors in ${selectedState}` : `Total Active Vendors : ${liveActiveVendors}`,
       icon: UserCheck,
       bgGlow: 'from-emerald-500/10 to-transparent',
       iconBg: 'bg-emerald-50 text-emerald-600 border-emerald-200/60',
@@ -1040,10 +1029,10 @@ function Dashboard({ initialTab = 'dashboard' }) {
     },
     {
       title: 'Rejected Vendor',
-      value: String(Math.round((dStats.newVendorRequests?.count ?? 145) * stateMultiplier)),
+      value: String(Math.round(liveRejectedVendors * stateMultiplier)),
       progress: 'w-[45%]',
       progressBg: 'bg-rose-500',
-      subText: selectedState !== 'All' ? `Rejected Vendors in ${selectedState}` : `Total Rejected Vendors : ${dStats.newVendorRequests?.totalFYRequests ?? 450}`,
+      subText: selectedState !== 'All' ? `Rejected Vendors in ${selectedState}` : `Total Rejected Vendors : ${liveRejectedVendors}`,
       icon: AlertTriangle,
       bgGlow: 'from-rose-500/10 to-transparent',
       iconBg: 'bg-rose-50 text-rose-600 border-rose-200/60',
@@ -1051,10 +1040,10 @@ function Dashboard({ initialTab = 'dashboard' }) {
     },
     {
       title: 'Blocked Vendor',
-      value: String(Math.round((dStats.newCustomerQueries?.count ?? 89) * stateMultiplier)),
+      value: String(Math.round(liveBlockedVendors * stateMultiplier)),
       progress: 'w-[30%]',
       progressBg: 'bg-amber-500',
-      subText: selectedState !== 'All' ? `Blocked Vendors in ${selectedState}` : `Total Blocked Vendors : ${dStats.newCustomerQueries?.totalQueries ?? 890}`,
+      subText: selectedState !== 'All' ? `Blocked Vendors in ${selectedState}` : `Total Blocked Vendors : ${liveBlockedVendors}`,
       icon: Ban,
       bgGlow: 'from-amber-500/10 to-transparent',
       iconBg: 'bg-amber-50 text-amber-700 border-amber-200/60',
@@ -1062,10 +1051,10 @@ function Dashboard({ initialTab = 'dashboard' }) {
     },
     {
       title: "Today's Vendor Audit",
-      value: String(Math.round((dStats.todaysVendorAudit?.count ?? 34) * stateMultiplier)),
+      value: String(Math.round((Number(dStats.todaysVendorAudit?.count) || 0) * stateMultiplier)),
       progress: 'w-[60%]',
       progressBg: 'bg-indigo-500',
-      subText: `Pending Quality : ${Math.round((dStats.todaysVendorAudit?.pendingQuality ?? 8) * stateMultiplier)}`,
+      subText: `Pending Quality : ${Math.round((Number(dStats.todaysVendorAudit?.pendingQuality) || 0) * stateMultiplier)}`,
       icon: ShieldCheck,
       bgGlow: 'from-indigo-500/10 to-transparent',
       iconBg: 'bg-indigo-50 text-indigo-600 border-indigo-200/60',
@@ -1073,11 +1062,11 @@ function Dashboard({ initialTab = 'dashboard' }) {
     },
     {
       title: 'Online User in DMS',
-      value: String(Math.round((dStats.onlineUsersDMS?.count ?? 512) * stateMultiplier)),
-      badge: dStats.onlineUsersDMS?.badgePercentage || '+8.4%',
+      value: String(Math.round((Number(dStats.onlineUsersDMS?.count) || 0) * stateMultiplier)),
+      badge: dStats.onlineUsersDMS?.badgePercentage || '+100%',
       progress: 'w-full',
       progressBg: 'bg-sky-500',
-      subText: selectedState !== 'All' ? `Online Users in ${selectedState}` : `Total User Count : ${dStats.onlineUsersDMS?.totalUserCount ?? 1540}`,
+      subText: selectedState !== 'All' ? `Online Users in ${selectedState}` : `Total User Count : ${dStats.onlineUsersDMS?.totalUserCount ?? 0}`,
       icon: Activity,
       bgGlow: 'from-sky-500/10 to-transparent',
       iconBg: 'bg-sky-50 text-sky-600 border-sky-200/60',
@@ -1085,49 +1074,26 @@ function Dashboard({ initialTab = 'dashboard' }) {
     },
   ];
 
-  // Dynamic Main Category Table Data mapped & scaled by state multiplier ⭐
-  const mainCategoryData = (cascadeData?.categories && cascadeData.categories.length > 0 
-    ? cascadeData.categories.map(c => ({ category: c.name || c.category, count: c.vendorCount ?? c.count ?? 0, id: c._id || c.id }))
-    : MASTER_CATEGORIES_WITH_SUBCATS.map(c => ({
-        category: c.name,
-        count: Math.round(c.totalCount * stateMultiplier),
-        id: c.id
-      }))
-  );
+  // Dynamic Main Category Table Data mapped from real live vendor database ⭐
+  const mainCategoryData = MASTER_CATEGORIES_WITH_SUBCATS.map(c => {
+    const realCatCount = liveVendorCategoryCounts[c.name.toLowerCase()] || 0;
+    return {
+      category: c.name,
+      count: selectedState === 'All' ? realCatCount : Math.round(realCatCount * stateMultiplier),
+      id: c.id
+    };
+  });
 
   // Filter Sub Categories dynamically based on selectedCategory & selectedState ⭐
   const activeSubCategoryData = (() => {
-    // If backend provided subcategories, use them
-    if (cascadeData?.subcategories && cascadeData.subcategories.length > 0) {
-      const rawSubcats = cascadeData.subcategories;
-      const mappedSubcats = rawSubcats.map((sc) => ({
-        category: sc.name || sc.subCategory || sc.category,
-        count: Math.round((sc.vendorCount ?? sc.count ?? 0) * (selectedState === 'All' ? 1 : stateMultiplier)),
-        categoryId: sc.categoryId || sc.category_id,
-        parentCategory: sc.parentCategory || sc.categoryName || (typeof sc.category === 'object' ? sc.category?.name : sc.category),
-        state: sc.state || sc.stateName
-      }));
-
-      let filtered = mappedSubcats;
-      if (selectedCategory !== 'All') {
-        const selCatLower = selectedCategory.toLowerCase();
-        filtered = filtered.filter((sc) => {
-          const scName = String(sc.category || '').toLowerCase();
-          const scParent = String(sc.parentCategory || '').toLowerCase();
-          return scParent.includes(selCatLower) || selCatLower.includes(scParent) || scName.includes(selCatLower);
-        });
-      }
-      return filtered;
-    }
-
-    // Default relational filtering using MASTER_CATEGORIES_WITH_SUBCATS
     let subCatList = [];
     if (selectedCategory === 'All') {
       MASTER_CATEGORIES_WITH_SUBCATS.forEach(cat => {
         cat.subcategories.forEach(sub => {
+          const realCatCount = liveVendorCategoryCounts[cat.name.toLowerCase()] || 0;
           subCatList.push({
             category: sub.name,
-            count: Math.round(sub.totalCount * stateMultiplier),
+            count: selectedState === 'All' ? 0 : Math.round(realCatCount * stateMultiplier),
             parentCategory: cat.name
           });
         });
@@ -1137,9 +1103,10 @@ function Dashboard({ initialTab = 'dashboard' }) {
         c => c.name.toLowerCase() === selectedCategory.toLowerCase()
       );
       if (matchedCat) {
+        const realCatCount = liveVendorCategoryCounts[matchedCat.name.toLowerCase()] || 0;
         subCatList = matchedCat.subcategories.map(sub => ({
           category: sub.name,
-          count: Math.round(sub.totalCount * stateMultiplier),
+          count: selectedState === 'All' ? realCatCount : Math.round(realCatCount * stateMultiplier),
           parentCategory: matchedCat.name
         }));
       }
@@ -1241,13 +1208,13 @@ function Dashboard({ initialTab = 'dashboard' }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   return (
-    <div className="h-screen bg-[#f4f6f9] flex flex-col font-sans text-slate-800 overflow-hidden">
+    <div className="min-h-screen md:h-screen bg-[#f4f6f9] flex flex-col font-sans text-slate-800 overflow-x-hidden md:overflow-hidden">
       
       {/* Top Navbar */}
       <Navbar isMobileMenuOpen={isMobileMenuOpen} setIsMobileMenuOpen={setIsMobileMenuOpen} />
 
       {/* Main Layout Area */}
-      <div className="flex-1 flex p-3 md:p-4 md:px-6 md:py-4 gap-4 md:gap-6 w-full max-w-full overflow-hidden relative">
+      <div className="flex-1 flex flex-col md:flex-row p-3 md:p-4 md:px-6 md:py-4 gap-4 md:gap-6 w-full max-w-full overflow-x-hidden md:overflow-hidden relative">
         
         {/* Left Sidebar */}
         <Sidebar
@@ -1258,7 +1225,7 @@ function Dashboard({ initialTab = 'dashboard' }) {
         />
 
         {/* Dynamic Main Content */}
-        <main className="flex-1 space-y-4 min-w-0 overflow-y-auto pr-0 md:pr-1 custom-scrollbar">
+        <main className="flex-1 space-y-4 min-w-0 w-full overflow-y-auto pr-0 md:pr-1 custom-scrollbar">
           
           {activeTab === 'usermanagement' ? (
             <UserManagement />

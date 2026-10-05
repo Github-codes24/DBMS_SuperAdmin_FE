@@ -216,7 +216,11 @@ function VendorDatabase({ compact = false }) {
     dispatch(fetchVendors());
   }, [dispatch]);
 
-  const vendors = Array.isArray(apiVendors) ? apiVendors.map((v, idx) => {
+  const activeApiVendors = Array.isArray(apiVendors) ? apiVendors.filter(
+    (v) => !v.isDeleted && v.status !== 'Deleted'
+  ) : [];
+
+  const vendors = activeApiVendors.map((v, idx) => {
     let dateOnly = '-';
     if (v.verificationDateTime) {
       const d = new Date(v.verificationDateTime);
@@ -249,7 +253,7 @@ function VendorDatabase({ compact = false }) {
       agentName: v.agentName || v.assignedAgent || v.agent || '-',
       mappedCustomers: v.mappedCustomers ?? 0
     };
-  }) : [];
+  });
 
   // Filter Logic
   const filteredVendors = vendors.filter((ven) => {
@@ -347,7 +351,7 @@ function VendorDatabase({ compact = false }) {
   const handleToggleStatus = (ven) => {
     if (!hasAccessPermission) return;
     const isActivating = ven.status !== 'Active';
-    const identifier = ven.vendorCode || ven.vendorId || ven._id || ven.id;
+    const identifier = ven._id || ven.id || ven.vendorId || ven.vendorCode;
 
     if (isActivating) {
       dispatch(activateVendor(identifier)).unwrap().then(() => {
@@ -571,9 +575,8 @@ function VendorDatabase({ compact = false }) {
 
   // Execute Confirmed Block or Delete Action
   const handleConfirmAction = () => {
-    if (!confirmModal.vendor) return;
     const ven = confirmModal.vendor;
-    const targetId = ven._id || ven.id;
+    const targetId = ven._id || ven.vendorId || ven.id;
 
     if (confirmModal.type === 'block') {
       const newStatus = ven.status === 'Blocked' ? 'Active' : 'Blocked';
@@ -583,7 +586,7 @@ function VendorDatabase({ compact = false }) {
       })).unwrap().then(() => {
         setToastMsg(`Vendor "${ven.name}" has been ${newStatus === 'Blocked' ? 'blocked' : 'unblocked'}.`);
         setTimeout(() => setToastMsg(''), 4000);
-        if (selectedVendorDetail && (selectedVendorDetail._id === targetId || selectedVendorDetail.id === targetId)) {
+        if (selectedVendorDetail && (selectedVendorDetail._id === targetId || selectedVendorDetail.id === targetId || selectedVendorDetail.vendorId === targetId)) {
           setSelectedVendorDetail({ ...selectedVendorDetail, status: newStatus });
         }
         handleCloseConfirmModal();
@@ -591,13 +594,22 @@ function VendorDatabase({ compact = false }) {
         handleCloseConfirmModal();
       });
     } else if (confirmModal.type === 'delete') {
-      dispatch(deleteVendor(targetId))
+      const vendorIdPayload = {
+        vendorCode: ven.vendorCode || ven.vendorId || ven.id || ven._id,
+        vendorId: ven.vendorCode || ven.vendorId || ven.id || ven._id,
+        primaryId: ven.vendorCode || ven.vendorId || ven.id || ven._id,
+        secondaryId: ven._id || ven.id,
+      };
+      dispatch(deleteVendor(vendorIdPayload))
         .unwrap()
-        .then(() => {
-          setToastMsg(`Vendor "${ven.name}" deleted successfully.`);
+        .then((res) => {
+          setToastMsg(res?.message || `Vendor "${ven.name}" deleted successfully.`);
           setTimeout(() => setToastMsg(''), 4000);
-          if (selectedVendorDetail && (selectedVendorDetail._id === targetId || selectedVendorDetail.id === targetId)) {
+          if (selectedVendorDetail && (selectedVendorDetail._id === targetId || selectedVendorDetail.id === targetId || selectedVendorDetail.vendorId === targetId)) {
             setSelectedVendorDetail(null);
+          }
+          if (location.pathname.includes('/vendor-db/view/') || location.pathname.includes('/vendor-db/edit/') || location.pathname.includes('/vendor-db/change-password/')) {
+            navigate('/vendor-db' + location.search);
           }
           handleCloseConfirmModal();
         }).catch(() => {
@@ -1218,13 +1230,12 @@ function VendorDatabase({ compact = false }) {
             <span className="bg-white border border-slate-200 px-3 py-1.5 rounded-xl font-bold text-slate-700">
               Category: <span className="text-[#f26522]">{ven.category || 'N/A'}</span>
             </span>
-            <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border uppercase ${
-              ven.status === 'Active'
-                ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
-                : ven.status === 'Blocked'
-                  ? 'bg-rose-50 text-rose-600 border-rose-200'
-                  : 'bg-amber-50 text-amber-600 border-amber-200'
-            }`}>
+            <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border uppercase ${ven.status === 'Active'
+              ? 'bg-emerald-50 text-emerald-600 border-emerald-200'
+              : ven.status === 'Blocked'
+                ? 'bg-rose-50 text-rose-600 border-rose-200'
+                : 'bg-amber-50 text-amber-600 border-amber-200'
+              }`}>
               {ven.status || 'Active'}
             </span>
           </div>
@@ -1386,6 +1397,15 @@ function VendorDatabase({ compact = false }) {
               <Edit2 size={14} />
               <span>Edit Vendor Details</span>
             </button>
+            {hasAccessPermission && (
+              <button
+                onClick={() => handlePromptDelete(ven)}
+                className="px-4 py-2 bg-rose-50 text-rose-600 hover:bg-rose-100 font-bold text-xs rounded-xl border border-rose-200 transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <Trash2 size={14} />
+                <span>Delete Vendor</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -2182,6 +2202,83 @@ function VendorDatabase({ compact = false }) {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+      {/* Confirmation Popup Modal for Block / Delete in Table View */}
+      {confirmModal.isOpen && confirmModal.vendor && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <h3 className="text-base font-bold text-slate-900">
+              {confirmModal.type === 'delete' ? 'Delete Vendor' : confirmModal.vendor.status === 'Blocked' ? 'Unblock Vendor' : 'Block Vendor'}
+            </h3>
+            <p className="text-xs text-slate-500">
+              {confirmModal.type === 'delete'
+                ? `Are you sure you want to delete vendor "${confirmModal.vendor.name}"? This action cannot be undone.`
+                : `Are you sure you want to proceed with this action for "${confirmModal.vendor.name}"?`}
+            </p>
+
+            {/* Vendor Info Card */}
+            <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-left text-xs mb-5 space-y-1.5">
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-400 font-medium">Vendor Code:</span>
+                <span className="font-mono font-bold text-slate-700">{confirmModal.vendor.vendorCode || confirmModal.vendor.id}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-400 font-medium">Company Name:</span>
+                <span className="font-semibold text-slate-700">{confirmModal.vendor.name || confirmModal.vendor.companyName}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-400 font-medium">Category:</span>
+                <span className="font-semibold text-slate-700">{confirmModal.vendor.category}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-400 font-medium">Current Status:</span>
+                <span className="font-bold text-slate-800">{confirmModal.vendor.status}</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleCloseConfirmModal}
+                disabled={isSaving}
+                className="w-full py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmAction}
+                disabled={isSaving}
+                className={`w-full py-2.5 px-4 text-xs font-bold text-white rounded-xl transition-colors cursor-pointer disabled:opacity-50 shadow-xs flex items-center justify-center gap-1.5 ${confirmModal.type === 'delete'
+                  ? 'bg-rose-600 hover:bg-rose-700'
+                  : confirmModal.vendor.status === 'Blocked'
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-amber-600 hover:bg-amber-700'
+                  }`}
+              >
+                {isSaving ? (
+                  <span>Processing...</span>
+                ) : confirmModal.type === 'delete' ? (
+                  <>
+                    <Trash2 size={14} />
+                    <span>Yes, Delete Vendor</span>
+                  </>
+                ) : confirmModal.vendor.status === 'Blocked' ? (
+                  <>
+                    <UserCheck size={14} />
+                    <span>Yes, Unblock</span>
+                  </>
+                ) : (
+                  <>
+                    <Ban size={14} />
+                    <span>Yes, Block</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

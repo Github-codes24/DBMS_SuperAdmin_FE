@@ -8,6 +8,7 @@ import {
   fetchTelecallers,
   createTelecaller,
   updateTelecaller,
+  deleteTelecaller,
   bulkImportTelecallers,
   clearTelecallers
 } from '../redux/slices/telecallerSlice';
@@ -60,6 +61,8 @@ function TelecallerManagement({ compact = false }) {
   const [selectedTc, setSelectedTc] = useState(null);
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [tcToDelete, setTcToDelete] = useState(null);
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'add-telecaller'
 
   // Pagination state
@@ -156,16 +159,20 @@ function TelecallerManagement({ compact = false }) {
     dispatch(clearTelecallers());
   };
 
-  const telecallers = Array.isArray(apiTelecallers) ? apiTelecallers.map((tc, idx) => ({
+  const activeApiTelecallers = Array.isArray(apiTelecallers) ? apiTelecallers.filter(
+    (tc) => tc.status !== 'Deleted' && !tc.isDeleted
+  ) : [];
+
+  const telecallers = activeApiTelecallers.map((tc, idx) => ({
     _id: tc._id,
-    id: tc.userId,
+    id: tc.userId || tc._id,
     name: tc.fullName,
     mobile: tc.mobileNumber,
     email: tc.email,
     customers: tc.assignedCustomersCount ?? 0,
     status: tc.status || 'Active',
     area: tc.assignedRegion || 'Central Region',
-  })) : [];
+  }));
 
 
   const filteredTelecallers = hasSearched ? telecallers.filter((tc) => {
@@ -242,15 +249,33 @@ function TelecallerManagement({ compact = false }) {
   };
 
   const handleDeleteTc = (tc) => {
-    if (window.confirm(`Are you sure you want to delete telecaller "${tc.name}"?`)) {
-      dispatch(updateTelecaller({
-        userId: tc.id,
-        updateData: { status: 'Deleted' }
-      })).unwrap().catch(() => { }).finally(() => {
-        toast.success(`Telecaller "${tc.name}" deleted successfully.`);
-        setViewMode('table');
-      });
-    }
+    if (!tc) return;
+    setTcToDelete(tc);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDeleteTc = () => {
+    if (!tcToDelete) return;
+    const tc = tcToDelete;
+    const raw = tc.raw || tc;
+    dispatch(deleteTelecaller({
+      _id: raw._id || tc._id,
+      id: tc.id || raw.userId || raw._id || tc._id,
+      userId: raw.userId || tc.id || raw._id || tc._id
+    })).unwrap().then(() => {
+      if (selectedTc && (selectedTc._id === tc._id || selectedTc.id === tc.id)) {
+        setSelectedTc(null);
+      }
+      setIsDeleteModalOpen(false);
+      setTcToDelete(null);
+      setViewMode('table');
+      setToastMsg(`Telecaller "${tc.name || raw.fullName}" deleted successfully.`);
+      setTimeout(() => setToastMsg(''), 4000);
+    }).catch((err) => {
+      console.error('Telecaller deletion failed:', err);
+      setIsDeleteModalOpen(false);
+      setTcToDelete(null);
+    });
   };
 
   const handleAddTcSubmit = (e) => {
@@ -1119,7 +1144,7 @@ function TelecallerManagement({ compact = false }) {
 
         {/* Table View with required columns: Sr.No, Telecaller Name, Email, Mobile Number, Status, Action */}
         <div
-          className="max-h-[360px] overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200/80 mb-4 scroll-smooth custom-scrollbar"
+          className="max-h-[calc(100vh-280px)] min-h-[350px] overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200/80 mb-4 scroll-smooth custom-scrollbar"
         >
           <table className="w-full text-left border-collapse min-w-[720px]">
             <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-md z-10">
@@ -1655,6 +1680,43 @@ function TelecallerManagement({ compact = false }) {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMATION DELETE MODAL */}
+      {isDeleteModalOpen && tcToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm p-6 overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+                <Trash2 size={20} />
+              </div>
+              <button onClick={() => setIsDeleteModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer p-1 rounded-lg hover:bg-slate-100">
+                <X size={18} />
+              </button>
+            </div>
+            <h3 className="text-base font-bold text-slate-900 mb-1">Delete Telecaller Account?</h3>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              Are you sure you want to delete telecaller <strong className="text-slate-800">{tcToDelete.name || tcToDelete.fullName}</strong>? This action will remove their access from the database.
+            </p>
+            <div className="flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteTc}
+                className="px-4 py-2 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 size={14} />
+                <span>Confirm Delete</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

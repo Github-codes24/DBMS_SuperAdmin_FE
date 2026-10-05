@@ -285,11 +285,30 @@ function CustomerDatabase({ compact = false }) {
     return '-';
   };
 
-  const customers = Array.isArray(apiCustomers) ? apiCustomers.map((cust, idx) => {
+  const getDisplayEmail = (cust) => {
+    if (!cust) return '-';
+    const emailVal = cust.email || cust.emailAddress || cust.emailId || cust.email_id || cust.mail || cust.userEmail || cust.contactEmail;
+    if (emailVal && emailVal !== '-' && emailVal !== '—' && String(emailVal).includes('@')) {
+      return String(emailVal).trim();
+    }
+    if (cust.name && String(cust.name).includes('@')) {
+      return String(cust.name).trim();
+    }
+    return '-';
+  };
+
+  const activeApiCustomers = Array.isArray(apiCustomers) ? apiCustomers.filter(
+    (c) => !c.isDeleted && c.status !== 'Deleted'
+  ) : [];
+
+  const customers = activeApiCustomers.map((cust, idx) => {
     const mobileNum = getDisplayNumber(cust);
+    const emailStr = getDisplayEmail(cust);
 
     return {
+      ...cust,
       _id: cust._id,
+      customerId: cust.customerId || (typeof cust.id === 'string' && cust.id.startsWith('CUST') ? cust.id : undefined) || cust._id,
       srNo: cust.srNo || String(idx + 1).padStart(2, '0'),
       id: cust.customerId || cust._id,
       number: mobileNum,
@@ -301,10 +320,10 @@ function CustomerDatabase({ compact = false }) {
       regDate: cust.registrationDate ? new Date(cust.registrationDate).toISOString().slice(0, 10) : '-',
       status: cust.status,
       telecaller: cust.assignedTelecaller || 'Unassigned',
-      email: cust.email || '-',
+      email: emailStr,
       mobile: mobileNum,
     };
-  }) : [];
+  });
 
   const filteredCustomers = customers.filter((cust) => {
     const matchesSearch =
@@ -335,11 +354,15 @@ function CustomerDatabase({ compact = false }) {
       return;
     }
 
+    const mobVal = newCustomer.mobileNumber || newCustomer.mobile || newCustomer.number || '';
     dispatch(createCustomer({
       _isLocal: true,
       name: newCustomer.companyName || newCustomer.name || 'Customer',
       companyName: newCustomer.companyName,
-      mobileNumber: newCustomer.mobileNumber || newCustomer.mobile || newCustomer.number,
+      mobileNumber: mobVal,
+      mobile: mobVal,
+      contactNo: mobVal,
+      phone: mobVal,
       state: newCustomer.state,
       city: newCustomer.city,
       pincode: newCustomer.pincode,
@@ -460,11 +483,14 @@ function CustomerDatabase({ compact = false }) {
     if (!customer) return;
 
     if (type === 'delete') {
-      const targetId = customer._id || customer.id;
-      dispatch(deleteCustomer(targetId)).unwrap().then(() => {
+      const payload = {
+        customerId: customer.customerId || customer.customerCode || customer._id || customer.id,
+        primaryId: customer.customerId || customer.customerCode || customer._id || customer.id,
+        secondaryId: customer._id || customer.id
+      };
+      dispatch(deleteCustomer(payload)).unwrap().then((res) => {
         handleCloseConfirmModal();
-        dispatch(fetchCustomers());
-        setToastMsg(`Customer deleted successfully!`);
+        setToastMsg(res?.message || `Customer deleted successfully!`);
         setTimeout(() => setToastMsg(''), 4000);
       }).catch((err) => {
         console.error('Delete failed:', err);
@@ -1282,7 +1308,7 @@ function CustomerDatabase({ compact = false }) {
         {/* TABLE VIEW WITH MANUAL HORIZONTAL & VERTICAL SLIDING / SCROLLING */}
         <div
           ref={manualScrollRef}
-          className="max-h-[320px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar"
+          className="max-h-[calc(100vh-280px)] min-h-[350px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar"
         >
           <table className="w-full min-w-[750px] text-left border-collapse">
             <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs z-10">
