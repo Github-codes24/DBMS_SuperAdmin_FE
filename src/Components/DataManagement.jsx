@@ -149,7 +149,7 @@ function DataManagement({ compact = false }) {
   // Export CSV Report
   const handleExportCSV = async () => {
     try {
-      const response = await api.get('/superadmin/data-management/vendors/export/csv', { responseType: 'blob' });
+      const response = await api.get('/superadmin/vendors/export/csv', { responseType: 'blob' });
       const blob = new Blob([response.data], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -170,7 +170,7 @@ function DataManagement({ compact = false }) {
   // Export PDF Report
   const handleExportPDF = async () => {
     try {
-      const response = await api.get('/superadmin/data-management/vendors/export/pdf', { responseType: 'blob' });
+      const response = await api.get('/superadmin/vendors/export/pdf', { responseType: 'blob' });
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');

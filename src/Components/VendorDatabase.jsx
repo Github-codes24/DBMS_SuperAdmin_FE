@@ -626,7 +626,7 @@ function VendorDatabase({ compact = false }) {
     }
 
     try {
-      const response = await api.get('/superadmin/data-management/vendors/export/csv', { responseType: 'blob' });
+      const response = await api.get('/superadmin/vendors/export/csv', { responseType: 'blob' });
       const blob = new Blob([response.data], { type: 'text/csv' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -652,7 +652,7 @@ function VendorDatabase({ compact = false }) {
     }
 
     try {
-      const response = await api.get('/superadmin/data-management/vendors/export/pdf', { responseType: 'blob' });
+      const response = await api.get('/superadmin/vendors/export/pdf', { responseType: 'blob' });
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
