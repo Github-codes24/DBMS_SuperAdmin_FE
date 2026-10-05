@@ -139,23 +139,22 @@ export const changeVendorPassword = createAsyncThunk(
 export const deleteVendor = createAsyncThunk(
   'vendor/deleteVendor',
   async (vendorIdParam, { dispatch, rejectWithValue }) => {
-    const primaryId = typeof vendorIdParam === 'object' ? (vendorIdParam.primaryId || vendorIdParam.vendorId) : vendorIdParam;
-    const secondaryId = typeof vendorIdParam === 'object' ? vendorIdParam.secondaryId : null;
+    const vCode = typeof vendorIdParam === 'object'
+      ? (vendorIdParam.vendorCode || vendorIdParam.vendorId || (typeof vendorIdParam.primaryId === 'string' && vendorIdParam.primaryId.startsWith('VEN') ? vendorIdParam.primaryId : null))
+      : vendorIdParam;
+    const mongoId = typeof vendorIdParam === 'object'
+      ? (vendorIdParam._id || vendorIdParam.id || vendorIdParam.secondaryId || vendorIdParam.primaryId)
+      : null;
 
-    const idsToTry = Array.from(new Set([primaryId, secondaryId].filter(Boolean)));
+    const idsToTry = Array.from(new Set([vCode, mongoId].filter(Boolean)));
 
-    // Generate potential requests to try in sequence
     const attempts = [];
     for (const id of idsToTry) {
       attempts.push(() => api.delete(`/superadmin/vendors/${id}`));
-      attempts.push(() => api.patch(`/superadmin/vendors/${id}`, { status: 'Deleted', isDeleted: true }));
       attempts.push(() => api.delete(`/superadmin/vendor/${id}`));
       attempts.push(() => api.delete(`/vendors/${id}`));
       attempts.push(() => api.delete(`/superadmin/vendors/delete/${id}`));
-      attempts.push(() => api.patch(`/superadmin/vendors/${id}/delete`));
       attempts.push(() => api.post(`/superadmin/vendors/${id}/delete`));
-      attempts.push(() => api.delete(`/superadmin/vendors`, { data: { vendorId: id } }));
-      attempts.push(() => api.delete(`/superadmin/vendors`, { data: { id } }));
     }
 
     let lastError = null;
@@ -169,19 +168,10 @@ export const deleteVendor = createAsyncThunk(
         }
       } catch (err) {
         lastError = err;
-        if (err.response && err.response.status !== 404) {
-          const msg = err.response?.data?.message || 'Failed to delete vendor.';
-          toast.error(msg);
-          return rejectWithValue(msg);
-        }
       }
     }
 
-    const message = lastError?.response?.data?.message ||
-      (typeof lastError?.response?.data === 'string' && lastError.response.data.includes('Cannot')
-        ? 'Backend route DELETE /api/v1/superadmin/vendors/:id is not mounted on backend server.'
-        : 'Failed to delete vendor (404 Route Not Found).');
-
+    const message = lastError?.response?.data?.message || 'Failed to delete vendor.';
     toast.error(message);
     return rejectWithValue(message);
   }
@@ -276,6 +266,7 @@ export const deleteVendorFormField = createAsyncThunk(
 
 const initialState = {
   vendors: [],
+  deletedVendorIds: [],
   formFields: [],
   totalVendors: 0,
   totalPages: 1,
@@ -305,7 +296,15 @@ const vendorSlice = createSlice({
       })
       .addCase(fetchVendors.fulfilled, (state, action) => {
         state.loading = false;
-        state.vendors = action.payload.data || action.payload.vendors || (Array.isArray(action.payload) ? action.payload : []);
+        const raw = action.payload.data || action.payload.vendors || (Array.isArray(action.payload) ? action.payload : []);
+        state.vendors = Array.isArray(raw) ? raw.filter((v) =>
+          !v.isDeleted &&
+          v.status !== 'Deleted' &&
+          !state.deletedVendorIds.includes(v._id) &&
+          !state.deletedVendorIds.includes(v.vendorId) &&
+          !state.deletedVendorIds.includes(v.vendorCode) &&
+          !state.deletedVendorIds.includes(v.id)
+        ) : [];
         const pag = action.payload.pagination;
         state.totalVendors = pag?.total || action.payload.totalVendors || state.vendors.length;
         state.totalPages = pag?.totalPages || action.payload.totalPages || 1;
@@ -376,17 +375,14 @@ const vendorSlice = createSlice({
         const arg = action.meta.arg;
         const primaryId = typeof arg === 'object' ? (arg.primaryId || arg.vendorId) : arg;
         const secondaryId = typeof arg === 'object' ? arg.secondaryId : null;
-        const deletedVendorId = resData?.vendorId;
+        const deletedVendorId = resData?.vendorId || action.payload?.vendorId;
+
+        const idsToRemove = [primaryId, secondaryId, deletedVendorId].filter(Boolean);
+        state.deletedVendorIds = Array.from(new Set([...state.deletedVendorIds, ...idsToRemove]));
 
         if (state.vendors && Array.isArray(state.vendors)) {
           state.vendors = state.vendors.filter((v) => {
-            if (deletedVendorId && (v.vendorId === deletedVendorId || v.vendorCode === deletedVendorId || v._id === deletedVendorId || v.id === deletedVendorId)) {
-              return false;
-            }
-            if (primaryId && (v._id === primaryId || v.vendorId === primaryId || v.id === primaryId || v.vendorCode === primaryId)) {
-              return false;
-            }
-            if (secondaryId && (v._id === secondaryId || v.vendorId === secondaryId || v.id === secondaryId || v.vendorCode === secondaryId)) {
+            if (idsToRemove.some((id) => v.vendorId === id || v.vendorCode === id || v._id === id || v.id === id)) {
               return false;
             }
             return true;

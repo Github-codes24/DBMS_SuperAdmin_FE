@@ -285,15 +285,30 @@ function CustomerDatabase({ compact = false }) {
     return '-';
   };
 
+  const getDisplayEmail = (cust) => {
+    if (!cust) return '-';
+    const emailVal = cust.email || cust.emailAddress || cust.emailId || cust.email_id || cust.mail || cust.userEmail || cust.contactEmail;
+    if (emailVal && emailVal !== '-' && emailVal !== '—' && String(emailVal).includes('@')) {
+      return String(emailVal).trim();
+    }
+    if (cust.name && String(cust.name).includes('@')) {
+      return String(cust.name).trim();
+    }
+    return '-';
+  };
+
   const activeApiCustomers = Array.isArray(apiCustomers) ? apiCustomers.filter(
     (c) => !c.isDeleted && c.status !== 'Deleted'
   ) : [];
 
   const customers = activeApiCustomers.map((cust, idx) => {
     const mobileNum = getDisplayNumber(cust);
+    const emailStr = getDisplayEmail(cust);
 
     return {
+      ...cust,
       _id: cust._id,
+      customerId: cust.customerId || (typeof cust.id === 'string' && cust.id.startsWith('CUST') ? cust.id : undefined) || cust._id,
       srNo: cust.srNo || String(idx + 1).padStart(2, '0'),
       id: cust.customerId || cust._id,
       number: mobileNum,
@@ -305,7 +320,7 @@ function CustomerDatabase({ compact = false }) {
       regDate: cust.registrationDate ? new Date(cust.registrationDate).toISOString().slice(0, 10) : '-',
       status: cust.status,
       telecaller: cust.assignedTelecaller || 'Unassigned',
-      email: cust.email || '-',
+      email: emailStr,
       mobile: mobileNum,
     };
   });
@@ -339,11 +354,15 @@ function CustomerDatabase({ compact = false }) {
       return;
     }
 
+    const mobVal = newCustomer.mobileNumber || newCustomer.mobile || newCustomer.number || '';
     dispatch(createCustomer({
       _isLocal: true,
       name: newCustomer.companyName || newCustomer.name || 'Customer',
       companyName: newCustomer.companyName,
-      mobileNumber: newCustomer.mobileNumber || newCustomer.mobile || newCustomer.number,
+      mobileNumber: mobVal,
+      mobile: mobVal,
+      contactNo: mobVal,
+      phone: mobVal,
       state: newCustomer.state,
       city: newCustomer.city,
       pincode: newCustomer.pincode,
@@ -465,7 +484,8 @@ function CustomerDatabase({ compact = false }) {
 
     if (type === 'delete') {
       const payload = {
-        primaryId: customer._id || customer.id || customer.customerId || customer.customerCode,
+        customerId: customer.customerId || customer.customerCode || customer._id || customer.id,
+        primaryId: customer.customerId || customer.customerCode || customer._id || customer.id,
         secondaryId: customer._id || customer.id
       };
       dispatch(deleteCustomer(payload)).unwrap().then((res) => {

@@ -595,7 +595,9 @@ function VendorDatabase({ compact = false }) {
       });
     } else if (confirmModal.type === 'delete') {
       const vendorIdPayload = {
-        primaryId: ven._id || ven.id || ven.vendorId || ven.vendorCode,
+        vendorCode: ven.vendorCode || ven.vendorId || ven.id || ven._id,
+        vendorId: ven.vendorCode || ven.vendorId || ven.id || ven._id,
+        primaryId: ven.vendorCode || ven.vendorId || ven.id || ven._id,
         secondaryId: ven._id || ven.id,
       };
       dispatch(deleteVendor(vendorIdPayload))

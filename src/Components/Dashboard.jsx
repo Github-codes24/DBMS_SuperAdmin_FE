@@ -906,6 +906,39 @@ function Dashboard({ initialTab = 'dashboard' }) {
     }
   ];
 
+  // Live State & Category count aggregation from actual vendors database ⭐
+  const liveVendorStateCounts = React.useMemo(() => {
+    const counts = {};
+    if (Array.isArray(vendors)) {
+      vendors.forEach((v) => {
+        if (!v.isDeleted && v.status !== 'Deleted') {
+          const st = String(v.state || v.rawVendor?.state || '').trim();
+          if (st) {
+            const lower = st.toLowerCase();
+            counts[lower] = (counts[lower] || 0) + 1;
+          }
+        }
+      });
+    }
+    return counts;
+  }, [vendors]);
+
+  const liveVendorCategoryCounts = React.useMemo(() => {
+    const counts = {};
+    if (Array.isArray(vendors)) {
+      vendors.forEach((v) => {
+        if (!v.isDeleted && v.status !== 'Deleted') {
+          const cat = String(v.category || v.rawVendor?.category || '').trim();
+          if (cat) {
+            const lower = cat.toLowerCase();
+            counts[lower] = (counts[lower] || 0) + 1;
+          }
+        }
+      });
+    }
+    return counts;
+  }, [vendors]);
+
   // Load all 36 Indian States and Union Territories dynamically using country-state-city library ⭐
   const rawStates = (State && typeof State.getStatesOfCountry === 'function')
     ? State.getStatesOfCountry('IN')
@@ -948,74 +981,18 @@ function Dashboard({ initialTab = 'dashboard' }) {
     { name: 'Andaman and Nicobar Islands', isoCode: 'AN' },
     { name: 'Dadra and Nagar Haveli and Daman and Diu', isoCode: 'DH' },
     { name: 'Lakshadweep', isoCode: 'LD' },
-  ]).map((st, idx) => {
-    const baseVendorCounts = {
-      'Maharashtra': 1950958,
-      'Uttar Pradesh': 1280656,
-      'Tamil Nadu': 1175749,
-      'Gujarat': 1014905,
-      'Karnataka': 914058,
-      'Rajasthan': 737685,
-      'West Bengal': 680200,
-      'Telangana': 540100,
-      'Madhya Pradesh': 510200,
-      'Delhi': 490300,
-      'Kerala': 450100,
-      'Bihar': 420800,
-      'Punjab': 380400,
-      'Haryana': 350200,
-      'Andhra Pradesh': 340100,
-      'Odisha': 290500,
-      'Jharkhand': 240100,
-      'Assam': 210300,
-      'Chhattisgarh': 190400,
-      'Jammu and Kashmir': 160200,
-      'Uttarakhand': 140100,
-      'Himachal Pradesh': 110500,
-      'Goa': 95000,
-      'Puducherry': 75000,
-      'Chandigarh': 68000,
-      'Tripura': 52000,
-      'Meghalaya': 48000,
-      'Manipur': 42000,
-      'Nagaland': 38000,
-      'Arunachal Pradesh': 31000,
-      'Mizoram': 28000,
-      'Sikkim': 22000,
-      'Ladakh': 18000,
-      'Andaman and Nicobar Islands': 15000,
-      'Dadra and Nagar Haveli and Daman and Diu': 12000,
-      'Lakshadweep': 8000,
-    };
-
+  ]).map((st) => {
     const name = st.name;
-    const count = baseVendorCounts[name] || Math.max(10000, 50000 - idx * 1200);
+    const realCount = liveVendorStateCounts[name.toLowerCase()] || 0;
     return {
       state: name,
       code: st.isoCode,
-      count
+      count: realCount
     };
   });
 
-  // Dynamic States Table Data using standard Indian states library ⭐
-  const statesData = (() => {
-    const backendStates = (cascadeData?.states && cascadeData.states.length > 0)
-      ? cascadeData.states.map((s) => ({ state: s.name || s.state, count: s.vendorCount ?? s.count ?? 0 }))
-      : [];
-
-    // Map of existing backend states for quick lookup
-    const backendStateMap = new Map();
-    backendStates.forEach(s => backendStateMap.set((s.state || '').trim().toLowerCase(), s.count));
-
-    // Only return official Indian states/UTs from the library
-    return allIndianStatesFromLibrary.map(st => {
-      const lower = st.state.toLowerCase();
-      if (backendStateMap.has(lower)) {
-        return { state: st.state, count: backendStateMap.get(lower) };
-      }
-      return st;
-    });
-  })();
+  // Dynamic States Table Data computed strictly from real live vendors database ⭐
+  const statesData = allIndianStatesFromLibrary;
 
   // Calculate State Multiplier based on selected state's vendor share
   const totalStatesVendors = statesData.reduce((acc, curr) => acc + (Number(curr.count) || 0), 0) || 1;
@@ -1097,49 +1074,26 @@ function Dashboard({ initialTab = 'dashboard' }) {
     },
   ];
 
-  // Dynamic Main Category Table Data mapped & scaled by state multiplier ⭐
-  const mainCategoryData = (cascadeData?.categories && cascadeData.categories.length > 0 
-    ? cascadeData.categories.map(c => ({ category: c.name || c.category, count: c.vendorCount ?? c.count ?? 0, id: c._id || c.id }))
-    : MASTER_CATEGORIES_WITH_SUBCATS.map(c => ({
-        category: c.name,
-        count: Math.round(c.totalCount * stateMultiplier),
-        id: c.id
-      }))
-  );
+  // Dynamic Main Category Table Data mapped from real live vendor database ⭐
+  const mainCategoryData = MASTER_CATEGORIES_WITH_SUBCATS.map(c => {
+    const realCatCount = liveVendorCategoryCounts[c.name.toLowerCase()] || 0;
+    return {
+      category: c.name,
+      count: selectedState === 'All' ? realCatCount : Math.round(realCatCount * stateMultiplier),
+      id: c.id
+    };
+  });
 
   // Filter Sub Categories dynamically based on selectedCategory & selectedState ⭐
   const activeSubCategoryData = (() => {
-    // If backend provided subcategories, use them
-    if (cascadeData?.subcategories && cascadeData.subcategories.length > 0) {
-      const rawSubcats = cascadeData.subcategories;
-      const mappedSubcats = rawSubcats.map((sc) => ({
-        category: sc.name || sc.subCategory || sc.category,
-        count: Math.round((sc.vendorCount ?? sc.count ?? 0) * (selectedState === 'All' ? 1 : stateMultiplier)),
-        categoryId: sc.categoryId || sc.category_id,
-        parentCategory: sc.parentCategory || sc.categoryName || (typeof sc.category === 'object' ? sc.category?.name : sc.category),
-        state: sc.state || sc.stateName
-      }));
-
-      let filtered = mappedSubcats;
-      if (selectedCategory !== 'All') {
-        const selCatLower = selectedCategory.toLowerCase();
-        filtered = filtered.filter((sc) => {
-          const scName = String(sc.category || '').toLowerCase();
-          const scParent = String(sc.parentCategory || '').toLowerCase();
-          return scParent.includes(selCatLower) || selCatLower.includes(scParent) || scName.includes(selCatLower);
-        });
-      }
-      return filtered;
-    }
-
-    // Default relational filtering using MASTER_CATEGORIES_WITH_SUBCATS
     let subCatList = [];
     if (selectedCategory === 'All') {
       MASTER_CATEGORIES_WITH_SUBCATS.forEach(cat => {
         cat.subcategories.forEach(sub => {
+          const realCatCount = liveVendorCategoryCounts[cat.name.toLowerCase()] || 0;
           subCatList.push({
             category: sub.name,
-            count: Math.round(sub.totalCount * stateMultiplier),
+            count: selectedState === 'All' ? 0 : Math.round(realCatCount * stateMultiplier),
             parentCategory: cat.name
           });
         });
@@ -1149,9 +1103,10 @@ function Dashboard({ initialTab = 'dashboard' }) {
         c => c.name.toLowerCase() === selectedCategory.toLowerCase()
       );
       if (matchedCat) {
+        const realCatCount = liveVendorCategoryCounts[matchedCat.name.toLowerCase()] || 0;
         subCatList = matchedCat.subcategories.map(sub => ({
           category: sub.name,
-          count: Math.round(sub.totalCount * stateMultiplier),
+          count: selectedState === 'All' ? realCatCount : Math.round(realCatCount * stateMultiplier),
           parentCategory: matchedCat.name
         }));
       }

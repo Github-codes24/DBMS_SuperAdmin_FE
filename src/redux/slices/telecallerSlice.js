@@ -65,8 +65,8 @@ export const deleteTelecaller = createAsyncThunk(
     let userId = null;
 
     if (typeof telecallerParam === 'object' && telecallerParam !== null) {
-      mongoId = telecallerParam._id || telecallerParam.mongoId;
-      userId = telecallerParam.userId || telecallerParam.id;
+      userId = telecallerParam.userId || telecallerParam.telecallerId || (typeof telecallerParam.id === 'string' && telecallerParam.id.startsWith('TC') ? telecallerParam.id : null);
+      mongoId = telecallerParam._id || telecallerParam.mongoId || telecallerParam.id;
     } else if (typeof telecallerParam === 'string') {
       if (/^[0-9a-fA-F]{24}$/.test(telecallerParam)) {
         mongoId = telecallerParam;
@@ -75,25 +75,26 @@ export const deleteTelecaller = createAsyncThunk(
       }
     }
 
-    const idsToTry = Array.from(new Set([mongoId, userId, telecallerParam?.id, telecallerParam?._id].filter(Boolean)));
+    const idsToTry = Array.from(new Set([userId, mongoId].filter(Boolean)));
+
+    const attempts = [];
+    for (const id of idsToTry) {
+      attempts.push(() => api.delete(`/superadmin/telecallers/${id}`));
+      attempts.push(() => api.delete(`/users/${id}`));
+      attempts.push(() => api.post(`/superadmin/telecallers/${id}/delete`));
+    }
 
     let lastError = null;
-    for (const id of idsToTry) {
+    for (const makeAttempt of attempts) {
       try {
-        const response = await api.delete(`/users/${id}`);
-        toast.success(response.data?.message || 'Telecaller deleted successfully');
-        dispatch(fetchTelecallers());
-        return { mongoId, userId, targetId: id, data: response.data };
-      } catch (err) {
-        lastError = err;
-        try {
-          const response = await api.delete(`/superadmin/telecallers/${id}`);
+        const response = await makeAttempt();
+        if (response.status >= 200 && response.status < 300) {
           toast.success(response.data?.message || 'Telecaller deleted successfully');
           dispatch(fetchTelecallers());
-          return { mongoId, userId, targetId: id, data: response.data };
-        } catch (err2) {
-          lastError = err2;
+          return { mongoId, userId, targetId: idsToTry[0], data: response.data };
         }
+      } catch (err) {
+        lastError = err;
       }
     }
 
@@ -127,6 +128,7 @@ export const bulkImportTelecallers = createAsyncThunk(
 
 const initialState = {
   telecallers: [],
+  deletedTelecallerIds: [],
   totalTelecallers: 0,
   activeTelecallersCount: 0,
   totalPages: 1,
@@ -161,7 +163,14 @@ const telecallerSlice = createSlice({
         state.loading = false;
         const rawList = action.payload.telecallers || action.payload.data || [];
         state.telecallers = Array.isArray(rawList)
-          ? rawList.filter((tc) => tc.status !== 'Deleted' && !tc.isDeleted)
+          ? rawList.filter(
+              (tc) =>
+                tc.status !== 'Deleted' &&
+                !tc.isDeleted &&
+                !state.deletedTelecallerIds.includes(tc._id) &&
+                !state.deletedTelecallerIds.includes(tc.id) &&
+                !state.deletedTelecallerIds.includes(tc.userId)
+            )
           : [];
         state.totalTelecallers = action.payload.totalTelecallers || state.telecallers.length;
         state.activeTelecallersCount = action.payload.activeTelecallersCount || state.telecallers.filter(t => t.status === 'Active').length;
@@ -198,16 +207,17 @@ const telecallerSlice = createSlice({
       })
       .addCase(deleteTelecaller.fulfilled, (state, action) => {
         state.isSaving = false;
-        const { mongoId, userId } = action.payload || {};
+        const { mongoId, userId, targetId } = action.payload || {};
         const arg = action.meta?.arg;
         const argId = typeof arg === 'object' ? (arg._id || arg.id || arg.userId) : arg;
+
+        const idsToRemove = [mongoId, userId, targetId, argId].filter(Boolean);
+        state.deletedTelecallerIds = Array.from(new Set([...state.deletedTelecallerIds, ...idsToRemove]));
 
         if (state.telecallers && Array.isArray(state.telecallers)) {
           state.telecallers = state.telecallers.filter((tc) => {
             if (tc.status === 'Deleted' || tc.isDeleted) return false;
-            if (mongoId && tc._id === mongoId) return false;
-            if (userId && (tc.userId === userId || tc.id === userId)) return false;
-            if (argId && (tc._id === argId || tc.userId === argId || tc.id === argId)) return false;
+            if (idsToRemove.some((id) => tc._id === id || tc.userId === id || tc.id === id)) return false;
             return true;
           });
         }

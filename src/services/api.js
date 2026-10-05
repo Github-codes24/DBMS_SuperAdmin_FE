@@ -9,12 +9,18 @@ const api = axios.create({
   },
 });
 
-// Request interceptor to attach bearer token
+// Request interceptor to attach bearer token and bypass browser/304 caching for GET requests
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    if (config.method && config.method.toLowerCase() === 'get') {
+      config.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      config.headers['Pragma'] = 'no-cache';
+      config.headers['Expires'] = '0';
+      config.params = { ...config.params, _t: Date.now() };
     }
     return config;
   },

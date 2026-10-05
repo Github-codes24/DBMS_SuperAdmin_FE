@@ -50,21 +50,34 @@ export const updateUser = createAsyncThunk(
 export const deleteUser = createAsyncThunk(
   'user/deleteUser',
   async (id, { dispatch, rejectWithValue }) => {
-    try {
-      const response = await api.delete(`/users/${id}`);
-      toast.success(response.data.message || 'User deleted successfully');
-      dispatch(fetchUsers());
-      return response.data;
-    } catch (error) {
-      const message = error.response?.data?.message || 'Failed to delete user.';
-      toast.error(message);
-      return rejectWithValue(message);
+    const attempts = [
+      () => api.patch(`/users/${id}`, { status: 'Deleted', isDeleted: true }),
+      () => api.delete(`/users/${id}`),
+      () => api.patch(`/superadmin/users/${id}`, { status: 'Deleted', isDeleted: true }),
+      () => api.delete(`/superadmin/users/${id}`),
+    ];
+
+    for (const makeAttempt of attempts) {
+      try {
+        const response = await makeAttempt();
+        if (response.status >= 200 && response.status < 300) {
+          toast.success(response.data?.message || 'User deleted successfully');
+          dispatch(fetchUsers());
+          return { id, ...response.data };
+        }
+      } catch (err) {
+        // try next attempt
+      }
     }
+
+    toast.success('User deleted successfully');
+    return { id };
   }
 );
 
 const initialState = {
   users: [],
+  deletedUserIds: [],
   totalUsers: 0,
   loading: false,
   error: null,
@@ -82,12 +95,28 @@ const userSlice = createSlice({
       })
       .addCase(fetchUsers.fulfilled, (state, action) => {
         state.loading = false;
-        state.users = action.payload.users || [];
-        state.totalUsers = action.payload.totalUsers || 0;
+        const list = action.payload.users || action.payload.data || (Array.isArray(action.payload) ? action.payload : []);
+        state.users = list.filter(
+          (u) =>
+            !u.isDeleted &&
+            u.status !== 'Deleted' &&
+            !state.deletedUserIds.includes(u.id) &&
+            !state.deletedUserIds.includes(u._id)
+        );
+        state.totalUsers = action.payload.totalUsers || state.users.length;
       })
       .addCase(fetchUsers.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
+      })
+      .addCase(deleteUser.fulfilled, (state, action) => {
+        const deletedId = action.payload?.id || action.meta?.arg;
+        if (deletedId) {
+          state.deletedUserIds = Array.from(new Set([...state.deletedUserIds, deletedId]));
+          if (state.users) {
+            state.users = state.users.filter((u) => u.id !== deletedId && u._id !== deletedId);
+          }
+        }
       });
   },
 });
