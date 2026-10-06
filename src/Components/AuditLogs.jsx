@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import api from '../services/api';
 import { fetchAuditLogs } from '../redux/slices/auditLogsSlice';
-import { Search, Download, Lock, FileSpreadsheet, FileText, Check, ChevronUp, ChevronDown } from 'lucide-react';
+import { Search, Download, Lock, FileSpreadsheet, FileText, Check, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 
 function AuditLogs({ compact = false }) {
   const dispatch = useDispatch();
@@ -12,6 +12,9 @@ function AuditLogs({ compact = false }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [toastMsg, setToastMsg] = useState('');
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   // Role Access Check: Only Super Admin and Admin have access to Export
   const userRole = (localStorage.getItem('userRole') || 'Super Admin').trim();
@@ -22,21 +25,29 @@ function AuditLogs({ compact = false }) {
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       dispatch(fetchAuditLogs(searchTerm));
+      setCurrentPage(1);
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
   }, [dispatch, searchTerm]);
 
   const logs = Array.isArray(apiLogs) ? apiLogs.map((log) => ({
-    id: log._id,
-    time: log.time || '',
-    user: log.user || '',
+    id: log._id || log.id || Math.random(),
+    time: log.time || log.createdAt || '',
+    user: log.user || log.performedBy || '',
     action: log.action || '',
-    record: log.record || '',
+    record: log.record || log.targetId || '',
     details: log.details || `${log.action} performed on record ${log.record}`
   })) : [];
 
   const filteredLogs = logs;
+
+  // Pagination calculations
+  const totalPages = Math.max(1, Math.ceil(filteredLogs.length / itemsPerPage));
+  const validCurrentPage = Math.min(currentPage, totalPages);
+  const indexOfLastItem = validCurrentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentDisplayedLogs = filteredLogs.slice(indexOfFirstItem, indexOfLastItem);
 
   // Handle Export CSV
   const handleExportLogs = async () => {
@@ -151,7 +162,7 @@ function AuditLogs({ compact = false }) {
 
         {/* Table View */}
         <div
-          className="max-h-[300px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar"
+          className="max-h-[350px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar"
         >
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs z-10">
@@ -163,9 +174,9 @@ function AuditLogs({ compact = false }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium">
-              {filteredLogs.length > 0 ? (
-                filteredLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50/60 transition-colors">
+              {currentDisplayedLogs.length > 0 ? (
+                currentDisplayedLogs.map((log, idx) => (
+                  <tr key={log.id || idx} className="hover:bg-slate-50/60 transition-colors">
                     <td className="py-3 px-3 font-semibold text-slate-600">{log.time}</td>
                     <td className="py-3 px-3 font-bold text-slate-900">{log.user}</td>
                     <td className="py-3 px-3 font-semibold text-slate-700">{log.action}</td>
@@ -184,10 +195,73 @@ function AuditLogs({ compact = false }) {
         </div>
       </div>
 
-      {/* Footer Info Status */}
-      <div className="pt-2 flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-100">
-        <span>Showing {filteredLogs.length} audit records</span>
-      </div>
+      {/* Modern Interactive Pagination & Footer Bar */}
+      {filteredLogs.length > 0 && (
+        <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs border-t border-slate-100">
+          <div className="flex items-center gap-3 text-slate-500 font-medium">
+            <span>
+              Showing <strong className="text-slate-800">{indexOfFirstItem + 1}</strong> to{' '}
+              <strong className="text-slate-800">{Math.min(indexOfLastItem, filteredLogs.length)}</strong> of{' '}
+              <strong className="text-slate-800">{filteredLogs.length}</strong> records
+            </span>
+            <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
+              <span className="text-[11px] text-slate-400">Per page:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={validCurrentPage === 1}
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              title="Previous Page"
+            >
+              <ChevronLeft size={16} />
+            </button>
+
+            <div className="flex items-center gap-1 px-1">
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+                <button
+                  key={pageNum}
+                  type="button"
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    pageNum === validCurrentPage
+                      ? 'bg-[#f26522] text-white shadow-xs'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              disabled={validCurrentPage >= totalPages}
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              title="Next Page"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

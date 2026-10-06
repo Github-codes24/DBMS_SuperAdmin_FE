@@ -37,7 +37,10 @@ import {
   Ban,
   ChevronLeft,
   ChevronRight,
-  Filter
+  Filter,
+  User,
+  Phone,
+  Tag
 } from 'lucide-react';
 
 function CustomerDatabase({ compact = false }) {
@@ -99,6 +102,7 @@ function CustomerDatabase({ compact = false }) {
 
   // Add Customer Modal State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editTab, setEditTab] = useState('personal');
   const [newCustomer, setNewCustomer] = useState({
     srNo: '',
     id: '',
@@ -349,8 +353,8 @@ function CustomerDatabase({ compact = false }) {
   // Submit New Customer Form (Super Admin Access)
   const handleAddCustomerSubmit = (e) => {
     e.preventDefault();
-    if (!newCustomer.name || !newCustomer.companyName) {
-      alert('Please fill in Customer Name and Company Name');
+    if (!newCustomer.companyName && !newCustomer.name) {
+      alert('Please fill in Company Name');
       return;
     }
 
@@ -981,133 +985,403 @@ function CustomerDatabase({ compact = false }) {
   // RENDER DEDICATED EDIT PAGE VIEW
   if (viewMode === 'edit' && editingCustomer) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-2xs space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-md overflow-hidden flex flex-col min-h-[600px] text-left">
+        {/* Header */}
+        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
                 setViewMode('list');
                 setEditingCustomer(null);
               }}
-              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
               title="Back to Customer Directory"
             >
               <X size={18} />
             </button>
             <div>
-              <h2 className="text-lg font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <Edit2 size={20} className="text-[#f26522]" />
-                <span>Edit Customer Record</span>
+              <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                <Edit2 size={18} className="text-[#f26522]" />
+                <span>Edit Vendor / Customer Record</span>
               </h2>
-              <p className="text-xs text-slate-500">Update customer details below and click save</p>
+              <p className="text-xs text-slate-400">Update vendor details and sync with telecaller follow-up list</p>
             </div>
           </div>
         </div>
 
-        <form onSubmit={handleEditCustomerSubmit} className="space-y-6 max-w-4xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Mobile Number *</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. +91 98765 43210"
-                value={editingCustomer.mobile}
-                onChange={(e) => setEditingCustomer({ ...editingCustomer, mobile: e.target.value })}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Customer / Contact Name *</label>
-              <input
-                type="text"
-                required
-                value={editingCustomer.name}
-                onChange={(e) => setEditingCustomer({ ...editingCustomer, name: e.target.value })}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Email Address</label>
-              <input
-                type="email"
-                placeholder="e.g. customer@example.com"
-                value={editingCustomer.email}
-                onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Company Name *</label>
-              <input
-                type="text"
-                required
-                value={editingCustomer.companyName}
-                onChange={(e) => setEditingCustomer({ ...editingCustomer, companyName: e.target.value })}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">State</label>
-              <input
-                type="text"
-                value={editingCustomer.state}
-                onChange={(e) => setEditingCustomer({ ...editingCustomer, state: e.target.value })}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">City</label>
-              <input
-                type="text"
-                value={editingCustomer.city}
-                onChange={(e) => setEditingCustomer({ ...editingCustomer, city: e.target.value })}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Status</label>
-              <select
-                value={editingCustomer.status}
-                onChange={(e) => setEditingCustomer({ ...editingCustomer, status: e.target.value })}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 cursor-pointer"
-              >
-                <option value="Active">Active</option>
-                <option value="Pending">Pending</option>
-                <option value="Blocked">Blocked</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Assigned Telecaller</label>
-              <input
-                type="text"
-                value={editingCustomer.telecaller}
-                onChange={(e) => setEditingCustomer({ ...editingCustomer, telecaller: e.target.value })}
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-              />
-            </div>
-          </div>
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+        {/* Main Layout */}
+        <div className="flex flex-col md:flex-row flex-1">
+          {/* Left Sidebar Tabs */}
+          <div className="w-full md:w-64 bg-slate-50 border-r border-slate-200/80 p-4 space-y-2 shrink-0">
             <button
               type="button"
-              onClick={() => {
-                setViewMode('list');
-                setEditingCustomer(null);
-              }}
-              className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              onClick={() => setEditTab('personal')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all text-left cursor-pointer ${
+                editTab === 'personal'
+                  ? 'bg-[#f26522] text-white shadow-md shadow-orange-500/20'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
             >
-              Cancel
+              <User size={18} />
+              <span>Vendor Personal Info</span>
             </button>
+
             <button
-              type="submit"
-              disabled={isSaving}
-              className="px-6 py-2.5 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-all cursor-pointer shadow-xs flex items-center gap-2"
+              type="button"
+              onClick={() => setEditTab('images')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all text-left cursor-pointer ${
+                editTab === 'images'
+                  ? 'bg-[#f26522] text-white shadow-md shadow-orange-500/20'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
             >
-              <Check size={15} />
-              <span>{isSaving ? 'Saving...' : 'Update Record'}</span>
+              <FileSpreadsheet size={18} />
+              <span>Upload Images</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setEditTab('contact')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all text-left cursor-pointer ${
+                editTab === 'contact'
+                  ? 'bg-[#f26522] text-white shadow-md shadow-orange-500/20'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <Phone size={18} />
+              <span>Contact & Payment Info</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setEditTab('category')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all text-left cursor-pointer ${
+                editTab === 'category'
+                  ? 'bg-[#f26522] text-white shadow-md shadow-orange-500/20'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <Tag size={18} />
+              <span>Vendor Category Details</span>
             </button>
           </div>
-        </form>
+
+          {/* Right Panel */}
+          <div className="flex-1 p-6 md:p-8 flex flex-col justify-between space-y-6">
+            <div>
+              {/* TAB 1: PERSONAL */}
+              {editTab === 'personal' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">Vendor Code</label>
+                      <input
+                        type="text"
+                        disabled
+                        value={editingCustomer.id || 'VEN986080'}
+                        className="w-full px-3.5 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-700 cursor-not-allowed"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">System Register Date</label>
+                      <input
+                        type="text"
+                        disabled
+                        value={editingCustomer.regDate || '02/10/2026'}
+                        className="w-full px-3.5 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl font-bold text-slate-700 cursor-not-allowed"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-600 mb-1">Vendor Name *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Owner Name"
+                        value={editingCustomer.name || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, name: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-600 mb-1">Vendor Company Name *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Vendor Company Name"
+                        value={editingCustomer.companyName || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, companyName: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">Country Name:</label>
+                      <select
+                        value={editingCustomer.country || 'India'}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, country: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold cursor-pointer"
+                      >
+                        <option value="India">India</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">State Name:</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Uttar Pradesh"
+                        value={editingCustomer.state || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, state: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">City Name:</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Noida"
+                        value={editingCustomer.city || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, city: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">Locality:</label>
+                      <input
+                        type="text"
+                        placeholder="Locality"
+                        value={editingCustomer.locality || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, locality: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">Email:</label>
+                      <input
+                        type="email"
+                        placeholder="vendor@example.com"
+                        value={editingCustomer.email || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, email: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">GST Number:</label>
+                      <input
+                        type="text"
+                        placeholder="15 Digit GST Number"
+                        value={editingCustomer.gstNumber || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, gstNumber: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">Address:</label>
+                      <textarea
+                        rows={2}
+                        placeholder="Address"
+                        value={editingCustomer.address || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, address: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold resize-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: IMAGES */}
+              {editTab === 'images' && (
+                <div className="space-y-4 max-w-xl">
+                  <h3 className="text-sm font-bold text-slate-800">Upload Vendor Banner & Document Photos</h3>
+                  <div className="border-2 border-dashed border-slate-200 rounded-3xl p-8 text-center bg-slate-50 hover:bg-slate-100/50 transition-colors cursor-pointer">
+                    <p className="text-xs font-bold text-slate-800">Upload new vendor photos or documents</p>
+                    <p className="text-[11px] text-slate-400 mt-1">PNG, JPG up to 5MB</p>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: CONTACT & PAYMENT */}
+              {editTab === 'contact' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-600 mb-1">Registered Phone No. (Locked) *</label>
+                      <input
+                        type="text"
+                        required
+                        value={editingCustomer.mobile || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, mobile: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-bold text-slate-800"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">Whatsapp No. :</label>
+                      <input
+                        type="text"
+                        placeholder="Whatsapp Number"
+                        value={editingCustomer.whatsappNumber || editingCustomer.mobile || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, whatsappNumber: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">Alternate Contact No.:</label>
+                      <input
+                        type="text"
+                        placeholder="Alternate Contact No"
+                        value={editingCustomer.altContactNumber || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, altContactNumber: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                      />
+                    </div>
+
+
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">Website:</label>
+                      <input
+                        type="text"
+                        placeholder="N/A"
+                        value={editingCustomer.website || 'N/A'}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, website: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">Vendor Listing Type:</label>
+                      <select
+                        value={editingCustomer.listingType || 'Not-Verified'}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, listingType: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold cursor-pointer"
+                      >
+                        <option value="Not-Verified">Not-Verified</option>
+                        <option value="Verified">Verified</option>
+                        <option value="Premium">Premium</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">Is Paid Vendor:</label>
+                      <select
+                        value={editingCustomer.isPaid || 'No'}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, isPaid: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold cursor-pointer"
+                      >
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-500 mb-1">Assigned Telecaller:</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. TC014"
+                        value={editingCustomer.telecaller || '2547'}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, telecaller: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 4: CATEGORY DETAILS */}
+              {editTab === 'category' && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-600 mb-1">Primary Business Category:</label>
+                      <select
+                        value={editingCustomer.category || 'Electrical & Electronics Repair'}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, category: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold cursor-pointer"
+                      >
+                        <option value="Electrical & Electronics Repair">Electrical & Electronics Repair</option>
+                        <option value="Grocery & FMCG">Grocery & FMCG</option>
+                        <option value="Electronics & IT">Electronics & IT</option>
+                        <option value="Medical & Pharma">Medical & Pharma</option>
+                        <option value="Home Products & Kitchenware">Home Products & Kitchenware</option>
+                        <option value="Hardware & Tools">Hardware & Tools</option>
+                        <option value="Fashion & Apparel">Fashion & Apparel</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-black uppercase text-slate-600 mb-1">Service Specialization:</label>
+                      <input
+                        type="text"
+                        placeholder="Service Specialization"
+                        value={editingCustomer.serviceSpecialization || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, serviceSpecialization: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-[11px] font-black uppercase text-slate-600 mb-1">Keywords / Tags for Telecaller Search:</label>
+                      <textarea
+                        rows={3}
+                        placeholder="Keywords & Search Tags"
+                        value={editingCustomer.keywordsTags || ''}
+                        onChange={(e) => setEditingCustomer({ ...editingCustomer, keywordsTags: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-semibold resize-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('list');
+                  setEditingCustomer(null);
+                }}
+                className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={handleEditCustomerSubmit}
+                className="px-6 py-2.5 text-xs font-bold text-white bg-[#5b52f6] hover:bg-[#4940e0] rounded-xl transition-all shadow-md cursor-pointer active:scale-95 flex items-center gap-2"
+              >
+                <Check size={15} />
+                <span>{isSaving ? 'Saving...' : 'Save'}</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={(e) => {
+                  handleEditCustomerSubmit(e);
+                  alert(`Vendor details updated! Added to Telecaller Follow-up List for ${editingCustomer.name || editingCustomer.companyName}.`);
+                }}
+                className="px-6 py-2.5 text-xs font-bold text-white bg-[#00b074] hover:bg-[#009663] rounded-xl transition-all shadow-md cursor-pointer active:scale-95 flex items-center gap-2"
+              >
+                <Check size={15} />
+                <span>{isSaving ? 'Saving...' : 'Save & Followup'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1340,13 +1614,12 @@ function CustomerDatabase({ compact = false }) {
                           type="button"
                           onClick={() => handleToggleStatus(cust)}
                           disabled={isSaving}
-                          className={`font-semibold text-xs transition-all hover:scale-105 active:scale-95 cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed ${
-                            cust.status === 'Active'
+                          className={`font-semibold text-xs transition-all hover:scale-105 active:scale-95 cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed ${cust.status === 'Active'
                               ? 'text-emerald-600'
                               : cust.status === 'Blocked' || cust.status === 'Rejected'
-                              ? 'text-rose-600'
-                              : 'text-amber-600'
-                          }`}
+                                ? 'text-rose-600'
+                                : 'text-amber-600'
+                            }`}
                           title="Click to toggle status"
                         >
                           {cust.status}
@@ -1452,8 +1725,8 @@ function CustomerDatabase({ compact = false }) {
                 type="button"
                 onClick={() => setCurrentPage(pageNum)}
                 className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${pageNum === validCurrentPage
-                    ? 'bg-[#f26522] text-white shadow-xs'
-                    : 'text-slate-600 hover:bg-slate-100'
+                  ? 'bg-[#f26522] text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100'
                   }`}
               >
                 {pageNum}

@@ -156,7 +156,7 @@ function TelecallerManagement({ compact = false }) {
     setHasSearched(false);
     setCurrentPage(1);
     updateUrlParams({ search: null, page: null });
-    dispatch(clearTelecallers());
+    dispatch(fetchTelecallers({}));
   };
 
   const activeApiTelecallers = Array.isArray(apiTelecallers) ? apiTelecallers.filter(
@@ -1257,23 +1257,19 @@ function TelecallerManagement({ compact = false }) {
                 })
               ) : (
                 <tr>
-                  <td colSpan="8" className="py-12 text-center text-xs text-slate-400 font-medium">
+                  <td colSpan="6" className="py-12 text-center text-xs text-slate-400 font-medium">
                     {loading ? (
                       <div className="flex flex-col items-center justify-center gap-2 text-slate-500">
                         <Loader2 size={24} className="animate-spin text-[#f26522]" />
-                        <span className="font-semibold">Searching for telecallers...</span>
-                      </div>
-                    ) : !hasSearched ? (
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <Search size={28} className="text-slate-300" />
-                        <span className="font-semibold text-slate-600 text-sm">Search for a telecaller to view results.</span>
-                        <span className="text-[11px] text-slate-400">Enter a name, ID, mobile, email, or region above and click Search.</span>
+                        <span className="font-semibold">Loading telecallers...</span>
                       </div>
                     ) : (
                       <div className="flex flex-col items-center justify-center gap-2">
                         <UserX size={28} className="text-slate-300" />
-                        <span className="font-semibold text-slate-600 text-sm">No telecallers found matching your search.</span>
-                        <span className="text-[11px] text-slate-400">No telecaller records matched "{submittedSearch}". Try a different search term.</span>
+                        <span className="font-semibold text-slate-600 text-sm">No telecallers found.</span>
+                        <span className="text-[11px] text-slate-400">
+                          {submittedSearch ? `No telecaller records matched "${submittedSearch}". Try a different search term.` : 'No telecaller records available.'}
+                        </span>
                       </div>
                     )}
                   </td>
@@ -1284,7 +1280,7 @@ function TelecallerManagement({ compact = false }) {
         </div>
 
         {/* Modern Interactive Pagination & Footer Bar */}
-        {hasSearched && filteredTelecallers.length > 0 && (
+        {filteredTelecallers.length > 0 && (
           <div className="pt-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs border-t border-slate-100">
             <div className="flex items-center gap-3 text-slate-500 font-medium">
               <span>

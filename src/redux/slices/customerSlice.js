@@ -48,18 +48,33 @@ export const createCustomer = createAsyncThunk(
         customerData.userEmail ||
         '';
 
+      const nameVal =
+        (customerData.name && customerData.name.trim()) ||
+        (customerData.companyName && customerData.companyName.trim()) ||
+        (customerData.customerName && customerData.customerName.trim()) ||
+        (customerData.ownerName && customerData.ownerName.trim()) ||
+        'Customer';
+
+      const companyVal =
+        (customerData.companyName && customerData.companyName.trim()) ||
+        (customerData.name && customerData.name.trim()) ||
+        'Customer Firm';
+
       const formattedData = {
-        name: customerData.name || customerData.customerName || customerData.companyName || customerData.ownerName || 'Customer',
-        companyName: customerData.companyName || customerData.name || customerData.customerName || 'Customer Firm',
-        ownerName: customerData.ownerName || '',
-        category: customerData.category || customerData.serviceCategory || '',
-        subCategory: customerData.subCategory || customerData.serviceSubcategory || '',
+        ...customerData,
+        name: nameVal,
+        companyName: companyVal,
+        customerName: nameVal,
+        ownerName: customerData.ownerName || nameVal,
+        category: customerData.category || customerData.serviceCategory || 'General',
+        subCategory: customerData.subCategory || customerData.serviceSubcategory || 'General',
         contactNo: mobileVal,
         mobile: mobileVal,
         mobileNumber: mobileVal,
         mobileNo: mobileVal,
         phone: mobileVal,
         phoneNumber: mobileVal,
+        phoneNo: mobileVal,
         contact: mobileVal,
         number: mobileVal,
         email: emailVal,
@@ -69,6 +84,11 @@ export const createCustomer = createAsyncThunk(
         state: customerData.state || '',
         city: customerData.city || '',
         pincode: customerData.pincode || '',
+        regDate: customerData.regDate || customerData.registrationDate || new Date().toISOString().slice(0, 10),
+        registrationDate: customerData.registrationDate || customerData.regDate || new Date().toISOString().slice(0, 10),
+        status: customerData.status || 'Active',
+        assignedTelecaller: customerData.assignedTelecaller || customerData.telecaller || '',
+        telecaller: customerData.telecaller || customerData.assignedTelecaller || '',
         completeAddress: customerData.completeAddress || customerData.address || '',
         gstin: customerData.gstin || customerData.gstNo || ''
       };
@@ -77,7 +97,10 @@ export const createCustomer = createAsyncThunk(
       dispatch(fetchCustomers());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to create customer.';
+      const message =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        'Failed to create customer.';
       toast.error(message);
       return rejectWithValue(message);
     }
