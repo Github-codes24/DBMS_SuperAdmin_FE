@@ -218,6 +218,7 @@ export const bulkImportCustomers = createAsyncThunk(
       formData.append('file', file);
 
       if (payload && !(payload instanceof File)) {
+        console.log("Importing customers with payload:", payload);
         if (payload.category) {
           formData.append('category', payload.category);
           formData.append('serviceCategory', payload.category);
@@ -230,7 +231,7 @@ export const bulkImportCustomers = createAsyncThunk(
         if (payload.city) formData.append('city', payload.city);
       }
 
-      const response = await api.post('/superadmin/customers/import', formData, {
+      const response = await api.post('/superadmin/customers/import', payload, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
