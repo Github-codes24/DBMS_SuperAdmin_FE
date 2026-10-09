@@ -532,9 +532,15 @@ function CustomerDatabase({ compact = false }) {
       const response = await api.get('/superadmin/customers/export/pdf', { responseType: 'blob' });
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `LTS_Customer_Database_${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.setTimeout(() => window.URL.revokeObjectURL(url), 1000);
 
-      setToastMsg('Formatted Customer PDF report generated!');
+      setToastMsg('Customer PDF downloaded successfully!');
       setTimeout(() => setToastMsg(''), 3500);
     } catch (error) {
       toast.error('Failed to export PDF file.');
