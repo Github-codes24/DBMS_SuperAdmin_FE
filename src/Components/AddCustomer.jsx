@@ -95,12 +95,14 @@ function AddCustomer({ onBack, onSuccess }) {
       srNo: String(customers.length + 1).padStart(2, '0'),
       id: form.customerCode,
       customerId: form.customerCode,
-      name: form.name || form.companyName,
-      companyName: form.companyName || form.name,
+      name: form.name,
+      companyName: form.companyName,
       customerName: form.name || form.companyName,
+      vendorName: form.name,
       ownerName: form.name || form.companyName,
       
       mobileNumber: form.mobileNumber,
+      registeredPhoneNo: form.mobileNumber,
       mobile: form.mobileNumber,
       mobileNo: form.mobileNumber,
       phone: form.mobileNumber,
@@ -138,6 +140,8 @@ function AddCustomer({ onBack, onSuccess }) {
       status: 'Active',
       regDate: new Date().toISOString().slice(0, 10),
     };
+
+    console.log('Dispatching createCustomer with payload:', payload);
 
     dispatch(createCustomer(payload))
       .unwrap()
