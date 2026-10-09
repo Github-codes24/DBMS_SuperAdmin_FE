@@ -215,7 +215,7 @@ export const bulkImportCustomers = createAsyncThunk(
     try {
       const file = payload instanceof File ? payload : payload?.file || payload;
       if (!(file instanceof File)) {
-        throw new Error('Select a CSV or Excel file before importing.');
+        throw new Error('Select a CSV or Excel file before importing..');
       }
 
       const formData = new FormData();
