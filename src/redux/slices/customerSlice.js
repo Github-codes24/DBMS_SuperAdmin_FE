@@ -221,26 +221,20 @@ export const bulkImportCustomers = createAsyncThunk(
         console.log("Importing customers with payload:", payload);
         if (payload.category) {
           formData.append('category', payload.category);
-          formData.append('serviceCategory', payload.category);
         }
         if (payload.subCategory) {
           formData.append('subCategory', payload.subCategory);
-          formData.append('serviceSubcategories', payload.subCategory);
         }
         if (payload.state) formData.append('state', payload.state);
         if (payload.city) formData.append('city', payload.city);
       }
 
-      const response = await api.post('/superadmin/customers/import', payload, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await api.post('/superadmin/customers/import', formData);
       toast.success(response.data.message || 'Import completed successfully');
       dispatch(fetchCustomers());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to import customer records.';
+      const message = error.response?.data?.error || error.response?.data?.message || 'Failed to import customer records.';
       toast.error(message);
       return rejectWithValue(message);
     }

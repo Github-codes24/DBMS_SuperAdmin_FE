@@ -3,7 +3,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import * as XLSX from 'xlsx';
-import axios from 'axios';
 import { State, City } from 'country-state-city';
 import api from '../services/api';
 import AddCustomer from './AddCustomer';
@@ -14,6 +13,7 @@ import {
   deleteCustomer,
   bulkImportCustomers
 } from '../redux/slices/customerSlice';
+import { fetchCategories } from '../redux/slices/categorySlice';
 import {
   Search,
   Download,
@@ -47,6 +47,12 @@ function CustomerDatabase({ compact = false }) {
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const { customers: apiCustomers = [], loading = false, isSaving = false } = useSelector((state) => state.customer || {});
+  const {
+    categories = [],
+    subcategories: allSubCategories = [],
+    loading: catsLoading = false,
+    error: categoriesError = null,
+  } = useSelector((state) => state.category || {});
 
   // Page View Mode: 'list' | 'add' | 'edit' | 'view'
   const [viewMode, setViewMode] = useState('list');
@@ -127,11 +133,7 @@ function CustomerDatabase({ compact = false }) {
   const fileInputRef = useRef(null);
 
   // Step 1: Dependent Dropdown States (Category, Sub-Category, State, City)
-  const [categories, setCategories] = useState([]);
-  const [allSubCategories, setAllSubCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
-  const [catsLoading, setCatsLoading] = useState(false);
-  const [subCatsLoading, setSubCatsLoading] = useState(false);
 
   const [selectedCatId, setSelectedCatId] = useState('');
   const [selectedCatName, setSelectedCatName] = useState('');
@@ -172,30 +174,9 @@ function CustomerDatabase({ compact = false }) {
   // Load categories and subcategories when upload modal opens
   useEffect(() => {
     if (isUploadModalOpen && categories.length === 0) {
-      setCatsLoading(true);
-      setSubCatsLoading(true);
-      Promise.all([
-        axios.get('https://local-trade-street-be-2.onrender.com/api/admin/category/getAllCategories?limit=1000')
-          .then((res) => {
-            const list = Array.isArray(res.data?.data) ? res.data.data : [];
-            setCategories(list);
-          })
-          .catch((err) => {
-            console.error('Failed to load categories:', err);
-          })
-          .finally(() => setCatsLoading(false)),
-        axios.get('https://local-trade-street-be-2.onrender.com/api/admin/subCategory/getAllSubCategories?limit=1000')
-          .then((res) => {
-            const list = Array.isArray(res.data?.data) ? res.data.data : [];
-            setAllSubCategories(list);
-          })
-          .catch((err) => {
-            console.error('Failed to load subcategories:', err);
-          })
-          .finally(() => setSubCatsLoading(false)),
-      ]);
+      dispatch(fetchCategories());
     }
-  }, [isUploadModalOpen, categories.length]);
+  }, [isUploadModalOpen, categories.length, dispatch]);
 
   // Click outside listener for all dropdowns
   useEffect(() => {
@@ -631,8 +612,20 @@ function CustomerDatabase({ compact = false }) {
 
     // Filter subcategories belonging to this category
     const filtered = allSubCategories.filter((sc) => {
-      const parentId = sc.categoryId || sc.categoryName?._id || sc.categoryName;
-      const parentName = sc.categoryName?.name || sc.parentCategory || sc.category;
+      const category = sc.category && typeof sc.category === 'object' ? sc.category : null;
+      const categoryName = sc.categoryName && typeof sc.categoryName === 'object' ? sc.categoryName : null;
+      const parentId =
+        sc.categoryId ||
+        category?._id ||
+        categoryName?._id ||
+        (typeof sc.category === 'string' ? sc.category : '') ||
+        (typeof sc.categoryName === 'string' ? sc.categoryName : '');
+      const parentName =
+        category?.name ||
+        categoryName?.name ||
+        sc.parentCategory ||
+        (typeof sc.category === 'string' ? sc.category : '') ||
+        (typeof sc.categoryName === 'string' ? sc.categoryName : '');
       if (catId && parentId && String(parentId) === String(catId)) return true;
       if (catName && parentName && String(parentName).trim().toLowerCase() === catName.trim().toLowerCase()) return true;
       return false;
@@ -1894,6 +1887,8 @@ function CustomerDatabase({ compact = false }) {
                             <Loader2 size={13} className="animate-spin text-[#f26522]" />
                             <span>Loading categories...</span>
                           </div>
+                        ) : categoriesError ? (
+                          <div className="py-3 text-center text-xs text-red-500">{categoriesError}</div>
                         ) : (
                           (() => {
                             const filtered = categories.filter((c) =>
@@ -1940,7 +1935,7 @@ function CustomerDatabase({ compact = false }) {
                 <div className="relative">
                   <button
                     type="button"
-                    disabled={!selectedCatName || subCatsLoading}
+                    disabled={!selectedCatName || catsLoading}
                     onClick={() => {
                       if (!selectedCatName) return;
                       setIsSubCatDropdownOpen(!isSubCatDropdownOpen);
@@ -1975,7 +1970,7 @@ function CustomerDatabase({ compact = false }) {
                         </div>
                       </div>
                       <div className="max-h-44 overflow-y-auto custom-scrollbar py-1">
-                        {subCatsLoading ? (
+                        {catsLoading ? (
                           <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-1.5">
                             <Loader2 size={13} className="animate-spin text-[#f26522]" />
                             <span>Loading sub-categories...</span>
