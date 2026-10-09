@@ -214,11 +214,14 @@ export const bulkImportCustomers = createAsyncThunk(
   async (payload, { dispatch, rejectWithValue }) => {
     try {
       const file = payload instanceof File ? payload : payload?.file || payload;
+      if (!(file instanceof File)) {
+        throw new Error('Select a CSV or Excel file before importing..');
+      }
+
       const formData = new FormData();
       formData.append('file', file);
 
       if (payload && !(payload instanceof File)) {
-        console.log("Importing customers with payload:", payload);
         if (payload.category) {
           formData.append('category', payload.category);
         }
@@ -229,12 +232,20 @@ export const bulkImportCustomers = createAsyncThunk(
         if (payload.city) formData.append('city', payload.city);
       }
 
-      const response = await api.post('/superadmin/customers/import', formData);
+      const response = await api.post('/superadmin/customers/import', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }); 
       toast.success(response.data.message || 'Import completed successfully');
       dispatch(fetchCustomers());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.error || error.response?.data?.message || 'Failed to import customer records.';
+      const message =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to import customer records.';
       toast.error(message);
       return rejectWithValue(message);
     }
