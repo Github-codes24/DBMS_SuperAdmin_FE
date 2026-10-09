@@ -218,21 +218,6 @@ export default function LoginPage({ onLogin }) {
             </div>
           </div>
 
-          {/* Financial Year Selection (only for login or display purpose) */}
-          {!isSignup && (
-            <div className="form-group">
-              <label>Financial Year Session</label>
-              <select
-                className="form-control"
-                value={financialYear}
-                onChange={(e) => setFinancialYear(e.target.value)}
-              >
-                <option value="2026-2027">FY 2026-2027 (Active)</option>
-                <option value="2025-2026">FY 2025-2026</option>
-              </select>
-            </div>
-          )}
-
           {/* Submit Button */}
           <button type="submit" className="btn-login-submit" disabled={loading}>
             {isSignup ? (
@@ -246,60 +231,6 @@ export default function LoginPage({ onLogin }) {
             )}
           </button>
         </form>
-
-        {/* Toggle between Sign In / Sign Up */}
-        <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '13px' }}>
-          <span style={{ color: '#64748b' }}>
-            {isSignup ? 'Already have an account? ' : "Don't have an account? "}
-          </span>
-          <button
-            type="button"
-            onClick={toggleMode}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--lts-orange)',
-              fontWeight: '700',
-              cursor: 'pointer',
-              padding: '0 4px',
-              textDecoration: 'underline',
-            }}
-          >
-            {isSignup ? 'Sign In' : 'Sign Up'}
-          </button>
-        </div>
-
-        {/* Quick Demo Accounts */}
-        {!isSignup && (
-          <div className="login-demo-box">
-            <div className="demo-box-header">
-              <ShieldCheck size={14} /> Quick Demo Access:
-            </div>
-            <div className="demo-btns-grid">
-              <button
-                type="button"
-                className="btn-demo-account"
-                onClick={() => handleQuickDemoLogin('rk@lts.com')}
-              >
-                <strong>Rohit</strong> (rk@lts.com)
-              </button>
-              <button
-                type="button"
-                className="btn-demo-account"
-                onClick={() => handleQuickDemoLogin('2547')}
-              >
-                <strong>Shivam</strong> (ID: 2547)
-              </button>
-              <button
-                type="button"
-                className="btn-demo-account"
-                onClick={() => handleQuickDemoLogin('1802')}
-              >
-                <strong>Anjali</strong> (ID: 1802)
-              </button>
-            </div>
-          </div>
-        )}
 
         {/* Footer info */}
         <div className="login-footer-text">
