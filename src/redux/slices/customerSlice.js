@@ -236,7 +236,7 @@ export const bulkImportCustomers = createAsyncThunk(
         headers: {
           'Content-Type': 'multipart/form-data',
         },
-      });
+      }); 
       toast.success(response.data.message || 'Import completed successfully');
       dispatch(fetchCustomers());
       return response.data;
