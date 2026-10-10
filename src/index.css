@@ -1,3 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+
 @import "tailwindcss";
 
 @layer base {
@@ -68,3 +71,87 @@ body {
   background: #94a3b8;
 }
 
+
+/* Vendor Login Styling */
+.login-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f8fafc 0%, #edf2f7 50%, #fff7ed 100%);
+  padding: 20px;
+}
+
+.login-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border-top: 4px solid #ff5500;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08),
+    0 5px 15px rgba(255, 85, 0, 0.05);
+  width: 100%;
+  max-width: 440px;
+  padding: 36px 32px;
+}
+
+.login-logo-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.login-logo-img {
+  height: 48px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  margin: 0 auto 12px;
+  display: block;
+}
+
+.login-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 4px;
+}
+
+.login-subtitle {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.login-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: #172033;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form-group label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.form-control {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+.field-has-icon {
+  padding-left: 36px !important;
+}
