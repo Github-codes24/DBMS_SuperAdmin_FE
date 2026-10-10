@@ -93,12 +93,6 @@ export const VendorLogin = ({ onLoginSuccess }) => {
               <label className="block text-[11px] font-extrabold text-[#172033] uppercase tracking-wider">
                 PASSWORD *
               </label>
-              <button
-                type="button"
-                className="text-xs font-bold text-[#F97316] hover:underline"
-              >
-                Forgot Password?
-              </button>
             </div>
             <div className="relative">
               <input
