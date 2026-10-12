@@ -3,7 +3,6 @@ import { useSelector } from 'react-redux';
 import { X, Upload, CheckSquare, Square, User, Image as ImageIcon, Phone, Tags, Save, CheckCircle, Trash2 } from 'lucide-react';
 import { GetCountries, GetState, GetCity} from 'react-country-state-city';
 
-
 const resolveImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:') || url.startsWith('blob:')) {
