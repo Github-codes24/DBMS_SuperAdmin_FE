@@ -110,6 +110,32 @@ export const updateVendor = createAsyncThunk(
   }
 );
 
+export const bulkUpdateVendorStatuses = createAsyncThunk(
+  'vendor/bulkUpdateStatuses',
+  async (vendors, { rejectWithValue }) => {
+    try {
+      const response = await api.patch('/superadmin/vendors/bulk-status', { vendors });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to update selected vendor statuses.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const bulkDeleteVendors = createAsyncThunk(
+  'vendor/bulkDelete',
+  async (vendorIds, { rejectWithValue }) => {
+    try {
+      const response = await api.patch('/superadmin/vendors/bulk-delete', { vendorIds });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to delete selected vendors.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 export const changeVendorPassword = createAsyncThunk(
   'vendor/changeVendorPassword',
   async ({ vendorId, password, newPassword, notifyVendor }, { dispatch, rejectWithValue }) => {
