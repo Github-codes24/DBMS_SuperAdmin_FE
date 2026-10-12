@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
@@ -112,7 +112,7 @@ const buildBulkCustomerPayload = (customer, status) => {
 
   bulkCustomerFields.forEach((field) => {
     const value = customer[field];
-    if (value !== undefined && !(typeof value === 'string' && ['-', '—'].includes(value.trim()))) {
+    if (value !== undefined && !(typeof value === 'string' && ['-', 'ΓÇö'].includes(value.trim()))) {
       payload[field] = value;
     }
   });
@@ -121,7 +121,7 @@ const buildBulkCustomerPayload = (customer, status) => {
   }
 
   const customerName = customer.vendorName || (
-    customer.name && customer.name !== customer.number && customer.name !== '-' && customer.name !== '—'
+    customer.name && customer.name !== customer.number && customer.name !== '-' && customer.name !== 'ΓÇö'
       ? customer.name
       : undefined
   );
@@ -137,7 +137,7 @@ const buildBulkCustomerPayload = (customer, status) => {
     customer.mobileNumber,
     customer.mobile,
     customer.number,
-  ].find((value) => value && !['-', '—'].includes(String(value).trim()));
+  ].find((value) => value && !['-', 'ΓÇö'].includes(String(value).trim()));
   if (phoneNumber) {
     payload.registeredPhoneNo = phoneNumber;
     payload.mobileNumber = customer.mobileNumber || phoneNumber;
@@ -233,6 +233,10 @@ function CustomerDatabase({ compact = false }) {
   });
 
   // Step 1: Import Customers Modal State
+  const projectOptions = ["CSR", "CRM", "Real Estate", "EDU-Merit", "DBMS"];
+const [selectedProject, setSelectedProject] = useState("");
+const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
+const [projectSearch, setProjectSearch] = useState("");
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -358,7 +362,7 @@ function CustomerDatabase({ compact = false }) {
         if (
           strVal &&
           strVal !== '-' &&
-          strVal !== '—' &&
+          strVal !== 'ΓÇö' &&
           strVal !== 'null' &&
           strVal !== 'undefined' &&
           !strVal.toUpperCase().startsWith('CUST') &&
@@ -382,7 +386,7 @@ function CustomerDatabase({ compact = false }) {
   const getDisplayEmail = (cust) => {
     if (!cust) return '-';
     const emailVal = cust.email || cust.emailAddress || cust.emailId || cust.email_id || cust.mail || cust.userEmail || cust.contactEmail;
-    if (emailVal && emailVal !== '-' && emailVal !== '—' && String(emailVal).includes('@')) {
+    if (emailVal && emailVal !== '-' && emailVal !== 'ΓÇö' && String(emailVal).includes('@')) {
       return String(emailVal).trim();
     }
     if (cust.name && String(cust.name).includes('@')) {
@@ -1117,10 +1121,10 @@ function CustomerDatabase({ compact = false }) {
 
           parsed.push({
             rowNum: idx + 1,
-            name: name || '—',
-            companyName: companyName || '—',
-            email: email || '—',
-            mobile: mobile || '—',
+            name: name || 'ΓÇö',
+            companyName: companyName || 'ΓÇö',
+            email: email || 'ΓÇö',
+            mobile: mobile || 'ΓÇö',
             state: state || selectedState || 'Maharashtra',
             city: city || selectedCity || 'Mumbai',
             pincode: pincode || '400001',
@@ -1197,8 +1201,8 @@ function CustomerDatabase({ compact = false }) {
         importRegistrationDate,
         r.status || 'Active',
         r.telecaller || 'TC014',
-        `"${(r.email !== '—' ? r.email : '').replace(/"/g, '""')}"`,
-        `"${(r.mobile !== '—' ? r.mobile : '').replace(/"/g, '""')}"`
+        `"${(r.email !== 'ΓÇö' ? r.email : '').replace(/"/g, '""')}"`,
+        `"${(r.mobile !== 'ΓÇö' ? r.mobile : '').replace(/"/g, '""')}"`
       ]);
 
       const csvString = [headers.join(','), ...csvRows.map((row) => row.join(','))].join('\n');
@@ -1208,6 +1212,7 @@ function CustomerDatabase({ compact = false }) {
 
       await dispatch(bulkImportCustomers({
         file: cleanFile,
+        projectName: selectedProject,
         category: selectedCatName,
         subCategory: selectedSubCatName,
         state: selectedState,
@@ -1216,7 +1221,7 @@ function CustomerDatabase({ compact = false }) {
 
       // Show dynamic breakdown toast
       toast.success(
-        `${reviewStats.total} records processed: ${reviewStats.newCount} New → Imported, ${reviewStats.duplicateCount} Duplicate → Skipped, ${reviewStats.invalidCount} Invalid → Skipped`
+        `${reviewStats.total} records processed: ${reviewStats.newCount} New ΓåÆ Imported, ${reviewStats.duplicateCount} Duplicate ΓåÆ Skipped, ${reviewStats.invalidCount} Invalid ΓåÆ Skipped`
       );
 
       // Re-fetch customer list to guarantee immediate update
@@ -1838,7 +1843,7 @@ function CustomerDatabase({ compact = false }) {
           <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-orange-200 bg-orange-50/70 px-3 py-2">
             <div className="text-xs font-semibold text-slate-700">
               {selectedCustomerIds.size} customer{selectedCustomerIds.size === 1 ? '' : 's'} selected
-              <span className="ml-1 font-medium text-slate-500">· Selection persists across pages and filters</span>
+              <span className="ml-1 font-medium text-slate-500">┬╖ Selection persists across pages and filters</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <label htmlFor="bulk-customer-status" className="text-xs font-semibold text-slate-600">Set status:</label>
@@ -2228,6 +2233,118 @@ function CustomerDatabase({ compact = false }) {
 
             {/* Modal Body */}
             <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+
+
+              {/* Project Name Dropdown */}
+              <div className="space-y-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  Project Name <span className="text-red-500">*</span>
+                </label>
+
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsProjectDropdownOpen(!isProjectDropdownOpen);
+                      setProjectSearch("");
+                      setIsCatDropdownOpen(false);
+                      setIsSubCatDropdownOpen(false);
+                      setIsStateDropdownOpen(false);
+                      setIsCityDropdownOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs bg-slate-50 border rounded-xl transition-all font-medium text-left cursor-pointer hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 ${
+                      isProjectDropdownOpen
+                        ? "border-[#f26522] ring-2 ring-[#f26522]/20 bg-white"
+                        : "border-slate-200"
+                    }`}
+                  >
+                    <span
+                      className={
+                        selectedProject
+                          ? "text-slate-800 font-semibold truncate"
+                          : "text-slate-400"
+                      }
+                    >
+                      {selectedProject || "Select Project"}
+                    </span>
+
+                    <ChevronDown
+                      size={14}
+                      className={`text-slate-400 transition-transform duration-200 shrink-0 ${
+                        isProjectDropdownOpen ? "rotate-180 text-[#f26522]" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {isProjectDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in duration-100">
+                      {/* Search Box */}
+                      <div className="p-2 border-b border-slate-100">
+                        <div className="relative">
+                          <Search
+                            size={13}
+                            className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+                          />
+                          <input
+                            type="text"
+                            placeholder="Search project..."
+                            value={projectSearch}
+                            onChange={(e) => setProjectSearch(e.target.value)}
+                            className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-[#f26522] text-slate-700"
+                            autoFocus
+                          />
+                        </div>
+                      </div>
+
+                      {/* Project Options */}
+                      <div className="max-h-44 overflow-y-auto custom-scrollbar py-1">
+                        {projectOptions.filter((project) =>
+                          project
+                            .toLowerCase()
+                            .includes(projectSearch.toLowerCase()),
+                        ).length === 0 ? (
+                          <div className="py-3 text-center text-xs text-slate-400">
+                            No projects found
+                          </div>
+                        ) : (
+                          projectOptions
+                            .filter((project) =>
+                              project
+                                .toLowerCase()
+                                .includes(projectSearch.toLowerCase()),
+                            )
+                            .map((project) => (
+                              <button
+                                key={project}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedProject(project);
+                                  setIsProjectDropdownOpen(false);
+                                  setProjectSearch("");
+                                  setFileError("");
+                                }}
+                                className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${
+                                  selectedProject === project
+                                    ? "bg-orange-50 font-bold text-[#f26522]"
+                                    : "text-slate-700 hover:bg-slate-50 hover:text-[#f26522]"
+                                }`}
+                              >
+                                <span className="truncate">{project}</span>
+                                {selectedProject === project && (
+                                  <Check
+                                    size={13}
+                                    className="text-[#f26522] shrink-0"
+                                  />
+                                )}
+                              </button>
+                            ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
 
               {/* Category Dropdown */}
               <div className="space-y-1.5" ref={catDropdownRef}>
