@@ -2773,7 +2773,6 @@ function CustomerDatabase({ compact = false }) {
                 <span className="text-xs font-bold text-slate-700">Record Preview ({reviewRecords.length} records)</span>
                 <span className="text-[11px] text-slate-400">Only "New" records will be imported into the database</span>
               </div>
-
               <div className="border border-slate-200 rounded-xl overflow-auto max-h-[46vh] bg-white shadow-2xs">
                 <table className="w-full text-left border-collapse min-w-[560px]">
                   <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200">
