@@ -58,6 +58,21 @@ export const updateTelecaller = createAsyncThunk(
   }
 );
 
+export const bulkUpdateTelecallerStatus = createAsyncThunk(
+  'telecaller/bulkUpdateStatus',
+  async ({ telecallers }, { rejectWithValue }) => {
+    try {
+      const response = await api.patch('/superadmin/telecallers/bulk-status', {
+        telecallers,
+      });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to update selected telecallers.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 export const deleteTelecaller = createAsyncThunk(
   'telecaller/deleteTelecaller',
   async (telecallerParam, { dispatch, rejectWithValue }) => {
