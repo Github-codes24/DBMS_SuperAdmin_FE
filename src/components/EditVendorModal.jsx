@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { X, Upload, CheckSquare, Square, User, Image as ImageIcon, Phone, Tags, Save, CheckCircle, Trash2 } from 'lucide-react';
+import { GetCountries, GetState, GetCity} from 'react-country-state-city';
+
 
 const resolveImageUrl = (url) => {
   if (!url) return '';
@@ -21,16 +23,100 @@ export default function EditVendorModal({ vendor, isViewOnly = false, onClose, o
   const [activeTab, setActiveTab] = useState('personal');
   const [formData, setFormData] = useState({ ...vendor });
   const [uploadedImages, setUploadedImages] = useState(vendor.images || []);
+  const [countryId, setCountryId] = useState(null);
+  const [states, setStates] = useState([]);
+  const [stateId, setStateId] = useState(null);
+  const [cities, setCities] = useState([]);
 
   useEffect(() => {
     setFormData({ ...vendor });
     setUploadedImages(vendor.images || []);
   }, [vendor]);
 
+
+  useEffect(() => {
+  const loadIndiaStates = async () => {
+    try {
+      const countries = await GetCountries();
+      console.log('Countries:', countries);
+
+      const india = countries.find((country) => country.name === 'India');
+      if (!india) 
+      {
+        console.error('India not found');
+        return;
+      }
+      setCountryId(india.id);
+      const indiaStates = await GetState(india.id);
+      console.log('India ID:', india.id);
+      console.log('India states:', indiaStates);
+      setStates(indiaStates);
+
+    } 
+    catch (err) 
+    {
+      console.error('Failed to load states:', err);
+    }
+  };
+  loadIndiaStates();
+}, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+
+
+
+const handleStateChange = async (e) => {
+  const selectedStateName = e.target.value;
+
+  console.log('State selected:', selectedStateName);
+
+  setFormData((prev) => ({
+    ...prev,
+    state: selectedStateName,
+    city: '',
+  }));
+
+  setCities([]);
+
+  const selectedState = states.find(
+    (state) => state.name === selectedStateName
+  );
+
+  if (!selectedState || !countryId) {
+    setStateId(null);
+    return;
+  }
+
+  setStateId(selectedState.id);
+
+  try {
+    console.log('Before GetCity:', countryId, selectedState.id);
+
+    const stateCities = await GetCity(
+      countryId,
+      selectedState.id
+    );
+
+    console.log('After GetCity:', stateCities);
+
+    console.log(
+      'City names:',
+      Array.isArray(stateCities)
+        ? stateCities.map((city) => city.name)
+        : []
+    );
+
+    setCities(
+      Array.isArray(stateCities) ? stateCities : []
+    );
+  } catch (err) {
+    console.error('Failed to load cities:', err);
+    setCities([]);
+  }
+};
 
   const handleSave = async (shouldFollowUp = false) => {
     setSubmitting(true);
@@ -359,35 +445,24 @@ export default function EditVendorModal({ vendor, isViewOnly = false, onClose, o
 
               <div className="form-group">
                 <label>State Name:</label>
-                <select
-                  name="state"
-                  className="form-control"
-                  value={formData.state || ''}
-                  onChange={handleChange}
-                >
-                  <option value="Uttar Pradesh">Uttar Pradesh</option>
-                  <option value="Maharashtra">Maharashtra</option>
-                  <option value="Goa">Goa</option>
-                  <option value="Delhi">Delhi</option>
-                  <option value="Gujarat">Gujarat</option>
-                  <option value="Karnataka">Karnataka</option>
-                </select>
+                  <select name="state" className="form-control" value={formData.state || ''} onChange={handleStateChange} >
+                    <option value="">Select State</option>
+                      {states.map((state) => ( <option key={state.id} value={state.name}>
+                        {state.name}
+                    </option>
+                    ))}
+                  </select>
               </div>
 
               <div className="form-group">
                 <label>City Name:</label>
-                <select
-                  name="city"
-                  className="form-control"
-                  value={formData.city || ''}
-                  onChange={handleChange}
-                >
-                  <option value="Noida">Noida</option>
-                  <option value="Nagpur">Nagpur</option>
-                  <option value="Sanquelim">Sanquelim</option>
-                  <option value="New Delhi">New Delhi</option>
-                  <option value="Mumbai">Mumbai</option>
-                </select>
+                  <select name="city" className="form-control" value={formData.city || ''} onChange={handleChange} disabled={!formData.state} >
+                      <option value="">Select City</option>
+                        {cities.map((city) => ( <option key={city.id} value={city.name}>
+                          {city.name}
+                      </option>
+                        ))}
+                  </select>
               </div>
 
               <div className="form-group">
@@ -565,16 +640,6 @@ export default function EditVendorModal({ vendor, isViewOnly = false, onClose, o
                 />
               </div>
 
-              <div className="form-group">
-                <label>Alternate Contact No.:</label>
-                <input
-                  type="text"
-                  name="alternatePhone"
-                  className="form-control"
-                  value={formData.alternatePhone || ''}
-                  onChange={handleChange}
-                />
-              </div>
 
               <div className="form-group">
                 <label>IVR No. :</label>
