@@ -773,7 +773,13 @@ function CustomerDatabase({ compact = false }) {
 
     try {
       const response = await api.get('/superadmin/customers/export/pdf', { responseType: 'blob' });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const blob = response.data instanceof Blob
+        ? response.data
+        : new Blob([response.data], { type: 'application/pdf' });
+      const signature = await blob.slice(0, 5).text();
+      if (signature !== '%PDF-') {
+        throw new Error('The export endpoint did not return a valid PDF document.');
+      }
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -786,7 +792,7 @@ function CustomerDatabase({ compact = false }) {
       setToastMsg('Customer PDF downloaded successfully!');
       setTimeout(() => setToastMsg(''), 3500);
     } catch (error) {
-      toast.error('Failed to export PDF file.');
+      toast.error(error instanceof Error ? error.message : 'Failed to export PDF file.');
     }
   };
 
