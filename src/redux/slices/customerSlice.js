@@ -248,6 +248,10 @@ export const bulkImportCustomers = createAsyncThunk(
       formData.append('file', file);
 
       if (payload && !(payload instanceof File)) {
+        if (payload.projectName) 
+        {
+          formData.append('projectName', payload.projectName);
+        }
         if (payload.category) {
           formData.append('category', payload.category);
         }
