@@ -8,6 +8,7 @@ import {
   fetchTelecallers,
   createTelecaller,
   updateTelecaller,
+  bulkUpdateTelecallerStatus,
   deleteTelecaller,
   bulkImportTelecallers,
   clearTelecallers
@@ -64,6 +65,10 @@ function TelecallerManagement({ compact = false }) {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [tcToDelete, setTcToDelete] = useState(null);
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'add-telecaller'
+  const [selectedTelecallerIds, setSelectedTelecallerIds] = useState(() => new Set());
+  const [bulkStatus, setBulkStatus] = useState('Active');
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const selectAllTelecallersRef = useRef(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(isNaN(initialPage) || initialPage < 1 ? 1 : initialPage);
@@ -164,6 +169,7 @@ function TelecallerManagement({ compact = false }) {
   ) : [];
 
   const telecallers = activeApiTelecallers.map((tc, idx) => ({
+    ...tc,
     _id: tc._id,
     id: tc.userId || tc._id,
     name: tc.fullName,
@@ -185,6 +191,92 @@ function TelecallerManagement({ compact = false }) {
       (tc.area && tc.area.toLowerCase().includes(search))
     );
   }) : telecallers;
+
+  const getTelecallerSelectionId = (tc) => String(tc._id || '');
+  const selectedFilteredTelecallerCount = filteredTelecallers.reduce(
+    (count, tc) => count + (selectedTelecallerIds.has(getTelecallerSelectionId(tc)) ? 1 : 0),
+    0
+  );
+  const allFilteredTelecallersSelected =
+    filteredTelecallers.length > 0 && selectedFilteredTelecallerCount === filteredTelecallers.length;
+
+  useEffect(() => {
+    if (selectAllTelecallersRef.current) {
+      selectAllTelecallersRef.current.indeterminate =
+        selectedFilteredTelecallerCount > 0 &&
+        selectedFilteredTelecallerCount < filteredTelecallers.length;
+    }
+  }, [selectedFilteredTelecallerCount, filteredTelecallers.length]);
+
+  const handleToggleTelecallerSelection = (telecaller, isSelected) => {
+    const telecallerId = getTelecallerSelectionId(telecaller);
+    if (!telecallerId) return;
+
+    setSelectedTelecallerIds((previous) => {
+      const next = new Set(previous);
+      if (isSelected) next.add(telecallerId);
+      else next.delete(telecallerId);
+      return next;
+    });
+  };
+
+  const handleToggleFilteredTelecallerSelection = (isSelected) => {
+    setSelectedTelecallerIds((previous) => {
+      const next = new Set(previous);
+      filteredTelecallers.forEach((telecaller) => {
+        const telecallerId = getTelecallerSelectionId(telecaller);
+        if (!telecallerId) return;
+        if (isSelected) next.add(telecallerId);
+        else next.delete(telecallerId);
+      });
+      return next;
+    });
+  };
+
+  const handleBulkStatusUpdate = async () => {
+    if (isBulkUpdating || selectedTelecallerIds.size === 0) return;
+    const selectedIds = Array.from(selectedTelecallerIds);
+    if (selectedIds.length > 24) {
+      toast.error('You can update a maximum of 24 telecallers at a time.');
+      return;
+    }
+
+    setIsBulkUpdating(true);
+    try {
+      const response = await dispatch(bulkUpdateTelecallerStatus({
+        telecallers: telecallers
+          .filter((telecaller) => selectedTelecallerIds.has(getTelecallerSelectionId(telecaller)))
+          .map((telecaller) => {
+            const record = Object.fromEntries(
+              Object.entries(telecaller).filter(([key]) => !/(password|token|secret)/i.test(key))
+            );
+            return {
+              ...record,
+              status: bulkStatus,
+            };
+          }),
+      })).unwrap();
+      const result = response.data || {};
+      const failedIds = new Set(
+        (result.failures || []).map((failure) => String(failure.telecallerId))
+      );
+      const updatedCount = result.updatedCount ?? selectedIds.length - failedIds.size;
+
+      setSelectedTelecallerIds(failedIds);
+      if (updatedCount > 0) {
+        dispatch(fetchTelecallers(submittedSearch ? { search: submittedSearch } : {}));
+        setToastMsg(response.message || `Updated ${updatedCount} telecaller statuses.`);
+        setTimeout(() => setToastMsg(''), 4000);
+      }
+      if (failedIds.size > 0) {
+        toast.error(`${failedIds.size} telecaller status update${failedIds.size === 1 ? '' : 's'} failed. Failed records remain selected.`);
+      }
+    } catch (error) {
+      toast.error(typeof error === 'string' ? error : 'Failed to update selected telecallers.');
+    } finally {
+      setIsBulkUpdating(false);
+    }
+  };
 
   // Pagination calculations
   const totalPages = Math.max(1, Math.ceil(filteredTelecallers.length / itemsPerPage));
@@ -1142,13 +1234,66 @@ function TelecallerManagement({ compact = false }) {
           </div>
         )}
 
+        {selectedTelecallerIds.size > 0 && (
+          <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-orange-200 bg-orange-50/70 px-3 py-2">
+            <div className="text-xs font-semibold text-slate-700">
+              {selectedTelecallerIds.size} telecaller{selectedTelecallerIds.size === 1 ? '' : 's'} selected
+              <span className="ml-1 font-medium text-slate-500">· Selection persists across pages and searches</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label htmlFor="bulk-telecaller-status" className="text-xs font-semibold text-slate-600">
+                Set status:
+              </label>
+              <select
+                id="bulk-telecaller-status"
+                value={bulkStatus}
+                onChange={(e) => setBulkStatus(e.target.value)}
+                disabled={isBulkUpdating}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 disabled:opacity-50"
+              >
+                <option value="Active">Active</option>
+                <option value="Disabled">Disabled</option>
+                <option value="Blocked">Blocked</option>
+              </select>
+              <button
+                type="button"
+                onClick={handleBulkStatusUpdate}
+                disabled={isBulkUpdating || isSaving}
+                className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isBulkUpdating ? 'Updating...' : 'Update status'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedTelecallerIds(new Set())}
+                disabled={isBulkUpdating}
+                className="rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white disabled:opacity-50"
+              >
+                Clear selection
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Table View with required columns: Sr.No, Telecaller Name, Email, Mobile Number, Status, Action */}
         <div
           className="max-h-[calc(100vh-280px)] min-h-[350px] overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200/80 mb-4 scroll-smooth custom-scrollbar"
         >
-          <table className="w-full text-left border-collapse min-w-[720px]">
+          <table className="w-full text-left border-collapse min-w-[760px]">
             <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-md z-10">
               <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                <th className="w-10 py-3 px-4 text-center">
+                  <input
+                    ref={selectAllTelecallersRef}
+                    type="checkbox"
+                    aria-label="Select all filtered telecallers across pages"
+                    title="Select all filtered telecallers across pages"
+                    checked={allFilteredTelecallersSelected}
+                    onChange={(e) => handleToggleFilteredTelecallerSelection(e.target.checked)}
+                    disabled={isBulkUpdating || filteredTelecallers.length === 0}
+                    className="h-4 w-4 cursor-pointer accent-[#f26522] disabled:cursor-not-allowed"
+                  />
+                </th>
                 <th className="py-3 px-4">Sr.No</th>
                 <th className="py-3 px-4">Telecaller Name</th>
                 <th className="py-3 px-4">Email</th>
@@ -1162,7 +1307,20 @@ function TelecallerManagement({ compact = false }) {
                 currentDisplayedTelecallers.map((tc, idx) => {
                   const globalIdx = indexOfFirstItem + idx + 1;
                   return (
-                    <tr key={tc.id || idx} className="hover:bg-slate-50/80 transition-colors">
+                    <tr
+                      key={tc.id || idx}
+                      className={`transition-colors ${selectedTelecallerIds.has(getTelecallerSelectionId(tc)) ? 'bg-orange-50/50' : 'hover:bg-slate-50/80'}`}
+                    >
+                      <td className="py-3 px-4 text-center">
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${tc.name || tc.id}`}
+                          checked={selectedTelecallerIds.has(getTelecallerSelectionId(tc))}
+                          onChange={(e) => handleToggleTelecallerSelection(tc, e.target.checked)}
+                          disabled={isBulkUpdating || !getTelecallerSelectionId(tc)}
+                          className="h-4 w-4 cursor-pointer accent-[#f26522] disabled:cursor-not-allowed"
+                        />
+                      </td>
 
                       {/* Sr.No */}
                       <td className="py-3 px-4">
@@ -1212,6 +1370,7 @@ function TelecallerManagement({ compact = false }) {
                           <button
                             type="button"
                             onClick={() => handleViewTc(tc)}
+                            disabled={isBulkUpdating}
                             title="View Details"
                             className="p-1.5 rounded-lg text-slate-600 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer"
                           >
@@ -1222,6 +1381,7 @@ function TelecallerManagement({ compact = false }) {
                           <button
                             type="button"
                             onClick={() => handleEditTc(tc)}
+                            disabled={isBulkUpdating}
                             title="Edit Settings"
                             className="p-1.5 rounded-lg text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors cursor-pointer"
                           >
@@ -1232,6 +1392,7 @@ function TelecallerManagement({ compact = false }) {
                           <button
                             type="button"
                             onClick={() => handleToggleStatus(tc)}
+                            disabled={isBulkUpdating}
                             title={tc.status === 'Active' ? 'Block Telecaller' : 'Unblock Telecaller'}
                             className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${tc.status === 'Active'
                               ? 'text-amber-600 border-amber-200 hover:bg-amber-50'
@@ -1245,6 +1406,7 @@ function TelecallerManagement({ compact = false }) {
                           <button
                             type="button"
                             onClick={() => handleDeleteTc(tc)}
+                            disabled={isBulkUpdating}
                             title="Delete Telecaller"
                             className="p-1.5 rounded-lg text-rose-600 border border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
                           >
@@ -1257,7 +1419,7 @@ function TelecallerManagement({ compact = false }) {
                 })
               ) : (
                 <tr>
-                  <td colSpan="6" className="py-12 text-center text-xs text-slate-400 font-medium">
+                  <td colSpan="7" className="py-12 text-center text-xs text-slate-400 font-medium">
                     {loading ? (
                       <div className="flex flex-col items-center justify-center gap-2 text-slate-500">
                         <Loader2 size={24} className="animate-spin text-[#f26522]" />
