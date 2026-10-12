@@ -10,6 +10,8 @@ import {
   createVendor,
   activateVendor,
   updateVendor,
+  bulkUpdateVendorStatuses,
+  bulkDeleteVendors,
   deleteVendor,
   bulkImportVendors,
   fetchVendorFormFields,
@@ -61,6 +63,11 @@ function VendorDatabase({ compact = false }) {
   const [selectedCity, setSelectedCity] = useState(initialUrlCity);
   const [toastMsg, setToastMsg] = useState('');
   const [selectedVendorDetail, setSelectedVendorDetail] = useState(null);
+  const [selectedVendorIds, setSelectedVendorIds] = useState(() => new Set());
+  const [bulkStatus, setBulkStatus] = useState('Blocked');
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
+  const selectAllVendorsRef = useRef(null);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(isNaN(initialPage) || initialPage < 1 ? 1 : initialPage);
@@ -230,6 +237,7 @@ function VendorDatabase({ compact = false }) {
     const mobileNum = v.contactNo || v.mobile || v.phone || v.phoneNumber || v.mobileNumber || '-';
 
     return {
+      ...v,
       _id: v._id,
       srNo: v.srNo || String(idx + 1).padStart(2, '0'),
       vendorCode: v.vendorCode || v.vendorId || `VND${Math.floor(1000 + Math.random() * 9000)}`,
@@ -273,6 +281,128 @@ function VendorDatabase({ compact = false }) {
 
     return matchesSearch && matchesState && matchesCity;
   });
+
+  const getVendorSelectionId = (vendor) => String(vendor._id || '');
+  const selectedFilteredVendorCount = filteredVendors.reduce(
+    (count, vendor) => count + (selectedVendorIds.has(getVendorSelectionId(vendor)) ? 1 : 0),
+    0
+  );
+  const allFilteredVendorsSelected =
+    filteredVendors.length > 0 && selectedFilteredVendorCount === filteredVendors.length;
+
+  useEffect(() => {
+    if (selectAllVendorsRef.current) {
+      selectAllVendorsRef.current.indeterminate =
+        selectedFilteredVendorCount > 0 && selectedFilteredVendorCount < filteredVendors.length;
+    }
+  }, [selectedFilteredVendorCount, filteredVendors.length]);
+
+  const handleToggleVendorSelection = (vendor, isSelected) => {
+    const vendorId = getVendorSelectionId(vendor);
+    if (!vendorId) return;
+
+    setSelectedVendorIds((previous) => {
+      const next = new Set(previous);
+      if (isSelected) next.add(vendorId);
+      else next.delete(vendorId);
+      return next;
+    });
+  };
+
+  const handleToggleFilteredVendorSelection = (isSelected) => {
+    setSelectedVendorIds((previous) => {
+      const next = new Set(previous);
+      filteredVendors.forEach((vendor) => {
+        const vendorId = getVendorSelectionId(vendor);
+        if (!vendorId) return;
+        if (isSelected) next.add(vendorId);
+        else next.delete(vendorId);
+      });
+      return next;
+    });
+  };
+
+  const handleBulkStatusUpdate = async () => {
+    if (!hasAccessPermission || isBulkProcessing || selectedVendorIds.size === 0) return;
+    const selectedVendors = vendors.filter((vendor) =>
+      selectedVendorIds.has(getVendorSelectionId(vendor))
+    );
+    if (selectedVendors.length > 100) {
+      toast.error('You can update a maximum of 100 vendors at a time.');
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    try {
+      const response = await dispatch(bulkUpdateVendorStatuses(
+        selectedVendors.map((vendor) => ({
+          ...Object.fromEntries(
+            Object.entries(vendor).filter(([key]) => !/(password|token|secret)/i.test(key))
+          ),
+          _id: vendor._id,
+          vendorId: vendor.vendorId || vendor.vendorCode || vendor.id,
+          vendorCode: vendor.vendorCode || vendor.vendorId || vendor.id,
+          vendorName: vendor.vendorName || vendor.companyName || vendor.name,
+          companyName: vendor.companyName || vendor.name,
+          contactNo: vendor.contactNo || vendor.mobile || '',
+          status: bulkStatus,
+        }))
+      )).unwrap();
+      const result = response.data || {};
+      const failedIds = new Set(
+        (result.failures || []).map((failure) => String(failure.vendorId))
+      );
+      const updatedCount = result.updatedCount ?? selectedVendors.length - failedIds.size;
+
+      setSelectedVendorIds(failedIds);
+      if (updatedCount > 0) {
+        dispatch(fetchVendors());
+        setToastMsg(response.message || `Updated ${updatedCount} vendor status${updatedCount === 1 ? '' : 'es'}.`);
+        setTimeout(() => setToastMsg(''), 4000);
+      }
+      if (failedIds.size > 0) {
+        toast.error(`${failedIds.size} vendor status update${failedIds.size === 1 ? '' : 's'} failed. Failed vendors remain selected.`);
+      }
+    } catch (error) {
+      toast.error(typeof error === 'string' ? error : 'Failed to update selected vendor statuses.');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!hasAccessPermission || isBulkProcessing || selectedVendorIds.size === 0) return;
+    const vendorIds = Array.from(selectedVendorIds);
+    if (vendorIds.length > 100) {
+      toast.error('You can delete a maximum of 100 vendors at a time.');
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    try {
+      const response = await dispatch(bulkDeleteVendors(vendorIds)).unwrap();
+      const result = response.data || {};
+      const failedIds = new Set(
+        (result.failures || []).map((failure) => String(failure.vendorId))
+      );
+      const deletedCount = result.deletedCount ?? vendorIds.length - failedIds.size;
+
+      setSelectedVendorIds(failedIds);
+      setIsBulkDeleteConfirmOpen(false);
+      if (deletedCount > 0) {
+        dispatch(fetchVendors());
+        setToastMsg(response.message || `Deleted ${deletedCount} vendor${deletedCount === 1 ? '' : 's'}.`);
+        setTimeout(() => setToastMsg(''), 4000);
+      }
+      if (failedIds.size > 0) {
+        toast.error(`${failedIds.size} vendor deletion${failedIds.size === 1 ? '' : 's'} failed. Failed vendors remain selected.`);
+      }
+    } catch (error) {
+      toast.error(typeof error === 'string' ? error : 'Failed to delete selected vendors.');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
 
   // Calculate pagination boundaries
   const totalPages = Math.max(1, Math.ceil(filteredVendors.length / itemsPerPage));
@@ -1866,14 +1996,78 @@ function VendorDatabase({ compact = false }) {
           </div>
         )}
 
+        {hasAccessPermission && selectedVendorIds.size > 0 && (
+          <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-orange-200 bg-orange-50/70 px-3 py-2">
+            <div className="text-xs font-semibold text-slate-700">
+              {selectedVendorIds.size} vendor{selectedVendorIds.size === 1 ? '' : 's'} selected
+              <span className="ml-1 font-medium text-slate-500">· Selection persists across pages and filters</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label htmlFor="bulk-vendor-status" className="text-xs font-semibold text-slate-600">
+                Set status:
+              </label>
+              <select
+                id="bulk-vendor-status"
+                value={bulkStatus}
+                onChange={(e) => setBulkStatus(e.target.value)}
+                disabled={isBulkProcessing}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 disabled:opacity-50"
+              >
+                <option value="Active">Active</option>
+                <option value="Pending">Pending</option>
+                <option value="Blocked">Blocked</option>
+              </select>
+              <button
+                type="button"
+                onClick={handleBulkStatusUpdate}
+                disabled={isBulkProcessing || isSaving}
+                className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isBulkProcessing ? 'Processing...' : 'Update status'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsBulkDeleteConfirmOpen(true)}
+                disabled={isBulkProcessing || isSaving}
+                className="flex items-center gap-1 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 size={13} />
+                Delete selected
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedVendorIds(new Set())}
+                disabled={isBulkProcessing}
+                className="rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white disabled:opacity-50"
+              >
+                Clear selection
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* TABLE VIEW */}
         <div
           className={`${itemsPerPage === 5 ? 'h-[300px]' : 'h-[520px]'
             } overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar transition-all duration-200`}
         >
-          <table className="w-full min-w-[1250px] text-left border-collapse whitespace-nowrap">
+          <table className="w-full min-w-[1290px] text-left border-collapse whitespace-nowrap">
             <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs z-10">
               <tr className="border-b border-slate-100 text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+                {hasAccessPermission && (
+                  <th className="w-10 py-2.5 px-3 text-center">
+                    <input
+                      ref={selectAllVendorsRef}
+                      type="checkbox"
+                      aria-label="Select all filtered vendors across pages"
+                      title="Select all filtered vendors across pages"
+                      checked={allFilteredVendorsSelected}
+                      onChange={(e) => handleToggleFilteredVendorSelection(e.target.checked)}
+                      disabled={isBulkProcessing || filteredVendors.length === 0}
+                      className="h-4 w-4 cursor-pointer accent-[#f26522] disabled:cursor-not-allowed"
+                    />
+                  </th>
+                )}
                 <th className="py-2.5 px-3">SR. NO.</th>
                 <th className="py-2.5 px-3">VENDOR CODE</th>
                 <th className="py-2.5 px-3">COMPANY NAME</th>
@@ -1893,7 +2087,22 @@ function VendorDatabase({ compact = false }) {
                 currentDisplayedVendors.map((ven, idx) => {
                   const globalIdx = indexOfFirstItem + idx + 1;
                   return (
-                    <tr key={ven.id || ven._id || idx} className="hover:bg-slate-50/60 transition-colors">
+                    <tr
+                      key={ven.id || ven._id || idx}
+                      className={`transition-colors ${selectedVendorIds.has(getVendorSelectionId(ven)) ? 'bg-orange-50/50' : 'hover:bg-slate-50/60'}`}
+                    >
+                      {hasAccessPermission && (
+                        <td className="py-3 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${ven.companyName || ven.name}`}
+                            checked={selectedVendorIds.has(getVendorSelectionId(ven))}
+                            onChange={(e) => handleToggleVendorSelection(ven, e.target.checked)}
+                            disabled={isBulkProcessing || !getVendorSelectionId(ven)}
+                            className="h-4 w-4 cursor-pointer accent-[#f26522] disabled:cursor-not-allowed"
+                          />
+                        </td>
+                      )}
                       <td className="py-3 px-3 font-bold text-slate-800">{String(globalIdx).padStart(2, '0')}</td>
                       <td className="py-3 px-3 font-bold text-[#f26522] font-mono text-[11px]">{ven.vendorCode || ven.id}</td>
 
@@ -1902,6 +2111,7 @@ function VendorDatabase({ compact = false }) {
                         <button
                           type="button"
                           onClick={() => handleViewVendor(ven)}
+                          disabled={isBulkProcessing}
                           className="text-[#f26522] hover:text-[#e05411] font-black text-xs hover:underline flex items-center gap-1.5 cursor-pointer bg-orange-50/70 px-2 py-1 rounded-lg border border-orange-200/60 shadow-2xs"
                         >
                           <Building2 size={13} className="shrink-0 text-[#f26522]" />
@@ -1946,6 +2156,7 @@ function VendorDatabase({ compact = false }) {
                           <button
                             type="button"
                             onClick={() => handleEditVendor(ven)}
+                            disabled={isBulkProcessing}
                             title="Edit Vendor"
                             className="p-1.5 rounded-lg text-blue-600 border border-blue-200 hover:bg-blue-50 transition-colors cursor-pointer"
                           >
@@ -1956,6 +2167,7 @@ function VendorDatabase({ compact = false }) {
                           <button
                             type="button"
                             onClick={() => handleChangePasswordVendor(ven)}
+                            disabled={isBulkProcessing}
                             title="Change Password"
                             className="p-1.5 rounded-lg text-amber-600 border border-amber-200 hover:bg-amber-50 transition-colors cursor-pointer"
                           >
@@ -1966,6 +2178,7 @@ function VendorDatabase({ compact = false }) {
                           <button
                             type="button"
                             onClick={() => handlePromptBlock(ven)}
+                            disabled={isBulkProcessing}
                             title={ven.status === 'Blocked' ? 'Unblock Vendor' : 'Block Vendor'}
                             className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${ven.status === 'Blocked'
                               ? 'text-emerald-600 border-emerald-200 hover:bg-emerald-50'
@@ -1979,6 +2192,7 @@ function VendorDatabase({ compact = false }) {
                           <button
                             type="button"
                             onClick={() => handlePromptDelete(ven)}
+                            disabled={isBulkProcessing}
                             title="Delete Vendor"
                             className="p-1.5 rounded-lg text-rose-600 border border-rose-200 hover:bg-rose-50 transition-colors cursor-pointer"
                           >
@@ -1991,7 +2205,7 @@ function VendorDatabase({ compact = false }) {
                 })
               ) : (
                 <tr>
-                  <td colSpan="12" className="py-6 text-center text-xs text-slate-400">
+                  <td colSpan={hasAccessPermission ? 13 : 12} className="py-6 text-center text-xs text-slate-400">
                     No vendor records found matching search criteria.
                   </td>
                 </tr>
@@ -2206,6 +2420,42 @@ function VendorDatabase({ compact = false }) {
         </div>
       )}
       {/* Confirmation Popup Modal for Block / Delete in Table View */}
+      {isBulkDeleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="space-y-4 p-6 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-rose-100 bg-rose-50 text-rose-600">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Delete selected vendors?</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  This will permanently remove {selectedVendorIds.size} selected vendor{selectedVendorIds.size === 1 ? '' : 's'} from the active directory. This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsBulkDeleteConfirmOpen(false)}
+                  disabled={isBulkProcessing}
+                  className="w-full rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  disabled={isBulkProcessing || selectedVendorIds.size === 0}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-colors hover:bg-rose-700 disabled:opacity-50"
+                >
+                  {isBulkProcessing ? 'Deleting...' : <><Trash2 size={14} />Delete selected</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmModal.isOpen && confirmModal.vendor && (
         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-2xl text-center space-y-4 animate-in fade-in zoom-in-95 duration-150">
