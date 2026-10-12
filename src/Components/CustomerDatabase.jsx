@@ -10,6 +10,7 @@ import {
   fetchCustomers,
   createCustomer,
   updateCustomer,
+  bulkUpdateCustomers,
   deleteCustomer,
   bulkImportCustomers
 } from '../redux/slices/customerSlice';
@@ -42,6 +43,100 @@ import {
   Phone,
   Tag
 } from 'lucide-react';
+
+const runBulkActions = async (items, action, batchSize = 10) => {
+  const results = [];
+  for (let index = 0; index < items.length; index += batchSize) {
+    const batchResults = await Promise.allSettled(
+      items.slice(index, index + batchSize).map(action)
+    );
+    results.push(...batchResults);
+  }
+  return results;
+};
+
+const bulkCustomerFields = [
+  'vendorCode',
+  'vendorId',
+  'srNo',
+  'registrationDate',
+  'vendorName',
+  'name',
+  'fullName',
+  'companyName',
+  'category',
+  'subCategory',
+  'country',
+  'state',
+  'city',
+  'locality',
+  'email',
+  'gstNumber',
+  'address',
+  'image',
+  'registeredPhoneNo',
+  'mobileNumber',
+  'whatsappNo',
+  'whatsapp',
+  'alternateContactNo',
+  'website',
+  'vendorListingType',
+  'isPaidVendor',
+  'packagePaidAmount',
+  'lastPaymentDate',
+  'paymentTerm',
+  'lastPaymentInvoiceNo',
+  'nextPaymentDueDate',
+  'activePackageList',
+  'createdByTelecaller',
+  'primaryBusinessCategory',
+  'serviceSpecialization',
+  'keywordsTags',
+  'assignedTelecaller',
+  'status',
+];
+
+const buildBulkCustomerPayload = (customer, status) => {
+  const payload = {
+    _id: customer._id || customer.id,
+    customerId: customer.customerCode || customer.customerId || customer.id,
+  };
+
+  bulkCustomerFields.forEach((field) => {
+    const value = customer[field];
+    if (value !== undefined && !(typeof value === 'string' && ['-', '—'].includes(value.trim()))) {
+      payload[field] = value;
+    }
+  });
+  if (!payload.vendorCode && (customer.code || customer.customerCode)) {
+    payload.vendorCode = customer.code || customer.customerCode;
+  }
+
+  const customerName = customer.vendorName || (
+    customer.name && customer.name !== customer.number && customer.name !== '-' && customer.name !== '—'
+      ? customer.name
+      : undefined
+  );
+  if (customerName) {
+    payload.vendorName = customerName;
+    payload.name = customerName;
+  } else {
+    delete payload.name;
+  }
+
+  const phoneNumber = [
+    customer.registeredPhoneNo,
+    customer.mobileNumber,
+    customer.mobile,
+    customer.number,
+  ].find((value) => value && !['-', '—'].includes(String(value).trim()));
+  if (phoneNumber) {
+    payload.registeredPhoneNo = phoneNumber;
+    payload.mobileNumber = customer.mobileNumber || phoneNumber;
+  }
+  payload.status = status;
+  return payload;
+};
 
 function CustomerDatabase({ compact = false }) {
   const dispatch = useDispatch();
@@ -97,6 +192,11 @@ function CustomerDatabase({ compact = false }) {
   const [selectedCustomerDetail, setSelectedCustomerDetail] = useState(null);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, type: null, customer: null });
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState('Active');
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState(() => new Set());
+  const selectAllCheckboxRef = useRef(null);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -323,6 +423,149 @@ function CustomerDatabase({ compact = false }) {
     const matchesStatus = statusFilter === 'All' || cust.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const getCustomerSelectionId = (cust) => String(cust._id || cust.id || '');
+  const selectedFilteredCount = filteredCustomers.reduce(
+    (count, cust) => count + (selectedCustomerIds.has(getCustomerSelectionId(cust)) ? 1 : 0),
+    0
+  );
+  const allFilteredCustomersSelected =
+    filteredCustomers.length > 0 && selectedFilteredCount === filteredCustomers.length;
+
+  useEffect(() => {
+    if (selectAllCheckboxRef.current) {
+      selectAllCheckboxRef.current.indeterminate =
+        selectedFilteredCount > 0 && selectedFilteredCount < filteredCustomers.length;
+    }
+  }, [selectedFilteredCount, filteredCustomers.length]);
+
+  const handleToggleCustomerSelection = (customer, isSelected) => {
+    const customerId = getCustomerSelectionId(customer);
+    if (!customerId) return;
+
+    setSelectedCustomerIds((previous) => {
+      const next = new Set(previous);
+      if (isSelected) {
+        next.add(customerId);
+      } else {
+        next.delete(customerId);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleFilteredSelection = (isSelected) => {
+    setSelectedCustomerIds((previous) => {
+      const next = new Set(previous);
+      filteredCustomers.forEach((customer) => {
+        const customerId = getCustomerSelectionId(customer);
+        if (!customerId) return;
+        if (isSelected) {
+          next.add(customerId);
+        } else {
+          next.delete(customerId);
+        }
+      });
+      return next;
+    });
+  };
+
+  const getSelectedCustomers = () =>
+    customers.filter((customer) => selectedCustomerIds.has(getCustomerSelectionId(customer)));
+
+  const handleBulkUpdateStatus = async () => {
+    if (!hasAccessPermission || isBulkProcessing) return;
+
+    const selectedCustomers = getSelectedCustomers();
+    if (selectedCustomers.length === 0) return;
+    if (selectedCustomers.every((customer) => customer.status === bulkStatus)) {
+      setSelectedCustomerIds(new Set());
+      toast.info('All selected customers already have this status.');
+      return;
+    }
+    if (selectedCustomers.length > 24) {
+      toast.error('You can update a maximum of 24 customer records at a time.');
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    try {
+      const customersPayload = selectedCustomers.map((customer) =>
+        buildBulkCustomerPayload(customer, bulkStatus)
+      );
+      const response = await dispatch(bulkUpdateCustomers(customersPayload)).unwrap();
+      const result = response.data || {};
+      const failedIds = new Set((result.failures || []).map((failure) => String(failure.customerId)));
+      const successfulCount = result.modifiedCount ?? customersPayload.length - failedIds.size;
+      const failureCount = result.failures?.length || 0;
+
+      setSelectedCustomerIds(failedIds);
+      if (successfulCount > 0) {
+        dispatch(fetchCustomers());
+        setToastMsg(`Updated ${successfulCount} customer record${successfulCount === 1 ? '' : 's'}.`);
+        setTimeout(() => setToastMsg(''), 4000);
+      }
+      if (failureCount > 0) {
+        toast.error(`${failureCount} customer record${failureCount === 1 ? '' : 's'} failed to update. Failed records remain selected.`);
+      }
+    } catch (error) {
+      toast.error(typeof error === 'string' ? error : 'Failed to update selected customer records.');
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (!hasAccessPermission || isBulkProcessing) return;
+
+    const selectedCustomers = getSelectedCustomers();
+    if (selectedCustomers.length === 0) {
+      setSelectedCustomerIds(new Set());
+      setBulkDeleteConfirmOpen(false);
+      return;
+    }
+
+    setIsBulkProcessing(true);
+    try {
+      const results = await runBulkActions(selectedCustomers, (customer) =>
+        dispatch(deleteCustomer({
+          customerId: customer.customerId || customer.customerCode || customer._id || customer.id,
+          primaryId: customer.customerId || customer.customerCode || customer._id || customer.id,
+          secondaryId: customer._id || customer.id,
+          skipRefresh: true,
+          suppressToast: true,
+        })).unwrap()
+      );
+      const successfulIds = new Set();
+      results.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          successfulIds.add(getCustomerSelectionId(selectedCustomers[index]));
+        }
+      });
+      const successCount = successfulIds.size;
+      const failureCount = results.length - successCount;
+      const failedIds = new Set(
+        results.flatMap((result, index) =>
+          result.status === 'rejected' ? [getCustomerSelectionId(selectedCustomers[index])] : []
+        )
+      );
+
+      setSelectedCustomerIds(failedIds);
+      setBulkDeleteConfirmOpen(false);
+      if (successCount > 0) {
+        dispatch(fetchCustomers());
+        setToastMsg(`Deleted ${successCount} customer${successCount === 1 ? '' : 's'}.`);
+        setTimeout(() => setToastMsg(''), 4000);
+      }
+      if (failureCount > 0) {
+        const reason = results.find((result) => result.status === 'rejected')?.reason;
+        const detail = typeof reason === 'string' ? reason : reason?.message;
+        toast.error(`Delete failed for ${failureCount} customer${failureCount === 1 ? '' : 's'}.${detail ? ` ${detail}` : ''} Failed records remain selected.`);
+      }
+    } finally {
+      setIsBulkProcessing(false);
+    }
+  };
 
   // Calculate pagination boundaries
   const totalPages = Math.max(1, Math.ceil(filteredCustomers.length / itemsPerPage));
@@ -1568,6 +1811,55 @@ function CustomerDatabase({ compact = false }) {
           </div>
         </div>
 
+        {hasAccessPermission && selectedCustomerIds.size > 0 && (
+          <div className="mb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl border border-orange-200 bg-orange-50/70 px-3 py-2">
+            <div className="text-xs font-semibold text-slate-700">
+              {selectedCustomerIds.size} customer{selectedCustomerIds.size === 1 ? '' : 's'} selected
+              <span className="ml-1 font-medium text-slate-500">· Selection persists across pages and filters</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label htmlFor="bulk-customer-status" className="text-xs font-semibold text-slate-600">Set status:</label>
+              <select
+                id="bulk-customer-status"
+                value={bulkStatus}
+                onChange={(e) => setBulkStatus(e.target.value)}
+                disabled={isBulkProcessing}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 disabled:opacity-50"
+              >
+                <option value="Active">Active</option>
+                <option value="Pending">Pending</option>
+                <option value="Rejected">Rejected</option>
+                <option value="Blocked">Blocked</option>
+              </select>
+              <button
+                type="button"
+                onClick={handleBulkUpdateStatus}
+                disabled={isBulkProcessing || isSaving}
+                className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isBulkProcessing ? 'Processing...' : 'Update status'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setBulkDeleteConfirmOpen(true)}
+                disabled={isBulkProcessing || isSaving}
+                className="flex items-center gap-1 rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 size={13} />
+                Delete selected
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCustomerIds(new Set())}
+                disabled={isBulkProcessing}
+                className="rounded-lg px-2 py-1.5 text-xs font-semibold text-slate-600 hover:bg-white disabled:opacity-50"
+              >
+                Clear selection
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Toast Notification */}
         {toastMsg && (
           <div className="mb-3 px-3 py-2 bg-emerald-50 text-emerald-700 text-xs rounded-xl border border-emerald-200 flex items-center gap-1.5 animate-in fade-in">
@@ -1583,9 +1875,23 @@ function CustomerDatabase({ compact = false }) {
           ref={manualScrollRef}
           className="max-h-[calc(100vh-280px)] min-h-[350px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar"
         >
-          <table className="w-full min-w-[750px] text-left border-collapse">
+          <table className="w-full min-w-[790px] text-left border-collapse">
             <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs z-10">
               <tr className="border-b border-slate-100 text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+                {hasAccessPermission && (
+                  <th className="w-10 py-2.5 px-3 text-center">
+                    <input
+                      ref={selectAllCheckboxRef}
+                      type="checkbox"
+                      aria-label="Select all filtered customers across pages"
+                      title="Select all filtered customers across pages"
+                      checked={allFilteredCustomersSelected}
+                      onChange={(e) => handleToggleFilteredSelection(e.target.checked)}
+                      disabled={isBulkProcessing || filteredCustomers.length === 0}
+                      className="h-4 w-4 cursor-pointer accent-[#f26522] disabled:cursor-not-allowed"
+                    />
+                  </th>
+                )}
                 <th className="py-2.5 px-3">SR. NO.</th>
                 <th className="py-2.5 px-3">MOBILE NUMBER</th>
                 <th className="py-2.5 px-3">COMPANY NAME</th>
@@ -1601,7 +1907,19 @@ function CustomerDatabase({ compact = false }) {
                 currentDisplayedCustomers.map((cust, idx) => {
                   const globalIdx = indexOfFirstItem + idx + 1;
                   return (
-                    <tr key={cust.id || idx} className="hover:bg-slate-50/60 transition-colors">
+                    <tr key={cust.id || idx} className={`transition-colors ${selectedCustomerIds.has(getCustomerSelectionId(cust)) ? 'bg-orange-50/50' : 'hover:bg-slate-50/60'}`}>
+                      {hasAccessPermission && (
+                        <td className="py-3 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            aria-label={`Select ${cust.companyName || cust.name}`}
+                            checked={selectedCustomerIds.has(getCustomerSelectionId(cust))}
+                            onChange={(e) => handleToggleCustomerSelection(cust, e.target.checked)}
+                            disabled={isBulkProcessing}
+                            className="h-4 w-4 cursor-pointer accent-[#f26522] disabled:cursor-not-allowed"
+                          />
+                        </td>
+                      )}
                       <td className="py-3 px-3 font-bold text-slate-800">{String(globalIdx).padStart(2, '0')}</td>
                       <td className="py-3 px-3 font-semibold text-slate-900">{cust.number}</td>
                       <td className="py-3 px-3 font-bold text-[#f26522]">{cust.companyName || '-'}</td>
@@ -1612,7 +1930,7 @@ function CustomerDatabase({ compact = false }) {
                         <button
                           type="button"
                           onClick={() => handleToggleStatus(cust)}
-                          disabled={isSaving}
+                          disabled={isSaving || isBulkProcessing}
                           className={`font-semibold text-xs transition-all hover:scale-105 active:scale-95 cursor-pointer text-left disabled:opacity-50 disabled:cursor-not-allowed ${cust.status === 'Active'
                               ? 'text-emerald-600'
                               : cust.status === 'Blocked' || cust.status === 'Rejected'
@@ -1630,6 +1948,7 @@ function CustomerDatabase({ compact = false }) {
                           <button
                             type="button"
                             onClick={() => handleViewCustomer(cust)}
+                            disabled={isBulkProcessing}
                             className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                             title="View Profile"
                           >
@@ -1639,6 +1958,7 @@ function CustomerDatabase({ compact = false }) {
                           <button
                             type="button"
                             onClick={() => handleEditCustomer(cust)}
+                            disabled={isBulkProcessing}
                             className="p-1.5 text-slate-400 hover:text-[#f26522] hover:bg-orange-50 rounded-lg transition-colors cursor-pointer"
                             title="Edit Customer"
                           >
@@ -1648,6 +1968,7 @@ function CustomerDatabase({ compact = false }) {
                           <button
                             type="button"
                             onClick={() => handleOpenConfirmModal('block', cust)}
+                            disabled={isBulkProcessing}
                             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${cust.status === 'Blocked'
                               ? 'text-emerald-600 hover:bg-emerald-50'
                               : 'text-amber-500 hover:text-amber-700 hover:bg-amber-50'
@@ -1660,6 +1981,7 @@ function CustomerDatabase({ compact = false }) {
                           <button
                             type="button"
                             onClick={() => handleOpenConfirmModal('delete', cust)}
+                            disabled={isBulkProcessing}
                             className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                             title="Delete Customer"
                           >
@@ -1672,7 +1994,7 @@ function CustomerDatabase({ compact = false }) {
                 })
               ) : (
                 <tr>
-                  <td colSpan="8" className="py-6 text-center text-xs text-slate-400">
+                  <td colSpan={hasAccessPermission ? 9 : 8} className="py-6 text-center text-xs text-slate-400">
                     No customer records found matching search criteria.
                   </td>
                 </tr>
@@ -1816,6 +2138,41 @@ function CustomerDatabase({ compact = false }) {
         </div>
       )}
 
+      {bulkDeleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="space-y-4 p-6 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl border border-rose-100 bg-rose-50 text-rose-600">
+                <Trash2 size={24} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Delete selected customer records?</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  This will permanently delete {selectedCustomerIds.size} selected customer{selectedCustomerIds.size === 1 ? '' : 's'}. This action cannot be undone.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setBulkDeleteConfirmOpen(false)}
+                  disabled={isBulkProcessing}
+                  className="w-full rounded-xl bg-slate-100 px-4 py-2.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleBulkDelete}
+                  disabled={isBulkProcessing || isSaving || selectedCustomerIds.size === 0}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-colors hover:bg-rose-700 disabled:opacity-50"
+                >
+                  {isBulkProcessing ? 'Deleting...' : <><Trash2 size={14} />Delete selected</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
 
       {/* STEP 1: IMPORT CUSTOMERS MODAL */}

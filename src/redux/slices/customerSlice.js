@@ -109,7 +109,7 @@ export const createCustomer = createAsyncThunk(
 
 export const updateCustomer = createAsyncThunk(
   'customer/updateCustomer',
-  async ({ customerId, updateData }, { dispatch, rejectWithValue }) => {
+  async ({ customerId, updateData, skipRefresh = false, suppressToast = false }, { dispatch, rejectWithValue }) => {
     try {
       const mobileVal =
         updateData.mobile ||
@@ -158,12 +158,31 @@ export const updateCustomer = createAsyncThunk(
       };
 
       const response = await api.patch(`/superadmin/customers/${customerId}`, updatePayload);
-      toast.success(response.data.message || 'Customer updated successfully');
-      dispatch(fetchCustomers());
+      if (!suppressToast) {
+        toast.success(response.data.message || 'Customer updated successfully');
+      }
+      if (!skipRefresh) {
+        dispatch(fetchCustomers());
+      }
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Failed to update customer.';
-      toast.error(message);
+      if (!suppressToast) {
+        toast.error(message);
+      }
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const bulkUpdateCustomers = createAsyncThunk(
+  'customer/bulkUpdateCustomers',
+  async (customers, { rejectWithValue }) => {
+    try {
+      const response = await api.patch('/superadmin/customers/bulk', { customers });
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Failed to update selected customers.';
       return rejectWithValue(message);
     }
   }
@@ -172,6 +191,7 @@ export const updateCustomer = createAsyncThunk(
 export const deleteCustomer = createAsyncThunk(
   'customer/deleteCustomer',
   async (customerIdParam, { dispatch, rejectWithValue }) => {
+    const options = typeof customerIdParam === 'object' ? customerIdParam : {};
     const custId = typeof customerIdParam === 'object'
       ? (customerIdParam.customerId || customerIdParam.customerCode || (typeof customerIdParam.primaryId === 'string' && customerIdParam.primaryId.startsWith('CUST') ? customerIdParam.primaryId : null))
       : customerIdParam;
@@ -194,8 +214,12 @@ export const deleteCustomer = createAsyncThunk(
       try {
         const response = await makeAttempt();
         if (response.status >= 200 && response.status < 300) {
-          toast.success(response.data?.message || 'Customer deleted successfully');
-          dispatch(fetchCustomers());
+          if (!options.suppressToast) {
+            toast.success(response.data?.message || 'Customer deleted successfully');
+          }
+          if (!options.skipRefresh) {
+            dispatch(fetchCustomers());
+          }
           return response.data;
         }
       } catch (err) {
@@ -204,7 +228,9 @@ export const deleteCustomer = createAsyncThunk(
     }
 
     const message = lastError?.response?.data?.message || 'Failed to delete customer.';
-    toast.error(message);
+    if (!options.suppressToast) {
+      toast.error(message);
+    }
     return rejectWithValue(message);
   }
 );
