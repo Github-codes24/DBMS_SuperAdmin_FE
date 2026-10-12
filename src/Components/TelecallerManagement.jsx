@@ -63,6 +63,8 @@ function TelecallerManagement({ compact = false }) {
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [tcToToggle, setTcToToggle] = useState(null);
   const [tcToDelete, setTcToDelete] = useState(null);
   const [viewMode, setViewMode] = useState('table'); // 'table' | 'add-telecaller'
   const [selectedTelecallerIds, setSelectedTelecallerIds] = useState(() => new Set());
@@ -330,15 +332,36 @@ function TelecallerManagement({ compact = false }) {
     });
   };
 
-  const handleToggleStatus = (tc) => {
-    const newStatus = tc.status === 'Active' ? 'Inactive' : 'Active';
-    dispatch(updateTelecaller({
-      userId: tc.id,
-      updateData: { status: newStatus }
-    })).unwrap().catch(() => { }).finally(() => {
-      toast.success(`Status for "${tc.name}" set to ${newStatus}`);
+  
+const handleToggleStatus = (tc) => {
+  setTcToToggle(tc);
+  setIsStatusModalOpen(true);
+};
+
+
+const handleConfirmStatusChange = () => {
+  if (!tcToToggle) return;
+
+  const newStatus = tcToToggle.status === 'Active' ? 'Inactive' : 'Active';
+  // console.log('Sending status:', newStatus);
+// console.log('Telecaller ID:', tcToToggle.id);
+
+  dispatch(updateTelecaller({
+    userId: tcToToggle.id,
+    updateData: { status: newStatus }
+  }))
+    .unwrap()
+    .then(() => {
+      toast.success(`Status for "${tcToToggle.name}" set to ${newStatus}`);
+    })
+    .catch(() => {
+      toast.error('Failed to update status');
+    })
+    .finally(() => {
+      setIsStatusModalOpen(false);
+      setTcToToggle(null);
     });
-  };
+};
 
   const handleDeleteTc = (tc) => {
     if (!tc) return;
@@ -1841,6 +1864,69 @@ function TelecallerManagement({ compact = false }) {
           </div>
         </div>
       )}
+
+
+
+
+{/* CONFIRMATION BLOCK / UNBLOCK MODAL */}
+{isStatusModalOpen && tcToToggle && (
+  <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden">
+      <div className="p-6 text-center space-y-4">
+         <div className={`w-12 h-12 rounded-2xl mx-auto flex items-center justify-center ${tcToToggle.status === 'Active' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100' }`}>
+          <Ban size={24} />
+         </div>
+      <h3 className="text-base font-bold text-slate-900 mb-1 text-center">
+        {tcToToggle.status === 'Active'
+          ? 'Block Telecaller?'
+          : 'Unblock Telecaller?'}
+      </h3>
+
+      <p className="text-xs text-slate-500 mb-4 leading-relaxed text-center">
+        Are you sure you want to{' '}
+        {tcToToggle.status === 'Active' ? 'block' : 'unblock'}{' '}
+        <strong className="text-slate-800">
+          {tcToToggle.name || tcToToggle.fullName}
+        </strong>?
+      </p>
+
+        <div className="flex items-center gap-2 pt-2">
+
+        <button
+          type="button"
+          onClick={() => {
+            setIsStatusModalOpen(false);
+            setTcToToggle(null);
+          }}
+          className="w-full py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+        >
+          Cancel
+        </button>
+
+        <button
+          type="button"
+          onClick={handleConfirmStatusChange}
+          className={`w-full py-2.5 px-4 text-xs font-bold text-white rounded-xl transition-colors cursor-pointer shadow-xs flex items-center justify-center gap-1.5 ${
+  tcToToggle.status === 'Active'
+    ? 'bg-amber-600 hover:bg-amber-700'
+    : 'bg-emerald-600 hover:bg-emerald-700'
+}`}
+        >
+          {tcToToggle.status === 'Active' ? (
+  <>
+    <Ban size={14} />
+    <span>Yes, Block</span>
+  </>
+) : (
+  <span>Yes, Unblock</span>
+)}
+        </button>
+      </div>
+      </div>
+    </div>
+  </div>
+)}
+
 
       {/* CONFIRMATION DELETE MODAL */}
       {isDeleteModalOpen && tcToDelete && (
