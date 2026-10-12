@@ -196,11 +196,14 @@ export default function App() {
         const mappedVendor = {
           id: createdVendor._id,
           vendorCode: createdVendor.vendorId,
-          company: createdVendor.storeName || '',
+          // company: createdVendor.storeName || '',
+          company: createdVendor.companyName || createdVendor.storeName || '',
           vendorName: createdVendor.fullName || '',
-          phone: createdVendor.phone || '',
+          // phone: createdVendor.phone || '',
+          phone: createdVendor.mobileNumber || createdVendor.phone || '',
           alternatePhone: createdVendor.alternatePhone || '',
-          whatsappNo: createdVendor.whatsapp || createdVendor.phone || '',
+          // whatsappNo: createdVendor.whatsapp || createdVendor.phone || '',
+          whatsappNo: createdVendor.whatsapp || createdVendor.mobileNumber || createdVendor.phone || '',
           email: createdVendor.email || '',
           state: createdVendor.state || 'Uttar Pradesh',
           city: createdVendor.city || 'Noida',
@@ -243,7 +246,9 @@ export default function App() {
     setModalState('none');
     if (shouldFollowUp) {
       alert(`Vendor details updated! Added to Telecaller Follow-up List for ${updatedVendor.vendorName}.`);
-    }
+  //      setSuccessMessage( `Vendor details updated! Added to Telecaller Follow-up List for ${updatedVendor.vendorName}.` );
+  // setModalState('packageSuccess');
+}
   };
 
   // Open Create Payment Order Modal
