@@ -787,7 +787,14 @@ function CustomerDatabase({ compact = false }) {
         : new Blob([response.data], { type: 'application/pdf' });
       const signature = await blob.slice(0, 5).text();
       if (signature !== '%PDF-') {
-        throw new Error('The export endpoint did not return a valid PDF document.');
+        const contentType = blob.type || response.headers?.['content-type'] || 'unknown content type';
+        const preview = await blob.slice(0, 100).text();
+        const isHtml = contentType.includes('text/html') || /<!doctype html|<html/i.test(preview);
+        throw new Error(
+          isHtml
+            ? 'The server returned an HTML report instead of a PDF. Deploy the latest backend PDF export changes, then try again.'
+            : `The export endpoint returned an invalid PDF response (${contentType}).`
+        );
       }
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
