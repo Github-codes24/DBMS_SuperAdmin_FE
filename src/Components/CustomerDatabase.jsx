@@ -96,6 +96,14 @@ const bulkCustomerFields = [
   'status',
 ];
 
+const getLocalDateInputValue = () => {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const buildBulkCustomerPayload = (customer, status) => {
   const payload = {
     _id: customer._id || customer.id,
@@ -230,6 +238,7 @@ function CustomerDatabase({ compact = false }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileError, setFileError] = useState('');
   const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [importRegistrationDate, setImportRegistrationDate] = useState(getLocalDateInputValue);
   const fileInputRef = useRef(null);
 
   // Step 1: Dependent Dropdown States (Category, Sub-Category, State, City)
@@ -807,10 +816,10 @@ function CustomerDatabase({ compact = false }) {
 
   // Download Sample CSV Import Template
   const handleDownloadSampleTemplate = () => {
-    const sampleHeaders = ['Sr No', 'ID', 'Name', 'Company Name', 'Email', 'Mobile', 'State', 'City', 'Pincode', 'Registration Date', 'Status', 'Telecaller'];
+    const sampleHeaders = ['Sr No', 'Company Name', 'Mobile', 'Pincode'];
     const sampleRows = [
-      ['01', 'CUST001', 'Global Logistics', 'Global Logistics Ltd', 'info@globallogistics.com', '9876543210', 'Maharashtra', 'Pune', '411001', '2026-06-15', 'Active', 'TC014'],
-      ['02', 'CUST002', 'Prime Pharma', 'Prime Pharma Pvt Ltd', 'contact@primepharma.com', '9876543211', 'Gujarat', 'Surat', '395001', '2026-07-01', 'Pending', 'TC021'],
+      ['01', 'Global Logistics Ltd', '9876543210', '411001'],
+      ['02', 'Prime Pharma Pvt Ltd', '9876543211', '395001'],
     ];
 
     const csvContent =
@@ -952,6 +961,7 @@ function CustomerDatabase({ compact = false }) {
     setCitySearch('');
     setCities([]);
 
+    setImportRegistrationDate(getLocalDateInputValue());
     setSelectedFile(null);
     setFileError('');
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1177,7 +1187,7 @@ function CustomerDatabase({ compact = false }) {
         `"${(r.state || selectedState || 'Maharashtra').replace(/"/g, '""')}"`,
         `"${(r.city || selectedCity || 'Mumbai').replace(/"/g, '""')}"`,
         `"${(r.pincode || '400001').replace(/"/g, '""')}"`,
-        new Date().toISOString().slice(0, 10),
+        importRegistrationDate,
         r.status || 'Active',
         r.telecaller || 'TC014',
         `"${(r.email !== '—' ? r.email : '').replace(/"/g, '""')}"`,
@@ -2534,6 +2544,20 @@ function CustomerDatabase({ compact = false }) {
                 </div>
               </div>
 
+              <div className="space-y-1.5">
+                <label htmlFor="import-registration-date" className="block text-xs font-bold text-slate-700">
+                  Registration Date <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="import-registration-date"
+                  type="date"
+                  value={importRegistrationDate}
+                  onChange={(e) => setImportRegistrationDate(e.target.value)}
+                  required
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-medium text-slate-800 transition-all focus:border-[#f26522] focus:outline-none focus:ring-2 focus:ring-[#f26522]/20"
+                />
+              </div>
+
               {/* Sample Template Bar */}
               <div className="flex items-center justify-between bg-orange-50/60 border border-orange-200/70 rounded-xl p-3 text-xs">
                 <div>
@@ -2749,59 +2773,32 @@ function CustomerDatabase({ compact = false }) {
                 <span className="text-xs font-bold text-slate-700">Record Preview ({reviewRecords.length} records)</span>
                 <span className="text-[11px] text-slate-400">Only "New" records will be imported into the database</span>
               </div>
-
               <div className="border border-slate-200 rounded-xl overflow-auto max-h-[46vh] bg-white shadow-2xs">
-                <table className="w-full text-left border-collapse min-w-[760px]">
+                <table className="w-full text-left border-collapse min-w-[560px]">
                   <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200">
                     <tr>
-                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Row</th>
-                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Customer Name</th>
+                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Sr No</th>
                       <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Company Name</th>
-                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Email</th>
-                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Phone / Mobile</th>
-                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Status</th>
-                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Reason / Note</th>
+                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Mobile</th>
+                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Pincode</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
                     {reviewRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-6 text-center text-slate-400">
+                        <td colSpan={4} className="p-6 text-center text-slate-400">
                           No records found to preview.
                         </td>
                       </tr>
                     ) : (
-                      reviewRecords.map((item) => {
-                        let badgeClass = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                        let dotClass = "bg-emerald-500";
-
-                        if (item.importStatus === 'DUPLICATE') {
-                          badgeClass = "bg-amber-50 text-amber-700 border-amber-200";
-                          dotClass = "bg-amber-500";
-                        } else if (item.importStatus === 'INVALID') {
-                          badgeClass = "bg-rose-50 text-rose-700 border-rose-200";
-                          dotClass = "bg-rose-500";
-                        }
-
-                        return (
+                      reviewRecords.map((item) => (
                           <tr key={item.rowNum} className="hover:bg-slate-50/60 transition-colors">
                             <td className="p-3 text-slate-500 font-medium">{item.rowNum}</td>
-                            <td className="p-3 font-semibold text-slate-800">{item.name}</td>
                             <td className="p-3 text-slate-600">{item.companyName}</td>
-                            <td className="p-3 text-slate-600">{item.email}</td>
                             <td className="p-3 text-slate-600">{item.mobile}</td>
-                            <td className="p-3">
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${badgeClass}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`}></span>
-                                {item.importStatus}
-                              </span>
-                            </td>
-                            <td className="p-3 text-[11px] text-slate-500 max-w-xs truncate" title={item.reason}>
-                              {item.reason}
-                            </td>
+                            <td className="p-3 text-slate-600">{item.pincode}</td>
                           </tr>
-                        );
-                      })
+                        ))
                     )}
                   </tbody>
                 </table>
