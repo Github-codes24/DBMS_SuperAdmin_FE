@@ -392,7 +392,7 @@ function TelecallerManagement({ compact = false }) {
   const handleConfirmStatusChange = () => {
     if (!tcToToggle) return;
 
-    const newStatus = tcToToggle.status === "Active" ? "Inactive" : "Active";
+    const newStatus = tcToToggle.status === "Active" ? "Blocked" : "Active";
     // console.log('Sending status:', newStatus);
     // console.log('Telecaller ID:', tcToToggle.id);
 
