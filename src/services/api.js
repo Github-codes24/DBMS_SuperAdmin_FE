@@ -2,6 +2,14 @@ import axios from 'axios';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://lts-dbms-backend.onrender.com/api/v1';
 // const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api/v1";
+// const DASHBOARD_API_BASE_URL = import.meta.env.VITE_DASHBOARD_API_BASE_URL ||
+//   (import.meta.env.DEV
+//     ? 'http://localhost:3007/api'
+//     : API_BASE_URL.replace(/\/api\/v1\/?$/, '/api'));
+const DASHBOARD_API_BASE_URL = 'https://lts-dbms-backend.onrender.com/api/'; 
+
+export const getDashboardApiUrl = (path) =>
+  `${DASHBOARD_API_BASE_URL.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
 
 
 const api = axios.create({
@@ -55,7 +63,7 @@ api.interceptors.response.use(
     // Check if error is 401 and request was not already retried
     if (error.response?.status === 401 && !originalRequest._retry) {
       // Do not try to refresh if the request was the refresh token request itself
-      if (originalRequest.url?.includes('/superadmin/auth/refresh-token')) {
+      if (originalRequest.url?.includes('/auth/refresh-token')) {
         return Promise.reject(error);
       }
 
@@ -84,7 +92,7 @@ api.interceptors.response.use(
 
       try {
         // Call the refresh API using a separate axios call
-        const response = await axios.post(`${API_BASE_URL}/superadmin/auth/refresh-token`, {
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh-token`, {
           refreshToken: storedRefreshToken,
         });
 

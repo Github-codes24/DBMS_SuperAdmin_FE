@@ -252,11 +252,20 @@ export const bulkImportCustomers = createAsyncThunk(
         {
           formData.append('projectName', payload.projectName);
         }
+        if (payload.projectId) {
+          formData.append('projectId', payload.projectId);
+        }
         if (payload.category) {
           formData.append('category', payload.category);
         }
+        if (payload.categoryId) {
+          formData.append('categoryId', payload.categoryId);
+        }
         if (payload.subCategory) {
           formData.append('subCategory', payload.subCategory);
+        }
+        if (payload.subCategoryId) {
+          formData.append('subCategoryId', payload.subCategoryId);
         }
         if (payload.state) formData.append('state', payload.state);
         if (payload.city) formData.append('city', payload.city);

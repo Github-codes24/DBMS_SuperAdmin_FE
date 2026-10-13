@@ -14,7 +14,7 @@ import {
   deleteCustomer,
   bulkImportCustomers
 } from '../redux/slices/customerSlice';
-import { fetchCategories } from '../redux/slices/categorySlice';
+import { getDashboardApiUrl } from '../services/api';
 import {
   Search,
   Download,
@@ -150,12 +150,6 @@ function CustomerDatabase({ compact = false }) {
   const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
   const { customers: apiCustomers = [], loading = false, isSaving = false } = useSelector((state) => state.customer || {});
-  const {
-    categories = [],
-    subcategories: allSubCategories = [],
-    loading: catsLoading = false,
-    error: categoriesError = null,
-  } = useSelector((state) => state.category || {});
 
   // Page View Mode: 'list' | 'add' | 'edit' | 'view'
   const [viewMode, setViewMode] = useState('list');
@@ -233,10 +227,13 @@ function CustomerDatabase({ compact = false }) {
   });
 
   // Step 1: Import Customers Modal State
-  const projectOptions = ["CSR", "CRM", "Real Estate", "EDU-Merit", "DBMS"];
-const [selectedProject, setSelectedProject] = useState("");
-const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
-const [projectSearch, setProjectSearch] = useState("");
+  const [projects, setProjects] = useState([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsError, setProjectsError] = useState('');
+  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
+  const [projectSearch, setProjectSearch] = useState('');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -246,7 +243,12 @@ const [projectSearch, setProjectSearch] = useState("");
   const fileInputRef = useRef(null);
 
   // Step 1: Dependent Dropdown States (Category, Sub-Category, State, City)
+  const [importCategories, setImportCategories] = useState([]);
+  const [importCategoriesLoading, setImportCategoriesLoading] = useState(false);
+  const [importCategoriesError, setImportCategoriesError] = useState('');
   const [subCategories, setSubCategories] = useState([]);
+  const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
+  const [subCategoriesError, setSubCategoriesError] = useState('');
 
   const [selectedCatId, setSelectedCatId] = useState('');
   const [selectedCatName, setSelectedCatName] = useState('');
@@ -273,6 +275,7 @@ const [projectSearch, setProjectSearch] = useState("");
   const subCatDropdownRef = useRef(null);
   const stateDropdownRef = useRef(null);
   const cityDropdownRef = useRef(null);
+  const projectDropdownRef = useRef(null);
 
   // Step 2: Import Review & Preview Modal State
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
@@ -284,12 +287,110 @@ const [projectSearch, setProjectSearch] = useState("");
   const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
   const exportDropdownRef = useRef(null);
 
-  // Load categories and subcategories when upload modal opens
+  // Load project options and the dependent category lists for the import workflow.
   useEffect(() => {
-    if (isUploadModalOpen && categories.length === 0) {
-      dispatch(fetchCategories());
+    if (!isUploadModalOpen) return undefined;
+
+    let isCurrentRequest = true;
+    setProjectsLoading(true);
+    setProjectsError('');
+    api.get(getDashboardApiUrl('/dashboard/projects'))
+      .then((response) => {
+        const payload = response.data;
+        const projectList = payload?.projects || payload?.data?.projects || payload?.data;
+        if (!Array.isArray(projectList)) {
+          throw new Error('The projects API returned an invalid response.');
+        }
+        if (isCurrentRequest) setProjects(projectList);
+      })
+      .catch((error) => {
+        if (isCurrentRequest) {
+          setProjects([]);
+          setProjectsError(error.response?.data?.message || error.message || 'Failed to load projects.');
+        }
+      })
+      .finally(() => {
+        if (isCurrentRequest) setProjectsLoading(false);
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [isUploadModalOpen]);
+
+  useEffect(() => {
+    if (!isUploadModalOpen || !selectedProjectId) {
+      setImportCategories([]);
+      setImportCategoriesLoading(false);
+      setImportCategoriesError('');
+      return undefined;
     }
-  }, [isUploadModalOpen, categories.length, dispatch]);
+
+    let isCurrentRequest = true;
+    setImportCategoriesLoading(true);
+    setImportCategoriesError('');
+    api.get(getDashboardApiUrl(`/dashboard/projects/${encodeURIComponent(selectedProjectId)}/categories`), {
+      params: { limit: 100 },
+    })
+      .then((response) => {
+        const payload = response.data;
+        const categoryList = payload?.categories || payload?.data?.categories || payload?.data;
+        if (!Array.isArray(categoryList)) {
+          throw new Error('The project categories API returned an invalid response.');
+        }
+        if (isCurrentRequest) setImportCategories(categoryList);
+      })
+      .catch((error) => {
+        if (isCurrentRequest) {
+          setImportCategories([]);
+          setImportCategoriesError(error.response?.data?.message || error.message || 'Failed to load project categories.');
+        }
+      })
+      .finally(() => {
+        if (isCurrentRequest) setImportCategoriesLoading(false);
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [isUploadModalOpen, selectedProjectId]);
+
+  useEffect(() => {
+    if (!isUploadModalOpen || !selectedCatId) {
+      setSubCategories([]);
+      setSubCategoriesLoading(false);
+      setSubCategoriesError('');
+      return undefined;
+    }
+
+    let isCurrentRequest = true;
+    setSubCategoriesLoading(true);
+    setSubCategoriesError('');
+    api.get(getDashboardApiUrl(`/dashboard/categories/${encodeURIComponent(selectedCatId)}/subcategories`), {
+      params: { limit: 100 },
+    })
+      .then((response) => {
+        const payload = response.data;
+        const subcategoryList = payload?.subcategories || payload?.data?.subcategories || payload?.data;
+        if (!Array.isArray(subcategoryList)) {
+          throw new Error('The subcategories API returned an invalid response.');
+        }
+        if (isCurrentRequest) setSubCategories(subcategoryList);
+      })
+      .catch((error) => {
+        if (isCurrentRequest) {
+          setSubCategories([]);
+          setSubCategoriesError(error.response?.data?.message || error.message || 'Failed to load subcategories.');
+        }
+      })
+      .finally(() => {
+        if (isCurrentRequest) setSubCategoriesLoading(false);
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [isUploadModalOpen, selectedCatId]);
 
   // Click outside listener for all dropdowns
   useEffect(() => {
@@ -308,6 +409,9 @@ const [projectSearch, setProjectSearch] = useState("");
       }
       if (exportDropdownRef.current && !exportDropdownRef.current.contains(e.target)) {
         setIsExportDropdownOpen(false);
+      }
+      if (projectDropdownRef.current && !projectDropdownRef.current.contains(e.target)) {
+        setIsProjectDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -872,7 +976,7 @@ const [projectSearch, setProjectSearch] = useState("");
 
   // Handle Category selection
   const handleSelectCategory = (cat) => {
-    const catId = cat._id || cat.id || '';
+    const catId = cat.categoryId || cat._id || cat.id || '';
     const catName = cat.name || cat.categoryName || cat.category || '';
     setSelectedCatId(catId);
     setSelectedCatName(catName);
@@ -884,34 +988,14 @@ const [projectSearch, setProjectSearch] = useState("");
     setSelectedSubCatName('');
     setSubCatSearch('');
     setFileError('');
-
-    // Filter subcategories belonging to this category
-    const filtered = allSubCategories.filter((sc) => {
-      const category = sc.category && typeof sc.category === 'object' ? sc.category : null;
-      const categoryName = sc.categoryName && typeof sc.categoryName === 'object' ? sc.categoryName : null;
-      const parentId =
-        sc.categoryId ||
-        category?._id ||
-        categoryName?._id ||
-        (typeof sc.category === 'string' ? sc.category : '') ||
-        (typeof sc.categoryName === 'string' ? sc.categoryName : '');
-      const parentName =
-        category?.name ||
-        categoryName?.name ||
-        sc.parentCategory ||
-        (typeof sc.category === 'string' ? sc.category : '') ||
-        (typeof sc.categoryName === 'string' ? sc.categoryName : '');
-      if (catId && parentId && String(parentId) === String(catId)) return true;
-      if (catName && parentName && String(parentName).trim().toLowerCase() === catName.trim().toLowerCase()) return true;
-      return false;
-    });
-    setSubCategories(filtered);
+    setSubCategories([]);
+    setSubCategoriesError('');
   };
 
   // Handle Sub-Category selection
   const handleSelectSubCategory = (sc) => {
-    const subId = sc._id || sc.id || '';
-    const subName = sc.name || sc.subCategoryName || '';
+    const subId = sc.subcategoryId || sc._id || sc.id || '';
+    const subName = sc.name || sc.subCategoryName || sc.subcategoryName || '';
     setSelectedSubCatId(subId);
     setSelectedSubCatName(subName);
     setIsSubCatDropdownOpen(false);
@@ -951,9 +1035,17 @@ const [projectSearch, setProjectSearch] = useState("");
 
   // Reset all import modal inputs and dropdowns
   const resetImportStates = () => {
+    setSelectedProject('');
+    setSelectedProjectId('');
+    setIsProjectDropdownOpen(false);
+    setProjectSearch('');
+    setProjectsError('');
+
+    setImportCategories([]);
+    setImportCategoriesError('');
+    setIsCatDropdownOpen(false);
     setSelectedCatId('');
     setSelectedCatName('');
-    setIsCatDropdownOpen(false);
     setCatSearch('');
 
     setSelectedSubCatId('');
@@ -961,6 +1053,7 @@ const [projectSearch, setProjectSearch] = useState("");
     setIsSubCatDropdownOpen(false);
     setSubCatSearch('');
     setSubCategories([]);
+    setSubCategoriesError('');
 
     setSelectedState('');
     setSelectedStateCode('');
@@ -980,11 +1073,15 @@ const [projectSearch, setProjectSearch] = useState("");
 
   // Step 1: Process and validate file without importing into database
   const handleProcessUploadFile = () => {
-    if (!selectedCatName) {
+    if (!selectedProjectId) {
+      setFileError('Please select a project.');
+      return;
+    }
+    if (!selectedCatId) {
       setFileError('Please select a category.');
       return;
     }
-    if (!selectedSubCatName) {
+    if (!selectedSubCatId) {
       setFileError('Please select a sub-category.');
       return;
     }
@@ -1213,8 +1310,11 @@ const [projectSearch, setProjectSearch] = useState("");
       await dispatch(bulkImportCustomers({
         file: cleanFile,
         projectName: selectedProject,
+        projectId: selectedProjectId,
         category: selectedCatName,
+        categoryId: selectedCatId,
         subCategory: selectedSubCatName,
+        subCategoryId: selectedSubCatId,
         state: selectedState,
         city: selectedCity
       })).unwrap();
@@ -2236,7 +2336,7 @@ const [projectSearch, setProjectSearch] = useState("");
 
 
               {/* Project Name Dropdown */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5" ref={projectDropdownRef}>
                 <label className="block text-xs font-bold text-slate-700">
                   Project Name <span className="text-red-500">*</span>
                 </label>
@@ -2244,6 +2344,7 @@ const [projectSearch, setProjectSearch] = useState("");
                 <div className="relative">
                   <button
                     type="button"
+                    disabled={projectsLoading}
                     onClick={() => {
                       setIsProjectDropdownOpen(!isProjectDropdownOpen);
                       setProjectSearch("");
@@ -2256,7 +2357,7 @@ const [projectSearch, setProjectSearch] = useState("");
                       isProjectDropdownOpen
                         ? "border-[#f26522] ring-2 ring-[#f26522]/20 bg-white"
                         : "border-slate-200"
-                    }`}
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
                   >
                     <span
                       className={
@@ -2298,8 +2399,15 @@ const [projectSearch, setProjectSearch] = useState("");
 
                       {/* Project Options */}
                       <div className="max-h-44 overflow-y-auto custom-scrollbar py-1">
-                        {projectOptions.filter((project) =>
-                          project
+                        {projectsLoading ? (
+                          <div className="flex items-center justify-center gap-1.5 py-4 text-center text-xs text-slate-400">
+                            <Loader2 size={13} className="animate-spin text-[#f26522]" />
+                            <span>Loading projects...</span>
+                          </div>
+                        ) : projectsError ? (
+                          <div className="py-3 text-center text-xs text-red-500">{projectsError}</div>
+                        ) : projects.filter((project) =>
+                          (project.name || project.projectName || '')
                             .toLowerCase()
                             .includes(projectSearch.toLowerCase()),
                         ).length === 0 ? (
@@ -2307,30 +2415,36 @@ const [projectSearch, setProjectSearch] = useState("");
                             No projects found
                           </div>
                         ) : (
-                          projectOptions
+                          projects
                             .filter((project) =>
-                              project
+                              (project.name || project.projectName || '')
                                 .toLowerCase()
                                 .includes(projectSearch.toLowerCase()),
                             )
                             .map((project) => (
                               <button
-                                key={project}
+                                key={project.projectId || project._id || project.id || project.name}
                                 type="button"
                                 onClick={() => {
-                                  setSelectedProject(project);
+                                  setSelectedProject(project.name || project.projectName || '');
+                                  setSelectedProjectId(project.projectId || project._id || project.id || '');
+                                  setSelectedCatId('');
+                                  setSelectedCatName('');
+                                  setSelectedSubCatId('');
+                                  setSelectedSubCatName('');
+                                  setSubCategories([]);
                                   setIsProjectDropdownOpen(false);
                                   setProjectSearch("");
                                   setFileError("");
                                 }}
                                 className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${
-                                  selectedProject === project
+                                  selectedProjectId === (project.projectId || project._id || project.id || '')
                                     ? "bg-orange-50 font-bold text-[#f26522]"
                                     : "text-slate-700 hover:bg-slate-50 hover:text-[#f26522]"
                                 }`}
                               >
-                                <span className="truncate">{project}</span>
-                                {selectedProject === project && (
+                                <span className="truncate">{project.name || project.projectName}</span>
+                                {selectedProjectId === (project.projectId || project._id || project.id || '') && (
                                   <Check
                                     size={13}
                                     className="text-[#f26522] shrink-0"
@@ -2354,17 +2468,19 @@ const [projectSearch, setProjectSearch] = useState("");
                 <div className="relative">
                   <button
                     type="button"
+                    disabled={!selectedProjectId || importCategoriesLoading}
                     onClick={() => {
+                      if (!selectedProjectId || importCategoriesLoading) return;
                       setIsCatDropdownOpen(!isCatDropdownOpen);
                       setIsSubCatDropdownOpen(false);
                       setIsStateDropdownOpen(false);
                       setIsCityDropdownOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs bg-slate-50 border rounded-xl transition-all font-medium text-left cursor-pointer hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 ${isCatDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : 'border-slate-200'
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs bg-slate-50 border rounded-xl transition-all font-medium text-left cursor-pointer hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 disabled:cursor-not-allowed disabled:opacity-60 ${isCatDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : 'border-slate-200'
                       }`}
                   >
                     <span className={selectedCatName ? 'text-slate-800 font-semibold truncate' : 'text-slate-400'}>
-                      {selectedCatName || 'Select Category'}
+                      {!selectedProjectId ? 'Select project first' : (selectedCatName || 'Select Category')}
                     </span>
                     <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 shrink-0 ${isCatDropdownOpen ? 'rotate-180 text-[#f26522]' : ''}`} />
                   </button>
@@ -2385,17 +2501,17 @@ const [projectSearch, setProjectSearch] = useState("");
                         </div>
                       </div>
                       <div className="max-h-44 overflow-y-auto custom-scrollbar py-1">
-                        {catsLoading ? (
+                        {importCategoriesLoading ? (
                           <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-1.5">
                             <Loader2 size={13} className="animate-spin text-[#f26522]" />
                             <span>Loading categories...</span>
                           </div>
-                        ) : categoriesError ? (
-                          <div className="py-3 text-center text-xs text-red-500">{categoriesError}</div>
+                        ) : importCategoriesError ? (
+                          <div className="py-3 text-center text-xs text-red-500">{importCategoriesError}</div>
                         ) : (
                           (() => {
-                            const filtered = categories.filter((c) =>
-                              (c.name || c.categoryName || c.category || '').toLowerCase().includes(catSearch.toLowerCase())
+                            const filtered = importCategories.filter((c) =>
+                              String(c.name || c.categoryName || c.category || '').toLowerCase().includes(catSearch.toLowerCase())
                             );
                             if (filtered.length === 0) {
                               return (
@@ -2409,7 +2525,7 @@ const [projectSearch, setProjectSearch] = useState("");
                               const isSelected = selectedCatName === name;
                               return (
                                 <button
-                                  key={c._id || name}
+                                  key={c.categoryId || c._id || c.id || name}
                                   type="button"
                                   onClick={() => handleSelectCategory(c)}
                                   className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${isSelected
@@ -2438,26 +2554,26 @@ const [projectSearch, setProjectSearch] = useState("");
                 <div className="relative">
                   <button
                     type="button"
-                    disabled={!selectedCatName || catsLoading}
+                    disabled={!selectedCatId || subCategoriesLoading}
                     onClick={() => {
-                      if (!selectedCatName) return;
+                      if (!selectedCatId || subCategoriesLoading) return;
                       setIsSubCatDropdownOpen(!isSubCatDropdownOpen);
                       setIsCatDropdownOpen(false);
                       setIsStateDropdownOpen(false);
                       setIsCityDropdownOpen(false);
                     }}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs border rounded-xl transition-all font-medium text-left ${!selectedCatName
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 text-xs border rounded-xl transition-all font-medium text-left disabled:cursor-not-allowed disabled:opacity-60 ${!selectedCatId
                       ? 'bg-slate-100/70 border-slate-200 text-slate-400 cursor-not-allowed'
                       : 'bg-slate-50 border-slate-200 hover:border-[#f26522] focus:outline-none focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20 cursor-pointer'
                       } ${isSubCatDropdownOpen ? 'border-[#f26522] ring-2 ring-[#f26522]/20 bg-white' : ''}`}
                   >
                     <span className={selectedSubCatName ? 'text-slate-800 font-semibold truncate' : 'text-slate-400'}>
-                      {!selectedCatName ? 'Select category first' : (selectedSubCatName || 'Select Sub-Category')}
+                      {!selectedCatId ? 'Select category first' : (selectedSubCatName || 'Select Sub-Category')}
                     </span>
                     <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 shrink-0 ${isSubCatDropdownOpen ? 'rotate-180 text-[#f26522]' : ''}`} />
                   </button>
 
-                  {isSubCatDropdownOpen && selectedCatName && (
+                  {isSubCatDropdownOpen && selectedCatId && (
                     <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-40 animate-in fade-in duration-100">
                       <div className="p-2 border-b border-slate-100">
                         <div className="relative">
@@ -2473,15 +2589,17 @@ const [projectSearch, setProjectSearch] = useState("");
                         </div>
                       </div>
                       <div className="max-h-44 overflow-y-auto custom-scrollbar py-1">
-                        {catsLoading ? (
+                        {subCategoriesLoading ? (
                           <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-1.5">
                             <Loader2 size={13} className="animate-spin text-[#f26522]" />
                             <span>Loading sub-categories...</span>
                           </div>
+                        ) : subCategoriesError ? (
+                          <div className="py-3 text-center text-xs text-red-500">{subCategoriesError}</div>
                         ) : (
                           (() => {
                             const filtered = subCategories.filter((sc) =>
-                              (sc.name || sc.subCategoryName || '').toLowerCase().includes(subCatSearch.toLowerCase())
+                              String(sc.name || sc.subCategoryName || sc.subcategoryName || '').toLowerCase().includes(subCatSearch.toLowerCase())
                             );
                             if (filtered.length === 0) {
                               return (
@@ -2491,11 +2609,11 @@ const [projectSearch, setProjectSearch] = useState("");
                               );
                             }
                             return filtered.map((sc) => {
-                              const name = sc.name || sc.subCategoryName;
+                              const name = sc.name || sc.subCategoryName || sc.subcategoryName;
                               const isSelected = selectedSubCatName === name;
                               return (
                                 <button
-                                  key={sc._id || name}
+                                  key={sc.subcategoryId || sc._id || sc.id || name}
                                   type="button"
                                   onClick={() => handleSelectSubCategory(sc)}
                                   className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${isSelected
