@@ -99,7 +99,7 @@ export const updateVendor = createAsyncThunk(
   async ({ vendorId, updateData }, { dispatch, rejectWithValue }) => {
     try {
       const response = await api.patch(`/superadmin/vendors/${vendorId}`, updateData);
-      toast.success(response.data.message || 'Vendor updated successfully');
+      // toast.success(response.data.message || 'Vendor updated successfully');
       dispatch(fetchVendors());
       return response.data;
     } catch (error) {

@@ -47,7 +47,7 @@ export const updateTelecaller = createAsyncThunk(
   async ({ userId, updateData }, { dispatch, rejectWithValue }) => {
     try {
       const response = await api.patch(`/superadmin/telecallers/${userId}`, updateData);
-      toast.success(response.data.message || 'Telecaller updated successfully');
+      // toast.success(response.data.message || 'Telecaller updated successfully');
       dispatch(fetchTelecallers());
       return response.data;
     } catch (error) {

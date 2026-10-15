@@ -159,7 +159,7 @@ export const updateCustomer = createAsyncThunk(
 
       const response = await api.patch(`/superadmin/customers/${customerId}`, updatePayload);
       if (!suppressToast) {
-        toast.success(response.data.message || 'Customer updated successfully');
+        // toast.success(response.data.message || 'Customer updated successfully');
       }
       if (!skipRefresh) {
         dispatch(fetchCustomers());
