@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   PlusCircle,
   RefreshCw,
   Pencil,
   ShoppingCart,
   Share,
-  RotateCcw
-} from 'lucide-react';
+  RotateCcw,
+} from "lucide-react";
 
 export default function VendorSearch({
   vendors = [],
@@ -19,40 +19,57 @@ export default function VendorSearch({
   onSendPackageDetails,
   onOpenPaymentHistory,
   onOpenAddVendor,
-  onRefresh
+  onRefresh,
 }) {
-  const [phoneSearch, setPhoneSearch] = useState('');
-  const [codeSearch, setCodeSearch] = useState('');
+  const [phoneSearch, setPhoneSearch] = useState("");
+  const [codeSearch, setCodeSearch] = useState("");
   const [hasSearched, setHasSearched] = useState(false);
-  const [validationError, setValidationError] = useState('');
+  const [phoneError, setPhoneError] = useState("");
+  const [codeError, setCodeError] = useState("");
 
   const handleSearch = (e) => {
     if (e) e.preventDefault();
+
     const queryPhone = phoneSearch.trim();
     const queryCode = codeSearch.trim();
 
+    setPhoneError("");
+    setCodeError("");
+
     if (!queryPhone && !queryCode) {
-      setValidationError('Please enter a search value.');
+      setPhoneError("Please enter a search value.");
       return;
     }
 
-    setValidationError('');
+    if (queryPhone && !/^\d{10}$/.test(queryPhone)) {
+      setPhoneError("Please enter a valid 10-digit contact number.");
+      return;
+    }
+
+    if (queryCode && !/^[A-Z]{4}-\d{13}$/.test(queryCode)) {
+      setCodeError("Please enter a valid Vendor Code.");
+      return;
+    }
+
     setHasSearched(true);
+
     const combinedQuery = queryPhone || queryCode;
+
     if (onSearch) {
       onSearch(combinedQuery);
     }
   };
 
   const handleResetSearch = () => {
-    setPhoneSearch('');
-    setCodeSearch('');
-    setValidationError('');
+    setPhoneSearch("");
+    setCodeSearch("");
+    setPhoneError("");
+    setCodeError("");
     setHasSearched(false);
+
     if (onClear) onClear();
     if (onRefresh) onRefresh();
   };
-
 
   return (
     <div className="card-panel">
@@ -78,37 +95,83 @@ export default function VendorSearch({
       </div>
 
       {/* Search Input Box */}
-      <div style={{ marginBottom: '24px' }}>
-        <form onSubmit={handleSearch} className="search-filter-box" style={{ marginBottom: validationError ? '8px' : '0' }}>
-          <input
-            type="text"
-            className="input-field"
-            placeholder="Ven. Register Contact/Alt No."
-            value={phoneSearch}
-            onChange={(e) => {
-              setPhoneSearch(e.target.value);
-              if (validationError) setValidationError('');
-            }}
-          />
-          <input
-            type="text"
-            className="input-field"
-            placeholder="Vendor Code"
-            value={codeSearch}
-            onChange={(e) => {
-              setCodeSearch(e.target.value);
-              if (validationError) setValidationError('');
-            }}
-          />
+      <div style={{ marginBottom: "24px" }}>
+        <form
+          onSubmit={handleSearch}
+          className="search-filter-box"
+          style={{
+            marginBottom: phoneError || codeError ? "8px" : "0",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "8px",
+            alignItems: "flex-start",
+          }}
+        >
+          {/* Phone Number Search */}
+          <div style={{ position: "relative" }}>
+            <input
+              type="text"
+              inputMode="numeric"
+              className="input-field"
+              placeholder="Vendor Register Contact/Alt No."
+              value={phoneSearch}
+              maxLength={10}
+              onChange={(e) => {
+                const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                setPhoneSearch(value);
+                setPhoneError("");
+              }}
+            />
+
+            {phoneError && (
+              <div
+                style={{
+                  color: "#dc2626",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  marginTop: "4px",
+                }}
+              >
+                {phoneError}
+              </div>
+            )}
+          </div>
+
+          {/* Vendor Code Search */}
+          <div style={{ position: "relative" }}>
+            <input
+              type="text"
+              className="input-field"
+              placeholder="Vendor Code"
+              value={codeSearch}
+              maxLength={18}
+              onChange={(e) => {
+                const value = e.target.value
+                  .toUpperCase()
+                  .replace(/[^A-Z0-9-]/g, "");
+                setCodeSearch(value);
+                setCodeError("");
+              }}
+            />
+
+            {codeError && (
+              <div
+                style={{
+                  color: "#dc2626",
+                  fontSize: "12px",
+                  fontWeight: "600",
+                  marginTop: "4px",
+                }}
+              >
+                {codeError}
+              </div>
+            )}
+          </div>
+
           <button type="submit" className="btn-orange" disabled={loading}>
-            {loading ? 'Searching...' : 'Search'}
+            {loading ? "Searching..." : "Search"}
           </button>
         </form>
-        {validationError && (
-          <div style={{ color: '#dc2626', fontSize: '12px', fontWeight: '600', paddingLeft: '12px' }}>
-            {validationError}
-          </div>
-        )}
       </div>
 
       {/* Results Table */}
@@ -158,7 +221,7 @@ export default function VendorSearch({
                   <span className="sort-icon">▲</span>
                 </div>
               </th>
-              <th style={{ textAlign: 'center' }}>Actions</th>
+              <th style={{ textAlign: "center" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -187,16 +250,16 @@ export default function VendorSearch({
               vendors.map((vendor, idx) => (
                 <tr key={vendor.id}>
                   <td>{idx + 1}</td>
-                  <td style={{ fontWeight: '600' }}>{vendor.company}</td>
+                  <td style={{ fontWeight: "600" }}>{vendor.company}</td>
                   <td>{vendor.state}</td>
                   <td>{vendor.city}</td>
-                  <td style={{ maxWidth: '280px', fontStyle: 'normal' }}>
+                  <td style={{ maxWidth: "280px", fontStyle: "normal" }}>
                     {vendor.address}
                   </td>
                   <td>
                     <span
                       className={
-                        vendor.paid === 'Yes' ? 'badge-yes' : 'badge-no'
+                        vendor.paid === "Yes" ? "badge-yes" : "badge-no"
                       }
                     >
                       {vendor.paid}
@@ -206,7 +269,10 @@ export default function VendorSearch({
 
                   {/* Actions Column with custom styled hover tooltips */}
                   <td>
-                    <div className="actions-cell" style={{ justifyContent: 'center' }}>
+                    <div
+                      className="actions-cell"
+                      style={{ justifyContent: "center" }}
+                    >
                       {/* Action a: Edit Button */}
                       <div className="tooltip-wrapper">
                         <button
