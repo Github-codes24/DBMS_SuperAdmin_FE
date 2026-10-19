@@ -292,15 +292,20 @@ function TelecallerManagement({ compact = false }) {
       const updatedCount =
         result.updatedCount ?? selectedIds.length - failedIds.size;
 
+        const updatedTelecallerNames = telecallers.filter((telecaller) =>
+              selectedTelecallerIds.has(getTelecallerSelectionId(telecaller)),
+             ).map((telecaller) => telecaller.name || telecaller.fullName).filter(Boolean);
+
       setSelectedTelecallerIds(failedIds);
       if (updatedCount > 0) {
         dispatch(
           fetchTelecallers(submittedSearch ? { search: submittedSearch } : {}),
         );
-        setToastMsg(
-          response.message || `Updated ${updatedCount} telecaller statuses.`,
-        );
-        setTimeout(() => setToastMsg(""), 4000);
+        toast.success(
+  response.message ||
+    `${updatedCount} telecaller${updatedCount === 1 ? "" : "s"} updated successfully`
+);
+        
       }
       if (failedIds.size > 0) {
         toast.error(
@@ -392,9 +397,7 @@ function TelecallerManagement({ compact = false }) {
   const handleConfirmStatusChange = () => {
     if (!tcToToggle) return;
 
-    const newStatus = tcToToggle.status === "Active" ? "Inactive" : "Active";
-    // console.log('Sending status:', newStatus);
-    // console.log('Telecaller ID:', tcToToggle.id);
+    const newStatus = tcToToggle.status === "Active" ? "Blocked" : "Active";
 
     dispatch(
       updateTelecaller({
@@ -403,8 +406,8 @@ function TelecallerManagement({ compact = false }) {
       }),
     )
       .unwrap()
-      .then(() => {
-        toast.success(`Status for "${tcToToggle.name}" set to ${newStatus}`);
+      .then((response) => {
+        toast.success(response?.message || "Telecaller updated successfully");
       })
       .catch(() => {
         toast.error("Failed to update status");
@@ -433,7 +436,7 @@ function TelecallerManagement({ compact = false }) {
       }),
     )
       .unwrap()
-      .then(() => {
+      .then((response) => {
         if (
           selectedTc &&
           (selectedTc._id === tc._id || selectedTc.id === tc.id)

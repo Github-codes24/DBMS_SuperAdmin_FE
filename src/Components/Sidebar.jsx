@@ -10,6 +10,7 @@ import {
   PhoneCall, 
   FolderGit2, 
   Building2, 
+  Layers,
   ChevronRight, 
   Sparkles,
   PanelLeftClose,
@@ -31,6 +32,7 @@ function Sidebar({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobileMenuOpe
 
   const navItems = [
     { key: 'dashboard', label: 'Super Admin Dashboard', icon: LayoutDashboard, badge: null },
+    { key: 'category-subcategory', label: 'Category & Sub-category', icon: Layers, badge: null },
     { key: 'usermanagement', label: 'User Management', icon: Users, badge: null },
     { key: 'role', label: 'Roles & Permissions', icon: ShieldCheck, badge: null },
     { key: 'feature', label: 'Feature Control', icon: FileText, badge: null },

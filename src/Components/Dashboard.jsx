@@ -21,6 +21,10 @@ import TelecallerManagement from './TelecallerManagement';
 import AuditLogs from './AuditLogs';
 import DataManagement from './DataManagement';
 import { State } from 'country-state-city';
+// import api from '../services/api';
+import api, { getDashboardApiUrl } from "../services/api";
+
+
 
 // Unified Master Data Table Component ⭐
 function MasterDataTable({
@@ -807,6 +811,98 @@ function Dashboard({ initialTab = 'dashboard' }) {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedSubCategory, setSelectedSubCategory] = useState('All');
 
+  const [apiCategories, setApiCategories] = useState([]);
+const [apiSubCategories, setApiSubCategories] = useState([]);
+const [categoriesLoading, setCategoriesLoading] = useState(false);
+const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
+
+useEffect(() => {
+  const fetchCategories = async () => {
+    setCategoriesLoading(true);
+
+    try {
+      const response = await api.get(
+        getDashboardApiUrl(
+          `/dashboard/projects/${encodeURIComponent("PID-005")}/categories`
+        ),
+        { params: { limit: 100 } }
+      );
+
+      const payload = response.data;
+
+      const categoryList =
+        payload?.categories ||
+        payload?.data?.categories ||
+        payload?.data ||
+        [];
+
+      setApiCategories(
+        Array.isArray(categoryList) ? categoryList : []
+      );
+    } catch (error) {
+      console.error("Failed to fetch categories:", error);
+      toast.error("Failed to load categories");
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
+  fetchCategories();
+}, []);
+
+
+useEffect(() => {
+  const fetchSubCategories = async () => {
+    if (selectedCategory === "All") {
+      setApiSubCategories([]);
+      return;
+    }
+
+    const selectedCat = apiCategories.find(
+      (cat) =>
+        (cat.name || cat.category || "").toLowerCase() ===
+        selectedCategory.toLowerCase()
+    );
+
+    const selectedCatId = selectedCat?.categoryId;
+
+    if (!selectedCatId) {
+      setApiSubCategories([]);
+      return;
+    }
+
+    setSubCategoriesLoading(true);
+
+    try {
+      const response = await api.get(
+        getDashboardApiUrl(
+          `/dashboard/categories/${encodeURIComponent(selectedCatId)}/subcategories`
+        ),
+        { params: { limit: 100 } }
+      );
+
+      const payload = response.data;
+
+      const subCategoryList =
+        payload?.subcategories ||
+        payload?.data?.subcategories ||
+        payload?.data ||
+        [];
+
+      setApiSubCategories(
+        Array.isArray(subCategoryList) ? subCategoryList : []
+      );
+    } catch (error) {
+      console.error("Failed to fetch subcategories:", error);
+      toast.error("Failed to load subcategories");
+    } finally {
+      setSubCategoriesLoading(false);
+    }
+  };
+
+  fetchSubCategories();
+}, [selectedCategory, apiCategories]);
+
   const dispatch = useDispatch();
   const { stats, cascadeData, loading, error } = useSelector((state) => state.dashboard);
   const { vendors = [] } = useSelector((state) => state.vendor || {});
@@ -1075,46 +1171,48 @@ function Dashboard({ initialTab = 'dashboard' }) {
   ];
 
   // Dynamic Main Category Table Data mapped from real live vendor database ⭐
-  const mainCategoryData = MASTER_CATEGORIES_WITH_SUBCATS.map(c => {
-    const realCatCount = liveVendorCategoryCounts[c.name.toLowerCase()] || 0;
-    return {
-      category: c.name,
-      count: selectedState === 'All' ? realCatCount : Math.round(realCatCount * stateMultiplier),
-      id: c.id
-    };
-  });
+  const mainCategoryData = apiCategories.map((c) => {
+  const categoryName = c.name || c.category || "";
 
+  const realCatCount =
+    liveVendorCategoryCounts[categoryName.toLowerCase()] || 0;
+
+  return {
+    category: categoryName,
+    count:
+      selectedState === "All"
+        ? realCatCount
+        : Math.round(realCatCount * stateMultiplier),
+    id: c.categoryId || c._id,
+    categoryId: c.categoryId,
+  };
+});
   // Filter Sub Categories dynamically based on selectedCategory & selectedState ⭐
-  const activeSubCategoryData = (() => {
-    let subCatList = [];
-    if (selectedCategory === 'All') {
-      MASTER_CATEGORIES_WITH_SUBCATS.forEach(cat => {
-        cat.subcategories.forEach(sub => {
-          const realCatCount = liveVendorCategoryCounts[cat.name.toLowerCase()] || 0;
-          subCatList.push({
-            category: sub.name,
-            count: selectedState === 'All' ? 0 : Math.round(realCatCount * stateMultiplier),
-            parentCategory: cat.name
-          });
-        });
-      });
-    } else {
-      const matchedCat = MASTER_CATEGORIES_WITH_SUBCATS.find(
-        c => c.name.toLowerCase() === selectedCategory.toLowerCase()
-      );
-      if (matchedCat) {
-        const realCatCount = liveVendorCategoryCounts[matchedCat.name.toLowerCase()] || 0;
-        subCatList = matchedCat.subcategories.map(sub => ({
-          category: sub.name,
-          count: selectedState === 'All' ? realCatCount : Math.round(realCatCount * stateMultiplier),
-          parentCategory: matchedCat.name
-        }));
-      }
-    }
+  const activeSubCategoryData = apiSubCategories.map((sc) => {
+  const subCategoryName = sc.name || sc.subcategory || sc.category || "";
 
-    return subCatList;
-  })();
+  const selectedCat = apiCategories.find(
+    (cat) =>
+      (cat.name || cat.category || "").toLowerCase() ===
+      selectedCategory.toLowerCase()
+  );
 
+  const parentCategoryName =
+    selectedCat?.name || selectedCat?.category || selectedCategory;
+
+  const realCatCount =
+    liveVendorCategoryCounts[parentCategoryName.toLowerCase()] || 0;
+
+  return {
+    category: subCategoryName,
+    count:
+      selectedState === "All"
+        ? realCatCount
+        : Math.round(realCatCount * stateMultiplier),
+    parentCategory: parentCategoryName,
+    id: sc.subcategoryId || sc._id,
+  };
+});
   const handleAddState = (newItem) => {
     dispatch(addDashboardState({
       name: newItem.state,

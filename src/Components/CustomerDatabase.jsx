@@ -617,11 +617,14 @@ function CustomerDatabase({ compact = false }) {
       const failureCount = result.failures?.length || 0;
 
       setSelectedCustomerIds(failedIds);
-      if (successfulCount > 0) {
-        dispatch(fetchCustomers());
-        setToastMsg(`Updated ${successfulCount} customer record${successfulCount === 1 ? '' : 's'}.`);
-        setTimeout(() => setToastMsg(''), 4000);
-      }
+     if (successfulCount > 0) {
+  dispatch(fetchCustomers());
+  console.log("Backend message:", response.message);
+  toast.success(
+    response.message ||
+      `${successfulCount} customer${successfulCount === 1 ? "" : "s"} updated successfully`
+  );
+}
       if (failureCount > 0) {
         toast.error(`${failureCount} customer record${failureCount === 1 ? '' : 's'} failed to update. Failed records remain selected.`);
       }
@@ -846,11 +849,10 @@ function CustomerDatabase({ compact = false }) {
       dispatch(updateCustomer({
         customerId: customer._id || customer.id,
         updateData: { status: newStatus }
-      })).unwrap().then(() => {
+      })).unwrap().then((response) => {
         handleCloseConfirmModal();
         dispatch(fetchCustomers());
-        setToastMsg(`Customer "${customer.name}" has been ${newStatus.toLowerCase()}!`);
-        setTimeout(() => setToastMsg(''), 4000);
+        toast.success(response?.message || "Customer updated successfully");
       });
     }
   };
