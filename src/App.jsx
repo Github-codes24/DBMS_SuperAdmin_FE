@@ -13,6 +13,7 @@ import Success from "./Pages/Success";
 import Navbar from "./Components/Navbar";
 import Sidebar from "./Components/Sidebar";
 import Dashboard from "./Components/Dashboard";
+import CategorySubcategory from "./Components/CategorySubcategory";
 import ProtectedRoute from "./Components/ProtectedRoute";
 
 function App() {
@@ -41,6 +42,14 @@ function App() {
         element={
           <ProtectedRoute>
             <Dashboard initialTab="dashboard" />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/category-subcategory"
+        element={
+          <ProtectedRoute>
+            <CategorySubcategory />
           </ProtectedRoute>
         }
       />
