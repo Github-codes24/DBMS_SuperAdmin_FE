@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import api from '../../services/api';
+import api, { getDashboardApiUrl } from '../../services/api';
 import { toast } from 'react-toastify';
 
 export const fetchDashboardOverview = createAsyncThunk(
@@ -33,9 +33,13 @@ export const addDashboardState = createAsyncThunk(
 
 export const addDashboardCategory = createAsyncThunk(
   'dashboard/addDashboardCategory',
-  async ({ name, vendorCount }, { dispatch, rejectWithValue }) => {
+  async ({ name, projectId, projectName }, { dispatch, rejectWithValue }) => {
     try {
-      const response = await api.post('/superadmin/dashboard/categories', { name, vendorCount });
+      const response = await api.post(getDashboardApiUrl('/dashboard/categories'), {
+        name,
+        projectId,
+        projectName,
+      });
       toast.success('Category added successfully!');
       dispatch(fetchDashboardOverview());
       return response.data;
@@ -49,9 +53,14 @@ export const addDashboardCategory = createAsyncThunk(
 
 export const addDashboardSubcategory = createAsyncThunk(
   'dashboard/addDashboardSubcategory',
-  async ({ name, categoryId, vendorCount }, { dispatch, rejectWithValue }) => {
+  async ({ parentCategory, subcategories, projectId, projectName }, { dispatch, rejectWithValue }) => {
     try {
-      const response = await api.post('/superadmin/dashboard/subcategories', { name, categoryId, vendorCount });
+      const response = await api.post(getDashboardApiUrl('/dashboard/subcategories'), {
+        parentCategory,
+        subcategories,
+        projectId,
+        projectName,
+      });
       toast.success('Subcategory added successfully!');
       dispatch(fetchDashboardOverview());
       return response.data;

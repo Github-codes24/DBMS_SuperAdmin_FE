@@ -1223,20 +1223,20 @@ useEffect(() => {
   const handleAddMainCategory = (newItem) => {
     dispatch(addDashboardCategory({
       name: newItem.category,
-      vendorCount: parseInt(newItem.count) || 0
     }));
   };
 
   const handleAddSubCategory = (newItem) => {
-    const categoryId = newItem.categoryId;
-    if (!categoryId) {
+    const parentCategory = MASTER_CATEGORIES_WITH_SUBCATS.find(
+      (category) => category.id === newItem.categoryId
+    )?.name;
+    if (!parentCategory) {
       toast.error('Please select a category to add a sub category.');
       return;
     }
     dispatch(addDashboardSubcategory({
-      name: newItem.category || newItem.name,
-      categoryId,
-      vendorCount: parseInt(newItem.count) || 0
+      parentCategory,
+      subcategories: [newItem.category || newItem.name],
     }));
   };
 
