@@ -1,14 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import { Layers, Loader2, Plus, X } from 'lucide-react';
 import { toast } from 'react-toastify';
 import Navbar from './Navbar';
 import Sidebar from './Sidebar';
+import api, { getDashboardApiUrl } from '../services/api';
 import {
   addDashboardCategory,
   addDashboardSubcategory,
 } from '../redux/slices/dashboardSlice';
-import { fetchCategories } from '../redux/slices/categorySlice';
 
 const NEW_CATEGORY = 'new';
 
@@ -45,85 +45,220 @@ const getSubcategoryParentName = (subcategory, categories) => {
   return matchingCategory ? getCategoryName(matchingCategory) : 'Unassigned';
 };
 
+const fetchProjectCategoryData = async (projectId) => {
+  const response = await api.get(
+    getDashboardApiUrl(
+      `/dashboard/projects/${encodeURIComponent(projectId)}/categories`
+    ),
+    { params: { limit: 100 } }
+  );
+  const payload = response.data;
+  const categories =
+    payload?.categories || payload?.data?.categories || payload?.data;
+  if (!Array.isArray(categories)) {
+    throw new Error('The project categories API returned an invalid response.');
+  }
+
+  const subcategoryLists = await Promise.all(
+    categories.map(async (category) => {
+      const categoryId = getCategoryId(category);
+      if (!categoryId) {
+        throw new Error(
+          `Category "${getCategoryName(category) || 'Unknown'}" is missing its ID.`
+        );
+      }
+      const subcategoryResponse = await api.get(
+        getDashboardApiUrl(
+          `/dashboard/categories/${encodeURIComponent(categoryId)}/subcategories`
+        ),
+        { params: { limit: 100 } }
+      );
+      const subcategoryPayload = subcategoryResponse.data;
+      const list =
+        subcategoryPayload?.subcategories ||
+        subcategoryPayload?.data?.subcategories ||
+        subcategoryPayload?.data;
+      if (!Array.isArray(list)) {
+        throw new Error(
+          `The sub-categories API returned invalid data for "${getCategoryName(category)}".`
+        );
+      }
+      return list.map((subcategory) => ({
+        ...subcategory,
+        parentCategory:
+          getSubcategoryParentName(subcategory, [category]) === 'Unassigned'
+            ? getCategoryName(category)
+            : getSubcategoryParentName(subcategory, [category]),
+      }));
+    })
+  );
+
+  return { categories, subcategories: subcategoryLists.flat() };
+};
+
 function CategorySubcategory() {
   const dispatch = useDispatch();
-  const { categories, subcategories, loading, error } = useSelector(
-    (state) => state.category
-  );
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsError, setProjectsError] = useState('');
+  const [categories, setCategories] = useState([]);
+  const [subcategories, setSubcategories] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState(NEW_CATEGORY);
+  const [selectedCategoryName, setSelectedCategoryName] = useState(NEW_CATEGORY);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const [newSubcategoryName, setNewSubcategoryName] = useState('');
+  const [newSubcategoryNames, setNewSubcategoryNames] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    dispatch(fetchCategories());
-  }, [dispatch]);
+    let isCurrentRequest = true;
+
+    const loadProjects = async () => {
+      setProjectsLoading(true);
+      setProjectsError('');
+      try {
+        const response = await api.get(getDashboardApiUrl('/dashboard/projects'));
+        const payload = response.data;
+        const projectList = payload?.projects || payload?.data?.projects || payload?.data;
+        if (!Array.isArray(projectList)) {
+          throw new Error('The projects API returned an invalid response.');
+        }
+        if (isCurrentRequest) setProjects(projectList);
+      } catch (requestError) {
+        if (isCurrentRequest) {
+          setProjects([]);
+          setProjectsError(
+            requestError.response?.data?.message ||
+              requestError.message ||
+              'Failed to load projects.'
+          );
+        }
+      } finally {
+        if (isCurrentRequest) setProjectsLoading(false);
+      }
+    };
+
+    loadProjects();
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let isCurrentRequest = true;
+    const loadProjectCategories = async () => {
+      if (!selectedProjectId) {
+        setCategories([]);
+        setSubcategories([]);
+        setLoading(false);
+        setError('');
+        return;
+      }
+
+      setLoading(true);
+      setError('');
+      setCategories([]);
+      setSubcategories([]);
+
+      try {
+        const result = await fetchProjectCategoryData(selectedProjectId);
+        if (isCurrentRequest) {
+          setCategories(result.categories);
+          setSubcategories(result.subcategories);
+        }
+      } catch (requestError) {
+        if (isCurrentRequest) {
+          setError(
+            requestError.response?.data?.message ||
+              requestError.message ||
+              'Failed to load this project’s categories.'
+          );
+        }
+      } finally {
+        if (isCurrentRequest) setLoading(false);
+      }
+    };
+
+    loadProjectCategories();
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [selectedProjectId]);
+
+  const selectedProject = projects.find(
+    (project) =>
+      String(project.projectId || project._id || project.id || '') ===
+      String(selectedProjectId)
+  );
+  const selectedProjectName =
+    selectedProject?.name || selectedProject?.projectName || selectedProject?.title || '';
 
   const closeModal = () => {
     setIsModalOpen(false);
-    setSelectedCategoryId(NEW_CATEGORY);
+    setSelectedCategoryName(NEW_CATEGORY);
     setNewCategoryName('');
-    setNewSubcategoryName('');
+    setNewSubcategoryNames('');
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     const categoryName = newCategoryName.trim();
-    const subcategoryName = newSubcategoryName.trim();
-    const isCreatingCategory = selectedCategoryId === NEW_CATEGORY;
+    const subcategories = newSubcategoryNames
+      .split(/[\n,]/)
+      .map((name) => name.trim())
+      .filter(Boolean);
+    const isCreatingCategory = selectedCategoryName === NEW_CATEGORY;
 
     if (isCreatingCategory && !categoryName) {
       toast.error('Please enter a category name.');
       return;
     }
-    if (!isCreatingCategory && !subcategoryName) {
+    if (!isCreatingCategory && subcategories.length === 0) {
       toast.error('Please enter a sub-category name.');
       return;
     }
 
     setIsSaving(true);
     try {
-      let categoryId = selectedCategoryId;
+      let parentCategory = categories.find(
+        (category) => getCategoryName(category) === selectedCategoryName
+      );
 
       if (isCreatingCategory) {
         await dispatch(
-          addDashboardCategory({ name: categoryName, vendorCount: 0 })
+          addDashboardCategory({
+            name: categoryName,
+            projectId: selectedProjectId,
+            projectName: selectedProjectName,
+          })
         ).unwrap();
-
-        if (subcategoryName) {
-          const refreshedCategories = await dispatch(fetchCategories()).unwrap();
-          const createdCategory = refreshedCategories.categories.find(
-            (category) =>
-              getCategoryName(category).trim().toLowerCase() ===
-              categoryName.toLowerCase()
-          );
-          categoryId = createdCategory ? getCategoryId(createdCategory) : '';
-
-          if (!categoryId) {
-            throw new Error(
-              'The category was added, but its ID could not be loaded. Refresh and add the sub-category separately.'
-            );
-          }
+        parentCategory = { name: categoryName };
+        if (subcategories.length > 0) {
+          setSelectedCategoryName(categoryName);
         }
       }
 
-      if (subcategoryName) {
-        if (!categoryId || categoryId === NEW_CATEGORY) {
+      if (subcategories.length > 0) {
+        const parentCategoryName = getCategoryName(parentCategory);
+        if (!parentCategoryName) {
           toast.error('Please select a category for the sub-category.');
           return;
         }
         await dispatch(
           addDashboardSubcategory({
-            name: subcategoryName,
-            categoryId,
-            vendorCount: 0,
+            parentCategory: parentCategoryName,
+            subcategories,
+            projectId: selectedProjectId,
+            projectName: selectedProjectName,
           })
         ).unwrap();
       }
 
-      await dispatch(fetchCategories()).unwrap();
+      await refreshProjectCategories();
       closeModal();
     } catch (saveError) {
       if (typeof saveError === 'string') {
@@ -133,6 +268,23 @@ function CategorySubcategory() {
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const refreshProjectCategories = async () => {
+    if (!selectedProjectId) return;
+    try {
+      const result = await fetchProjectCategoryData(selectedProjectId);
+      setCategories(result.categories);
+      setSubcategories(result.subcategories);
+      setError('');
+    } catch (refreshError) {
+      const message =
+        refreshError.response?.data?.message ||
+        refreshError.message ||
+        'Failed to refresh this project’s categories.';
+      setError(message);
+      toast.error(message);
     }
   };
 
@@ -162,25 +314,65 @@ function CategorySubcategory() {
                 Manage categories and their sub-categories in one place.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="px-4 py-2.5 bg-[#f26522] hover:bg-[#e05411] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer"
-            >
-              <Plus size={15} />
-              Add Category &amp; Sub-category
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select
+                aria-label="Select project"
+                value={selectedProjectId}
+                onChange={(event) => {
+                  setSelectedProjectId(event.target.value);
+                  setSelectedCategoryName(NEW_CATEGORY);
+                }}
+                disabled={projectsLoading || Boolean(projectsError) || isModalOpen}
+                className="min-w-52 px-3 py-2.5 bg-white text-slate-800 text-xs font-semibold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 disabled:opacity-60"
+              >
+                <option value="">
+                  {projectsLoading ? 'Loading projects...' : 'Select project'}
+                </option>
+                {projects.map((project, index) => {
+                  const projectId =
+                    project.projectId || project._id || project.id || '';
+                  const projectName =
+                    project.name || project.projectName || project.title || '';
+                  return (
+                    <option
+                      key={projectId || projectName || index}
+                      value={projectId}
+                    >
+                      {projectName || 'Unnamed project'}
+                    </option>
+                  );
+                })}
+              </select>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                disabled={!selectedProjectId}
+                className="px-4 py-2.5 bg-[#f26522] hover:bg-[#e05411] text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus size={15} />
+                Add Category &amp; Sub-category
+              </button>
+            </div>
           </section>
 
-          {error ? (
+          {projectsError ? (
+            <div className="bg-red-50 text-red-700 border border-red-200 rounded-2xl p-5">
+              <h2 className="text-sm font-bold">Unable to load projects</h2>
+              <p className="text-xs mt-1">{projectsError}</p>
+            </div>
+          ) : !selectedProjectId ? (
+            <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm font-semibold text-slate-500">
+              Select a project to view and manage its categories.
+            </div>
+          ) : error ? (
             <div className="bg-red-50 text-red-700 border border-red-200 rounded-2xl p-5 flex items-center justify-between gap-4">
               <div>
-                <h2 className="text-sm font-bold">Unable to load categories</h2>
+                <h2 className="text-sm font-bold">Unable to load project categories</h2>
                 <p className="text-xs mt-1">{error}</p>
               </div>
               <button
                 type="button"
-                onClick={() => dispatch(fetchCategories())}
+                onClick={refreshProjectCategories}
                 className="px-3 py-2 bg-white border border-red-200 rounded-lg text-xs font-bold hover:bg-red-100 cursor-pointer"
               >
                 Retry
@@ -284,15 +476,15 @@ function CategorySubcategory() {
                 </label>
                 <select
                   id="category-target"
-                  value={selectedCategoryId}
-                  onChange={(event) => setSelectedCategoryId(event.target.value)}
+                  value={selectedCategoryName}
+                  onChange={(event) => setSelectedCategoryName(event.target.value)}
                   className="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522]"
                 >
                   <option value={NEW_CATEGORY}>Create a new category</option>
                   {categories.map((category, index) => (
                     <option
                       key={getCategoryId(category) || getCategoryName(category) || index}
-                      value={getCategoryId(category)}
+                      value={getCategoryName(category)}
                     >
                       {getCategoryName(category)}
                     </option>
@@ -300,7 +492,7 @@ function CategorySubcategory() {
                 </select>
               </div>
 
-              {selectedCategoryId === NEW_CATEGORY && (
+              {selectedCategoryName === NEW_CATEGORY && (
                 <div>
                   <label
                     htmlFor="new-category-name"
@@ -322,21 +514,21 @@ function CategorySubcategory() {
 
               <div>
                 <label
-                  htmlFor="new-subcategory-name"
+                  htmlFor="new-subcategory-names"
                   className="block text-xs font-bold text-slate-700 mb-1.5"
                 >
                   Sub-category name
-                  {selectedCategoryId !== NEW_CATEGORY && (
+                  {selectedCategoryName !== NEW_CATEGORY && (
                     <span className="text-rose-500"> *</span>
                   )}
                 </label>
-                <input
-                  id="new-subcategory-name"
-                  type="text"
-                  value={newSubcategoryName}
-                  onChange={(event) => setNewSubcategoryName(event.target.value)}
-                  placeholder="Enter sub-category name (optional for a new category)"
-                  required={selectedCategoryId !== NEW_CATEGORY}
+                <textarea
+                  id="new-subcategory-names"
+                  value={newSubcategoryNames}
+                  onChange={(event) => setNewSubcategoryNames(event.target.value)}
+                  placeholder="Enter sub-category names separated by commas or new lines"
+                  required={selectedCategoryName !== NEW_CATEGORY}
+                  rows={3}
                   className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 focus:border-[#f26522]"
                 />
               </div>
