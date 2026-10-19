@@ -823,7 +823,7 @@ useEffect(() => {
     try {
       const response = await api.get(
         getDashboardApiUrl(
-          `/dashboard/projects/${encodeURIComponent("PID-005")}/categories`
+          `/dashboard/${encodeURIComponent("PID-005")}/categories`
         ),
         { params: { limit: 100 } }
       );

@@ -48,7 +48,7 @@ const getSubcategoryParentName = (subcategory, categories) => {
 const fetchProjectCategoryData = async (projectId) => {
   const response = await api.get(
     getDashboardApiUrl(
-      `/dashboard/projects/${encodeURIComponent(projectId)}/categories`
+      `/dashboard/${encodeURIComponent(projectId)}/categories`
     ),
     { params: { limit: 100 } }
   );

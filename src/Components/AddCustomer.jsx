@@ -153,7 +153,7 @@ function AddCustomer({ onBack, onSuccess }) {
     api
       .get(
         getDashboardApiUrl(
-          `/dashboard/projects/${encodeURIComponent(selectedProjectId)}/categories`,
+          `/dashboard/${encodeURIComponent(selectedProjectId)}/categories`,
         ),
         { params: { limit: 100 } },
       )
