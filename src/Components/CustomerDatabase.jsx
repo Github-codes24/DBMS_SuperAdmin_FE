@@ -329,7 +329,7 @@ function CustomerDatabase({ compact = false }) {
     let isCurrentRequest = true;
     setImportCategoriesLoading(true);
     setImportCategoriesError('');
-    api.get(getDashboardApiUrl(`/dashboard/projects/${encodeURIComponent(selectedProjectId)}/categories`), {
+    api.get(getDashboardApiUrl(`/dashboard/${encodeURIComponent(selectedProjectId)}/categories`), {
       params: { limit: 100 },
     })
       .then((response) => {
