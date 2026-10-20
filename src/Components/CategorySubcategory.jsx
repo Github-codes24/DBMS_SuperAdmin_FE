@@ -50,7 +50,7 @@ const fetchProjectCategoryData = async (projectId) => {
     getDashboardApiUrl(
       `/dashboard/${encodeURIComponent(projectId)}/categories`
     ),
-    { params: { limit: 100 } }
+    { params: { limit: 1000 } }
   );
   const payload = response.data;
   const categories =
