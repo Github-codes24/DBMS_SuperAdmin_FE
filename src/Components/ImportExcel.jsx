@@ -29,7 +29,7 @@ const ImportExcel = ({
         <button
           type="button"
           onClick={onDownloadTemplate}
-          className="px-3 py-1.5 bg-white border border-orange-300 text-[#f26522] rounded-lg text-[11px] font-bold flex items-center gap-1"
+          className="px-3 py-1.5 bg-white cursor-pointer border border-orange-300 text-[#f26522] rounded-lg text-[11px] font-bold flex items-center gap-1"
         >
           <FileDown size={13} />
           Template
@@ -118,7 +118,7 @@ const ImportExcel = ({
                   fileInputRef.current.value = "";
                 }
               }}
-              className="px-3 py-1 text-xs text-slate-600 hover:text-red-600"
+              className="px-3 py-1 text-xs text-slate-600 hover:text-red-600 cursor-pointer"
             >
               Change
             </button>

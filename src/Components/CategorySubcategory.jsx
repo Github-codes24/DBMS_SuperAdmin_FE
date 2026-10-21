@@ -52,7 +52,7 @@ const fetchProjectCategoryData = async (projectId) => {
     getDashboardApiUrl(
       `/dashboard/${encodeURIComponent(projectId)}/categories`,
     ),
-      { params: { limit: 1000 } },
+    { params: { limit: 1000 } },
   );
   const payload = response.data;
   const categories =
@@ -124,6 +124,7 @@ function CategorySubcategory() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [newSubcategoryNames, setNewSubcategoryNames] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [previewColumns, setPreviewColumns] = useState([]);
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -327,6 +328,162 @@ function CategorySubcategory() {
     setSelectedFile(file);
   };
 
+  const handleProcessUploadFile = async () => {
+    if (!selectedFile) {
+      setFileError("Please select a file first.");
+      return;
+    }
+
+    setIsProcessingFile(true);
+    setFileError("");
+
+    try {
+      const fileData = await selectedFile.arrayBuffer();
+
+      const workbook = XLSX.read(fileData, { type: "array" });
+      const firstSheetName = workbook.SheetNames[0];
+
+      if (!firstSheetName) {
+        throw new Error("The uploaded file has no worksheets.");
+      }
+
+      const worksheet = workbook.Sheets[firstSheetName];
+      const rows = XLSX.utils.sheet_to_json(worksheet, {
+        defval: "",
+        raw: false,
+      });
+
+      if (rows.length === 0) {
+        throw new Error("The uploaded file contains no data.");
+      }
+
+      const requiredColumns = [
+        "Serial No",
+        "Project Name",
+        "Category Name",
+        "Subcategory Name",
+      ];
+
+      const uploadedColumns = Object.keys(rows[0] || {});
+      const missingColumns = requiredColumns.filter(
+        (column) => !uploadedColumns.includes(column),
+      );
+
+      const hasInvalidFormat = missingColumns.length > 0;
+
+      const records = rows.map((row, index) => ({
+        id: `${index + 1}`,
+        rawData: row,
+        serialNo: row["Serial No"] || index + 1,
+        projectName: String(row["Project Name"] ?? "").trim(),
+        categoryName: String(row["Category Name"] ?? "").trim(),
+        subcategoryName: String(row["Subcategory Name"] ?? "").trim(),
+        status: hasInvalidFormat ? "Invalid" : "New",
+        errors: hasInvalidFormat
+          ? [`Invalid format. Missing columns: ${missingColumns.join(", ")}`]
+          : [],
+      }));
+
+      // Invalid format: show uploaded columns and values in preview.
+      if (hasInvalidFormat) {
+        setPreviewColumns(uploadedColumns);
+        setReviewRecords(records);
+        setIsImportModalOpen(false);
+        setIsReviewModalOpen(true);
+        return;
+      }
+
+      // Cache existing categories/subcategories for each project.
+      const projectDataCache = {};
+      const uploadedRecordKeys = new Set();
+
+      for (const record of records) {
+        const matchedProject = projects.find(
+          (project) =>
+            String(project.name || project.projectName || project.title || "")
+              .trim()
+              .toLowerCase()
+              .localeCompare(record.projectName.toLowerCase()) === 0,
+        );
+
+        if (!matchedProject) {
+          record.status = "Invalid";
+          record.errors.push(`Project "${record.projectName}" not found.`);
+          continue;
+        }
+
+        const projectId =
+          matchedProject.projectId || matchedProject._id || matchedProject.id;
+
+        if (!projectId) {
+          record.status = "Invalid";
+          record.errors.push("Project ID not found.");
+          continue;
+        }
+
+        if (!record.categoryName || !record.subcategoryName) {
+          record.status = "Invalid";
+          record.errors.push(
+            "Category Name and Subcategory Name are required.",
+          );
+          continue;
+        }
+
+        if (!projectDataCache[projectId]) {
+          projectDataCache[projectId] =
+            await fetchProjectCategoryData(projectId);
+        }
+
+        const projectData = projectDataCache[projectId];
+
+        const matchingCategory = projectData.categories.find(
+          (category) =>
+            getCategoryName(category).trim().toLowerCase() ===
+            record.categoryName.toLowerCase(),
+        );
+
+        const recordKey = [
+          String(projectId).toLowerCase(),
+          record.categoryName.toLowerCase(),
+          record.subcategoryName.toLowerCase(),
+        ].join("::");
+
+        const existsInDatabase =
+          matchingCategory &&
+          projectData.subcategories.some((subcategory) => {
+            const parentName = String(subcategory.parentCategory || "")
+              .trim()
+              .toLowerCase();
+
+            return (
+              parentName === record.categoryName.toLowerCase() &&
+              getSubcategoryName(subcategory).trim().toLowerCase() ===
+                record.subcategoryName.toLowerCase()
+            );
+          });
+
+        if (existsInDatabase || uploadedRecordKeys.has(recordKey)) {
+          record.status = "Duplicate";
+        } else {
+          record.status = "New";
+        }
+
+        uploadedRecordKeys.add(recordKey);
+      }
+
+      setPreviewColumns(uploadedColumns);
+      setReviewRecords(records);
+      setIsImportModalOpen(false);
+      setIsReviewModalOpen(true);
+    } catch (processingError) {
+      setFileError(
+        processingError.message || "Unable to process the uploaded file.",
+      );
+    } finally {
+      setIsProcessingFile(false);
+    }
+  };
+
   const handleDownloadTemplate = () => {
     const csvContent = [
       "Serial No,Project Name,Category Name,Subcategory Name",
@@ -348,6 +505,130 @@ function CategorySubcategory() {
     document.body.removeChild(link);
 
     URL.revokeObjectURL(url);
+  };
+  const handleAcceptImport = async () => {
+    const newRecords = reviewRecords.filter(
+      (record) => record.errors.length === 0 && record.status === "New",
+    );
+
+    if (newRecords.length === 0) {
+      toast.error("No valid records available to import.");
+      return;
+    }
+
+    setIsImporting(true);
+
+    try {
+      const groupedRecords = {};
+
+      newRecords.forEach((record) => {
+        const matchedProject = projects.find(
+          (project) =>
+            (project.name || project.projectName || project.title || "")
+              .trim()
+              .toLowerCase() === record.projectName.trim().toLowerCase(),
+        );
+
+        if (!matchedProject) {
+          record.errors.push(`Project "${record.projectName}" not found.`);
+          return;
+        }
+
+        const projectId =
+          matchedProject.projectId || matchedProject._id || matchedProject.id;
+
+        const projectName =
+          matchedProject.name ||
+          matchedProject.projectName ||
+          matchedProject.title;
+
+        const categoryName = record.categoryName.trim();
+        const subcategoryName = record.subcategoryName.trim();
+
+        if (!categoryName || !subcategoryName) {
+          record.errors.push(
+            "Category Name and Subcategory Name are required.",
+          );
+          return;
+        }
+
+        const key = `${projectId}_${categoryName.toLowerCase()}`;
+
+        if (!groupedRecords[key]) {
+          groupedRecords[key] = {
+            projectId,
+            projectName,
+            categoryName,
+            subcategories: [],
+          };
+        }
+
+        if (
+          !groupedRecords[key].subcategories.some(
+            (name) => name.toLowerCase() === subcategoryName.toLowerCase(),
+          )
+        ) {
+          groupedRecords[key].subcategories.push(subcategoryName);
+        }
+      });
+
+      if (Object.keys(groupedRecords).length === 0) {
+        toast.error("No valid records available to import.");
+        return;
+      }
+
+      const projectCategoryCache = {};
+
+      for (const group of Object.values(groupedRecords)) {
+        if (!projectCategoryCache[group.projectId]) {
+          projectCategoryCache[group.projectId] =
+            await fetchProjectCategoryData(group.projectId);
+        }
+
+        const existingCategoryNames = new Set(
+          projectCategoryCache[group.projectId].categories.map((category) =>
+            getCategoryName(category).trim().toLowerCase(),
+          ),
+        );
+
+        if (!existingCategoryNames.has(group.categoryName.toLowerCase())) {
+          await api.post(getDashboardApiUrl("/dashboard/categories"), {
+            name: group.categoryName,
+            projectId: group.projectId,
+            projectName: group.projectName,
+          });
+
+          existingCategoryNames.add(group.categoryName.toLowerCase());
+        }
+
+        await api.post(getDashboardApiUrl("/dashboard/subcategories"), {
+          parentCategory: group.categoryName,
+          subcategories: group.subcategories,
+          projectId: group.projectId,
+          projectName: group.projectName,
+        });
+      }
+
+      await refreshProjectCategories();
+
+      toast.success("Categories and subcategories imported successfully.");
+
+      setIsReviewModalOpen(false);
+      setReviewRecords([]);
+      setSelectedFile(null);
+      setFileError("");
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (importError) {
+      toast.error(
+        importError.response?.data?.message ||
+          "Import failed. Please check the records and try again.",
+      );
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   return (
@@ -376,12 +657,16 @@ function CategorySubcategory() {
                 Manage categories and their sub-categories in one place.
               </p>
             </div>
-
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 type="button"
-                onClick={() => setIsImportModalOpen(true)}
-                disabled={!selectedProjectId}
+                onClick={() => {
+                  setSelectedFile(null);
+                  setFileError("");
+                  setDragActive(false);
+                  setIsImportModalOpen(true);
+                }}
+                // disabled={!selectedProjectId}
                 className="px-4 py-2.5 bg-white border border-orange-300 text-[#f26522] text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Upload size={15} />
@@ -397,7 +682,7 @@ function CategorySubcategory() {
                 disabled={
                   projectsLoading || Boolean(projectsError) || isModalOpen
                 }
-                className="min-w-52 px-3 py-2.5 bg-white text-slate-800 text-xs font-semibold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 disabled:opacity-60"
+                className="min-w-52 px-3 py-2.5 bg-white text-slate-800 cursor-pointer text-xs font-semibold border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 disabled:opacity-60"
               >
                 <option value="">
                   {projectsLoading ? "Loading projects..." : "Select project"}
@@ -428,7 +713,6 @@ function CategorySubcategory() {
               </button>
             </div>
           </section>
-
           {projectsError ? (
             <div className="bg-red-50 text-red-700 border border-red-200 rounded-2xl p-5">
               <h2 className="text-sm font-bold">Unable to load projects</h2>
@@ -491,7 +775,6 @@ function CategorySubcategory() {
                   </p>
                 )}
               </section>
-
               <section className="bg-white rounded-2xl border border-slate-200/90 shadow-sm overflow-hidden">
                 <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                   <h2 className="text-sm font-black text-slate-800">
@@ -533,7 +816,6 @@ function CategorySubcategory() {
           )}
         </main>
       </div>
-
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
@@ -555,7 +837,6 @@ function CategorySubcategory() {
                 <X size={18} />
               </button>
             </div>
-
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div>
                 <label
@@ -587,7 +868,6 @@ function CategorySubcategory() {
                   ))}
                 </select>
               </div>
-
               {selectedCategoryName === NEW_CATEGORY && (
                 <div>
                   <label
@@ -607,7 +887,6 @@ function CategorySubcategory() {
                   />
                 </div>
               )}
-
               <div>
                 <label
                   htmlFor="new-subcategory-names"
@@ -665,17 +944,23 @@ function CategorySubcategory() {
                   Upload your Excel file to import category data.
                 </p>
               </div>
-
               <button
                 type="button"
-                onClick={() => setIsImportModalOpen(false)}
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setSelectedFile(null);
+                  setFileError("");
+                  setDragActive(false);
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                  }
+                }}
                 aria-label="Close"
                 className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200 cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
-
             <div className="p-5">
               <ImportExcel
                 selectedFile={selectedFile}
@@ -700,23 +985,201 @@ function CategorySubcategory() {
                     setSelectedFile(null);
                     setFileError("");
                   }}
-                  className="px-5 py-2 text-sm font-semibold text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50"
+                  className="px-5 py-2 text-sm font-semibold cursor-pointer text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50"
                 >
                   Cancel
                 </button>
-
                 <button
                   type="button"
                   disabled={!selectedFile || isProcessingFile}
-                  onClick={() => {
-                    setIsImportModalOpen(false);
-                    setIsReviewModalOpen(true);
-                  }}
-                  className="px-5 py-2 text-sm font-semibold text-white bg-[#f26522] rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={handleProcessUploadFile}
+                  className="px-5 py-2 text-sm font-semibold cursor-pointer text-white bg-[#f26522] rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Upload
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {isReviewModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#f26522]">
+                  <Layers size={18} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Import Review &amp; Preview
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Review and verify category and sub-category records before
+                    importing.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsReviewModalOpen(false);
+                  setReviewRecords([]);
+                }}
+                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer p-1 rounded-lg hover:bg-slate-200/50"
+                aria-label="Close review"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            {/* Summary Cards */}
+            <div className="px-6 py-3.5 bg-slate-50/70 border-b border-slate-100 shrink-0">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm">
+                  <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                    Total Records
+                  </div>
+                  <div className="text-xl font-bold text-slate-900 mt-0.5">
+                    {reviewRecords.length}
+                  </div>
+                </div>
+                <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200/80 shadow-sm">
+                  <div className="text-[11px] font-semibold text-emerald-700 uppercase tracking-wider">
+                    New (Eligible)
+                  </div>
+                  <div className="text-xl font-bold text-emerald-800 mt-0.5">
+                    {
+                      reviewRecords.filter((record) => record.status === "New")
+                        .length
+                    }
+                  </div>
+                </div>
+                <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/80 shadow-sm">
+                  <div className="text-[11px] font-semibold text-amber-700 uppercase tracking-wider">
+                    Duplicate (Skipped)
+                  </div>
+                  <div className="text-xl font-bold text-amber-800 mt-0.5">
+                    {
+                      reviewRecords.filter(
+                        (record) => record.status === "Duplicate",
+                      ).length
+                    }
+                  </div>
+                </div>
+                <div className="p-3 bg-rose-50/60 rounded-xl border border-rose-200/80 shadow-sm">
+                  <div className="text-[11px] font-semibold text-rose-700 uppercase tracking-wider">
+                    Invalid (Skipped)
+                  </div>
+                  <div className="text-xl font-bold text-rose-800 mt-0.5">
+                    {
+                      reviewRecords.filter((record) => record.errors.length > 0)
+                        .length
+                    }
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Preview Table */}
+            <div className="p-6 overflow-hidden flex flex-col flex-1">
+              <div className="flex items-center justify-between mb-2 shrink-0">
+                <span className="text-xs font-bold text-slate-700">
+                  Record Preview ({reviewRecords.length} records)
+                </span>
+                <span className="text-[11px] text-slate-400">
+                  Review records before importing
+                </span>
+              </div>
+              <div className="border border-slate-200 rounded-xl overflow-auto max-h-[46vh] bg-white shadow-sm">
+                <table className="w-full text-left border-collapse min-w-[650px]">
+                  <thead className="bg-slate-50 sticky top-0 z-10 border-b border-slate-200">
+                    <tr>
+                      {previewColumns.map((column) => (
+                        <th
+                          key={column}
+                          className="p-3 text-left text-xs font-bold text-slate-600 uppercase"
+                        >
+                          {column}
+                        </th>
+                      ))}
+                      {reviewRecords.some(
+                        (record) => record.status === "New",
+                      ) &&
+                        reviewRecords.some(
+                          (record) => record.status === "Duplicate",
+                        ) && (
+                          <th className="p-3 text-left text-xs font-bold text-slate-600 uppercase">
+                            Status
+                          </th>
+                        )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-xs">
+                    {reviewRecords.map((item) => (
+                      <tr key={item.id} className="hover:bg-slate-50/60">
+                        {previewColumns.map((column) => (
+                          <td key={column} className="p-3 text-slate-600">
+                            {item.rawData?.[column] ?? ""}
+                          </td>
+                        ))}
+                        {reviewRecords.some(
+                          (record) => record.status === "New",
+                        ) &&
+                          reviewRecords.some(
+                            (record) => record.status === "Duplicate",
+                          ) && (
+                            <td className="p-3 text-sm">
+                              {item.status === "Invalid" ? (
+                                <span className="text-red-600">Invalid</span>
+                              ) : item.status === "Duplicate" ? (
+                                <span className="text-amber-600">
+                                  Duplicate
+                                </span>
+                              ) : (
+                                <span className="text-emerald-600">New</span>
+                              )}
+                            </td>
+                          )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            {/* Modal Footer */}
+            <div className="flex items-center justify-end gap-2.5 px-6 py-3.5 border-t border-slate-100 bg-slate-50 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsReviewModalOpen(false);
+                  setIsImportModalOpen(true);
+                }}
+                className="px-5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+              >
+                Back
+              </button>
+              <button
+                type="button"
+                onClick={handleAcceptImport}
+                disabled={
+                  isImporting ||
+                  reviewRecords.length === 0 ||
+                  !reviewRecords.some(
+                    (record) =>
+                      record.status === "New" && record.errors.length === 0,
+                  )
+                }
+                className="px-5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isImporting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin cursor-pointer" />
+                    Importing...
+                  </>
+                ) : (
+                  "Accept & Import"
+                )}
+              </button>
             </div>
           </div>
         </div>
