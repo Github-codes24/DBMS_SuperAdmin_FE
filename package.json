@@ -1,0 +1,14 @@
+{
+  "name": "dbms-superadmin-fe",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:platform": "npm run dev --workspace=platform-admin",
+    "build:platform": "npm run build --workspace=platform-admin",
+    "lint:platform": "npm run lint --workspace=platform-admin"
+  }
+}
