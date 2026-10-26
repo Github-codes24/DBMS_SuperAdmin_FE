@@ -12,7 +12,10 @@ import { useNavigate } from "react-router-dom";
 import homeImg from "../../assets/home.png";
 import logo from "../../assets/logo.png";
 
-const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+const baseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(
+  /\/$/,
+  "",
+);
 
 const EMAIL_REGEX =
   /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
