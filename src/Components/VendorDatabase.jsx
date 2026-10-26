@@ -616,8 +616,12 @@ toast.success(
 
   const handleAddVendorSubmit = (e) => {
     e.preventDefault();
-    if (!newVendor.name || !newVendor.category) {
-      alert("Please fill in Vendor Name and Category");
+    // if (!newVendor.name || !newVendor.category) {
+    //   alert("Please fill in Vendor Name and Category");
+    //   return;
+    // }
+    if (!newVendor.name) {
+      alert("Please fill in Vendor Name");
       return;
     }
 
@@ -877,8 +881,12 @@ toast.success(
   const handleEditVendorSubmit = (e) => {
     e.preventDefault();
     if (!editingVendor) return;
-    if (!editingVendor.name || !editingVendor.category) {
-      alert("Please fill in Vendor Name and Category");
+    // if (!editingVendor.name || !editingVendor.category) {
+    //   alert("Please fill in Vendor Name and Category");
+    //   return;
+    // }
+    if (!editingVendor.name) {
+      alert("Please fill in Vendor Name");
       return;
     }
 
@@ -1274,7 +1282,8 @@ toast.success(response?.message || "Vendor updated successfully");
                 />
               </div>
 
-              <div>
+              {/* Category section commented out */}
+              {/* <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Category *
                 </label>
@@ -1302,7 +1311,7 @@ toast.success(response?.message || "Vendor updated successfully");
                     </option>
                   ))}
                 </select>
-              </div>
+              </div> */}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -2328,7 +2337,8 @@ toast.success(response?.message || "Vendor updated successfully");
               />
             </div>
 
-            <div>
+            {/* Category section commented out */}
+            {/* <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Category *
               </label>
@@ -2344,7 +2354,7 @@ toast.success(response?.message || "Vendor updated successfully");
                 }
                 className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
               />
-            </div>
+            </div> */}
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
