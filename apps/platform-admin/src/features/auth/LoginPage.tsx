@@ -12,6 +12,11 @@ import { useNavigate } from "react-router-dom";
 import homeImg from "../../assets/home.png";
 import logo from "../../assets/logo.png";
 
+const baseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(
+  /\/$/,
+  "",
+);
+
 const EMAIL_REGEX =
   /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
 
@@ -78,7 +83,7 @@ function Login() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://localhost:3007/api/auth/login", {
+      const response = await fetch(`${baseUrl}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

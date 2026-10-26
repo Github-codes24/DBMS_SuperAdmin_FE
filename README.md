@@ -165,15 +165,15 @@ git push -u origin feature/project-a-login
 
 Environment variables may be used for backend API URLs and other environment-specific configuration.
 
-For Vite, frontend environment variables exposed to the application generally use the `VITE_` prefix.
+For Vite, frontend environment variables exposed to the application generally use the `VITE_` prefix. The platform-admin app reads them from the repository-root `.env` file. Restart the development server after changing this file.
 
 Example `.env.example`:
 
 ```env
-VITE_API_BASE_URL=http://localhost:3007/api
+VITE_API_BASE_URL=http://localhost:5000
 ```
 
-Update the URL to match the actual backend configuration.
+Set this to the backend origin, without a trailing slash or `/api` suffix; the app adds endpoint paths itself.
 
 Do not put database connection strings, private API secrets, JWT signing secrets, or other server-only credentials in frontend environment variables. Frontend variables can be exposed to users in the built application.
 
