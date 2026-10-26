@@ -8,6 +8,7 @@ import {
   ShieldCheck,
   ArrowRight,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import homeImg from "../../assets/home.png";
 import logo from "../../assets/logo.png";
 
@@ -15,6 +16,7 @@ const EMAIL_REGEX =
   /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
 
 function Login() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -102,7 +104,7 @@ function Login() {
       localStorage.setItem("accessToken", accessToken);
       localStorage.setItem("user", JSON.stringify(user));
 
-      setNoticeMessage(result.message || "Login successful.");
+      navigate("/users", { replace: true });
     } catch (error) {
       setNoticeMessage(
         error instanceof Error
