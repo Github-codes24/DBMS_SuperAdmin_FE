@@ -1,17 +1,19 @@
-/*
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
-import LoginPage from './features/auth/LoginPage'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import LoginPage from './features/auth/LoginPage';
+import UsersPage from './features/users/UsersPage';
 
 function App() {
-  return <LoginPage />
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/users" element={<UsersPage />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
 }
 
-export default App
-*/
+export default App;
 
-export { default } from './features/users/UsersPage'
-export default App
