@@ -10,5 +10,8 @@
     "dev:platform": "npm run dev --workspace=platform-admin",
     "build:platform": "npm run build --workspace=platform-admin",
     "lint:platform": "npm run lint --workspace=platform-admin"
+  },
+  "dependencies": {
+    "react-router-dom": "^7.18.4"
   }
 }
