@@ -44,3 +44,7 @@ export interface UserInput {
   role: string
   assignedProjects: string[]
 }
+
+export interface CreateUserInput extends UserInput {
+  password: string
+}
