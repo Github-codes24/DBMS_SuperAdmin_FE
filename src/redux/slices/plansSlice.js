@@ -5,7 +5,7 @@ const getWebsiteBaseUrl = () => {
   return (
     import.meta.env.VITE_WEBSITE_API_BASE_URL ||
     import.meta.env.VITE_SUBSCRIPTION_API_BASE_URL ||
-    'https://local-trade-street-be-2.onrender.com/api'
+    'https://local-trade-street-be-2.onrender.com'
   );
 };
 
@@ -14,7 +14,7 @@ export const fetchSubscriptionPlans = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       const baseUrl = getWebsiteBaseUrl().replace(/\/+$/, '');
-      const response = await fetch(`${baseUrl}/customer/plan`, {
+      const response = await fetch(`${baseUrl}/api/customer/plan`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
