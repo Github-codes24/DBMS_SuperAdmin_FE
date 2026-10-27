@@ -81,12 +81,19 @@ export const fetchSubscriptionPlans = createAsyncThunk(
     } catch (err) {
       return rejectWithValue(err.message || 'Network error fetching subscription plans');
     }
+  },
+  {
+    condition: (_, { getState }) => {
+      const status = getState().plans.status;
+      return status !== 'loading' && status !== 'succeeded';
+    },
   }
 );
 
 const initialState = {
   plans: [],
   options: [],
+  status: 'idle',
   loading: false,
   error: null,
 };
@@ -102,15 +109,18 @@ const plansSlice = createSlice({
   extraReducers: (builder) => {
     builder
       .addCase(fetchSubscriptionPlans.pending, (state) => {
+        state.status = 'loading';
         state.loading = true;
         state.error = null;
       })
       .addCase(fetchSubscriptionPlans.fulfilled, (state, action) => {
+        state.status = 'succeeded';
         state.loading = false;
         state.plans = action.payload.plans;
         state.options = action.payload.options;
       })
       .addCase(fetchSubscriptionPlans.rejected, (state, action) => {
+        state.status = 'failed';
         state.loading = false;
         state.error = action.payload || 'Failed to load plans';
       });
