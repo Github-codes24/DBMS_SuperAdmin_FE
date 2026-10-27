@@ -1,12 +1,14 @@
 import type {
   AccountStatus,
   AssignedProject,
+  CreateUserInput,
   SelectOption,
   User,
   UserInput,
   UserListParams,
   UserListResult,
 } from '../types/user.types'
+import { clearAccessToken, getAccessToken } from '../../auth/authService'
 
 const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
 
@@ -31,8 +33,17 @@ function unwrapList(value: unknown): { items: unknown[]; metadata: Record<string
   const data = response.data
   if (Array.isArray(data)) return { items: data, metadata: response }
 
-  const nested = asRecord(data)
-  const items = nested.users ?? nested.items ?? response.users ?? response.items
+  const nested =
+    typeof data === 'object' && data !== null && !Array.isArray(data)
+      ? asRecord(data)
+      : {}
+  const items =
+    nested.users ??
+    nested.items ??
+    nested.projects ??
+    response.users ??
+    response.items ??
+    response.projects
   if (!Array.isArray(items)) {
     throw new Error('The server returned an invalid list response.')
   }
@@ -40,9 +51,14 @@ function unwrapList(value: unknown): { items: unknown[]; metadata: Record<string
 }
 
 function optionName(value: unknown): SelectOption {
+  if (typeof value === 'string' || typeof value === 'number') {
+    const name = String(value)
+    return { id: name, name }
+  }
+
   const option = asRecord(value)
-  const id = option.id ?? option._id ?? option.value ?? option.name
-  const name = option.name ?? option.label ?? option.title
+  const id = option.id ?? option._id ?? option.projectId ?? option.value ?? option.projectName ?? option.name
+  const name = option.name ?? option.projectName ?? option.label ?? option.title
   return {
     id: asString(id, 'an option identifier'),
     name: asString(name, 'an option name'),
@@ -100,7 +116,7 @@ function mapUser(value: unknown): User {
     email: asString(record.email, 'a user email address'),
     phoneNumber: String(phoneNumber),
     role,
-    assignedProjects: assignedProjects(record.assignedProjects ?? record.projects),
+    assignedProjects: assignedProjects(record.assignedProjects ?? record.projectIds ?? record.projects),
     status: status as AccountStatus,
     createdAt: asString(record.createdAt ?? record.created_at, 'a creation date'),
     ...(record.updatedAt || record.updated_at
@@ -110,13 +126,23 @@ function mapUser(value: unknown): User {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const accessToken = getAccessToken()
+  if (!accessToken) {
+    throw new Error('Authentication required. Please sign in to continue.')
+  }
+
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
     headers: {
+      Authorization: `Bearer ${accessToken}`,
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
       ...init?.headers,
     },
   })
+
+  if (response.status === 401) {
+    clearAccessToken()
+  }
 
   if (!response.ok) {
     let message = `Request failed (${response.status}).`
@@ -151,7 +177,9 @@ export async function listUsers(
   })
   if (params.search) query.set('search', params.search)
   if (params.role) query.set('role', params.role)
-  if (params.status) query.set('status', params.status)
+  if (params.status) query.set('isActive', String(params.status === 'active'))
+  query.set('sortBy', 'createdAt')
+  query.set('sortOrder', 'desc')
 
   const raw: unknown = await request(`/users?${query.toString()}`, { signal })
   const { items, metadata } = unwrapList(raw)
@@ -201,23 +229,50 @@ export async function getUser(id: string): Promise<User> {
   return mapUser(record.data ?? record.user ?? record)
 }
 
-export async function createUser(input: UserInput): Promise<void> {
+export async function createUser(input: CreateUserInput): Promise<void> {
   await request('/users', {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: JSON.stringify({
+      name: input.fullName,
+      email: input.email,
+      password: input.password,
+      phoneNumber: input.phoneNumber,
+      role: input.role,
+      projectIds: input.assignedProjects,
+      isActive: true,
+    }),
   })
 }
 
 export async function updateUser(id: string, input: UserInput): Promise<void> {
   await request(`/users/${encodeURIComponent(id)}`, {
-    method: 'PATCH',
-    body: JSON.stringify(input),
+    method: 'PUT',
+    body: JSON.stringify({
+      name: input.fullName,
+      email: input.email,
+      phoneNumber: input.phoneNumber,
+      role: input.role,
+      projectIds: input.assignedProjects,
+    }),
   })
 }
 
 export async function updateUserStatus(id: string, status: AccountStatus): Promise<void> {
   await request(`/users/${encodeURIComponent(id)}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ isActive: status === 'active' }),
+  })
+}
+
+export async function resetUserPassword(id: string, password: string): Promise<void> {
+  await request(`/users/${encodeURIComponent(id)}/reset-password`, {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  })
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  await request(`/users/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
   })
 }
