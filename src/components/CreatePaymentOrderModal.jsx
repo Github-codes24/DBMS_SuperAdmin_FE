@@ -6,7 +6,12 @@ import { fetchSubscriptionPlans } from '../redux/slices/plansSlice';
 
 export default function CreatePaymentOrderModal({ vendor, onClose, onSendPaymentLink }) {
   const dispatch = useDispatch();
-  const { options: planOptions = [], loading: loadingPlans = false, error: plansError = null } =
+  const {
+    options: planOptions = [],
+    status: plansStatus = 'idle',
+    loading: loadingPlans = false,
+    error: plansError = null,
+  } =
     useSelector((state) => state.plans || {});
 
   const [alternatePhone, setAlternatePhone] = useState(vendor.alternatePhone || vendor.phone || '');
@@ -23,10 +28,10 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
   const [actionError, setActionError] = useState(null);
 
   useEffect(() => {
-    if (planOptions.length === 0 && !loadingPlans) {
+    if (plansStatus === 'idle') {
       dispatch(fetchSubscriptionPlans());
     }
-  }, [dispatch, planOptions.length, loadingPlans]);
+  }, [dispatch, plansStatus]);
 
   const isAllSelected = orderItems.length > 0 && selectedItemIds.length === orderItems.length;
   const isIndeterminate = selectedItemIds.length > 0 && selectedItemIds.length < orderItems.length;
