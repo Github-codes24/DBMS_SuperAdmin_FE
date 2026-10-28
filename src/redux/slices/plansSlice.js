@@ -5,10 +5,10 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 // Falls back to the website backend only if the DBMS env var is not set.
 const getPlansBaseUrl = () => {
   return (
-    import.meta.env.VITE_API_BASE_URL || // primary: DBMS backend
-    import.meta.env.VITE_WEBSITE_API_BASE_URL || // legacy fallback
+    import.meta.env.VITE_API_BASE_URL ||              // primary: DBMS backend
+    import.meta.env.VITE_WEBSITE_API_BASE_URL ||      // legacy fallback
     import.meta.env.VITE_SUBSCRIPTION_API_BASE_URL || // legacy fallback
-    "https://lts-dbms-backend.onrender.com" // hard-coded fallback
+    "https://lts-dbms-backend.onrender.com"           // hard-coded fallback
   );
 };
 
