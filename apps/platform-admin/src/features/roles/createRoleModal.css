@@ -1,0 +1,224 @@
+.create-role-overlay {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  overflow-y: auto;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 23 42 / 40%);
+  backdrop-filter: blur(3px);
+}
+
+.create-role-modal {
+  width: min(448px, 100%);
+  padding: 18px 24px;
+  border: 1px solid #e5eaf1;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgb(0 0 0 / 18%);
+  color: #253249;
+  font: 12px/1.45 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.create-role-modal,
+.create-role-modal * {
+  box-sizing: border-box;
+}
+
+.create-role-modal button,
+.create-role-modal input,
+.create-role-modal textarea,
+.create-role-modal select {
+  font: inherit;
+}
+
+.create-role-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 21px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.create-role-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.create-role-heading svg {
+  flex: 0 0 auto;
+  color: #f96321;
+}
+
+.create-role-heading h2 {
+  margin: 0;
+  color: #253249;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.create-role-close {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+
+.create-role-close:hover {
+  background: #f8fafc;
+  color: #475569;
+}
+
+.create-role-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.create-role-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #52627a;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.create-role-field > span:first-child strong {
+  color: #f43f5e;
+}
+
+.create-role-field input,
+.create-role-field textarea,
+.create-role-field select {
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  outline: none;
+  background: #fff;
+  color: #253249;
+  font-size: 12px;
+  font-weight: 400;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.create-role-field input,
+.create-role-field select {
+  height: 36px;
+  padding: 0 14px;
+}
+
+.create-role-field textarea {
+  min-height: 50px;
+  padding: 10px 14px;
+  resize: vertical;
+}
+
+.create-role-field input::placeholder,
+.create-role-field textarea::placeholder {
+  color: #9ca3af;
+  opacity: 1;
+}
+
+.create-role-field input:focus,
+.create-role-field textarea:focus,
+.create-role-field select:focus {
+  border-color: #f96321;
+  box-shadow: 0 0 0 3px rgb(249 99 33 / 12%);
+}
+
+.create-role-field input[aria-invalid="true"] {
+  border-color: #f43f5e;
+}
+
+.create-role-select-wrap {
+  position: relative;
+  display: block;
+}
+
+.create-role-select-wrap select {
+  appearance: none;
+  padding-right: 38px;
+  color: #253249;
+  cursor: pointer;
+}
+
+.create-role-select-wrap svg {
+  position: absolute;
+  top: 50%;
+  right: 13px;
+  color: #253249;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.create-role-error {
+  color: #e4485b;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.create-role-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.create-role-footer button {
+  height: 34px;
+  padding: 0 17px;
+  border-radius: 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s ease, transform .15s ease;
+}
+
+.create-role-footer button:active {
+  transform: translateY(1px);
+}
+
+.create-role-cancel {
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.create-role-cancel:hover {
+  background: #f8fafc;
+}
+
+.create-role-submit {
+  border: 0;
+  background: #f96321;
+  color: #fff;
+  font-weight: 700;
+}
+
+.create-role-submit:hover {
+  background: #e85413;
+}
+
+@media (max-width: 520px) {
+  .create-role-overlay {
+    padding: 12px;
+  }
+
+  .create-role-modal {
+    width: 100%;
+    padding: 18px 21px;
+  }
+}
