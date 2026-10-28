@@ -1,11 +1,14 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 
-// Website / Backend API base URL
-const getWebsiteBaseUrl = () => {
+// Use the DBMS backend (same origin as the rest of the telecaller app) to avoid
+// cross-origin issues when the telecaller panel is deployed to its live domain.
+// Falls back to the website backend only if the DBMS env var is not set.
+const getPlansBaseUrl = () => {
   return (
-    import.meta.env.VITE_WEBSITE_API_BASE_URL ||
-    import.meta.env.VITE_SUBSCRIPTION_API_BASE_URL ||
-    'https://local-trade-street-be-2.onrender.com'
+    import.meta.env.VITE_API_BASE_URL ||           // primary: DBMS backend
+    import.meta.env.VITE_WEBSITE_API_BASE_URL ||    // legacy fallback
+    import.meta.env.VITE_SUBSCRIPTION_API_BASE_URL || // legacy fallback
+    'https://lts-dbms-backend.onrender.com'         // hard-coded fallback
   );
 };
 
@@ -13,7 +16,7 @@ export const fetchSubscriptionPlans = createAsyncThunk(
   'plans/fetchSubscriptionPlans',
   async (_, { rejectWithValue }) => {
     try {
-      const baseUrl = getWebsiteBaseUrl().replace(/\/+$/, '');
+      const baseUrl = getPlansBaseUrl().replace(/\/+$/, '');
       const response = await fetch(`${baseUrl}/api/customer/plan`, {
         method: 'GET',
         headers: {
