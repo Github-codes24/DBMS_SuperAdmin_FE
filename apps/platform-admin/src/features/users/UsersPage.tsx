@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { BarChart3 } from 'lucide-react'
 import './users.css'
 import {
   createUser,
@@ -320,7 +321,7 @@ function UserManagementPage() {
             <a className="user-admin-nav-link" href="#dashboard"><span aria-hidden="true">▦</span> Dashboard</a>
             <a className="user-admin-nav-link user-admin-nav-link--active" href="/" aria-current="page"><span aria-hidden="true">♙</span> User Management</a>
             <a className="user-admin-nav-link" href="#role-permission"><span aria-hidden="true">♧</span> Role &amp; Permission</a>
-            <a className="user-admin-nav-link" href="#reports"><span aria-hidden="true">▤</span> Reports</a>
+            <a className="user-admin-nav-link" href="/reports-analytics"><span aria-hidden="true"><BarChart3 size={15} /></span> Reports &amp; Analytics</a>
           </nav>
           <div className="user-admin-sidebar-profile">
             <span className="user-admin-profile-avatar">SA</span>
