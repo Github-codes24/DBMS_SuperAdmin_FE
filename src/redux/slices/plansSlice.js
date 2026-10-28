@@ -48,15 +48,24 @@ export const fetchSubscriptionPlans = createAsyncThunk(
           p.status !== "Inactive",
       );
 
-      // Flatten plans into selectable (plan, duration) option items
+      // Build selectable dropdown options.
+      // Supports two backend shapes:
+      //   (A) DBMS backend – flat Plan doc: price, durationInMonths, duration (string), discount, finalAmount. NO nested `durations`.
+      //   (B) Website/legacy backend – each plan has a nested `durations[]` array.
       const options = [];
+
       activePlans.forEach((plan) => {
         const planName =
           plan.subCategory || plan.name || plan.category || "Subscription Plan";
-        const durations = Array.isArray(plan.durations) ? plan.durations : [];
 
-        durations.forEach((dur) => {
-          if (dur && dur.isDeleted !== true) {
+        const hasDurationsArray =
+          Array.isArray(plan.durations) && plan.durations.length > 0;
+
+        if (hasDurationsArray) {
+          // ── Shape (B): nested durations ──────────────────────────────────────
+          plan.durations.forEach((dur) => {
+            if (!dur || dur.isDeleted === true) return;
+
             const months =
               dur.durationInMonths ||
               (dur.duration ? Math.round(dur.duration / 30) : 1);
@@ -84,8 +93,39 @@ export const fetchSubscriptionPlans = createAsyncThunk(
               features: dur.features || plan.features || [],
               label: `${planName} - ${durationLabel} - ₹${Number(price).toLocaleString("en-IN")}`,
             });
-          }
-        });
+          });
+        } else {
+          // ── Shape (A): flat DBMS plan ─────────────────────────────────────────
+          // plan.duration is already a human-readable string e.g. "1 Month", "3 Months"
+          const durationLabel =
+            plan.duration ||
+            (plan.durationInMonths
+              ? `${plan.durationInMonths} Month${plan.durationInMonths > 1 ? "s" : ""}`
+              : "N/A");
+          // Use finalAmount (after plan-level discount) as the sellable price;
+          // fall back to price if finalAmount is not set.
+          const price = parseFloat(plan.finalAmount ?? plan.price) || 0;
+          // DBMS Plan schema has no per-plan GST field; default to 0.
+          const taxPercent =
+            plan.gst !== undefined ? parseFloat(plan.gst) || 0 : 0;
+
+          options.push({
+            id: plan._id,
+            planId: plan._id,
+            durationId: plan._id,
+            planName,
+            category: plan.category || plan.code || "",
+            subCategory: plan.subCategory || "",
+            durationDays: (plan.durationInMonths || 1) * 30,
+            durationInMonths: plan.durationInMonths || 1,
+            durationLabel,
+            price,
+            taxPercent,
+            totalPayable: plan.finalAmount || plan.price,
+            features: plan.features || [],
+            label: `${planName} - ${durationLabel} - ₹${Number(price).toLocaleString("en-IN")}`,
+          });
+        }
       });
 
       return {
@@ -100,8 +140,12 @@ export const fetchSubscriptionPlans = createAsyncThunk(
   },
   {
     condition: (_, { getState }) => {
-      const status = getState().plans.status;
-      return status !== "loading" && status !== "succeeded";
+      const { status, options } = getState().plans;
+      // Allow re-fetch when: not already in-flight, AND either not yet succeeded OR succeeded
+      // but options is empty (meaning previous fetch parsed 0 plans due to a schema mismatch).
+      if (status === "loading") return false;
+      if (status === "succeeded" && options.length > 0) return false;
+      return true;
     },
   },
 );
@@ -120,6 +164,10 @@ const plansSlice = createSlice({
   reducers: {
     clearPlansError: (state) => {
       state.error = null;
+    },
+    // Call this to force a re-fetch (e.g. after a schema fix or manual retry)
+    resetPlansStatus: (state) => {
+      state.status = "idle";
     },
   },
   extraReducers: (builder) => {
@@ -143,5 +191,5 @@ const plansSlice = createSlice({
   },
 });
 
-export const { clearPlansError } = plansSlice.actions;
+export const { clearPlansError, resetPlansStatus } = plansSlice.actions;
 export default plansSlice.reducer;
