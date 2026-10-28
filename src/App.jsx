@@ -233,7 +233,11 @@ export default function App() {
           vendorCode: createdVendor.vendorId,
           // company: createdVendor.storeName || '',
           company: createdVendor.companyName || createdVendor.storeName || "",
-          vendorName: createdVendor.fullName || "",
+          vendorName:
+            createdVendor.vendorName ||
+            createdVendor.name ||
+            createdVendor.fullName ||
+            "",
           // phone: createdVendor.phone || '',
           phone: createdVendor.mobileNumber || createdVendor.phone || "",
           alternatePhone: createdVendor.alternatePhone || "",
