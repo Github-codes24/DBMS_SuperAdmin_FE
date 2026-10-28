@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { X, Trash2, AlertCircle, RefreshCw, Send, Loader2 } from 'lucide-react';
 import { DISCOUNT_OPTIONS } from '../mockData';
-import { fetchSubscriptionPlans } from '../redux/slices/plansSlice';
+import { fetchSubscriptionPlans, resetPlansStatus } from '../redux/slices/plansSlice';
 
 export default function CreatePaymentOrderModal({ vendor, onClose, onSendPaymentLink }) {
   const dispatch = useDispatch();
@@ -28,10 +28,20 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
   const [actionError, setActionError] = useState(null);
 
   useEffect(() => {
-    if (plansStatus === 'idle') {
+    // Fetch when: never fetched (idle), previously failed, or
+    // previously "succeeded" but produced 0 options (stale schema mismatch).
+    if (
+      plansStatus === 'idle' ||
+      plansStatus === 'failed' ||
+      (plansStatus === 'succeeded' && planOptions.length === 0)
+    ) {
+      if (plansStatus === 'succeeded') {
+        // Reset to idle first so the condition guard inside the thunk allows the call
+        dispatch(resetPlansStatus());
+      }
       dispatch(fetchSubscriptionPlans());
     }
-  }, [dispatch, plansStatus]);
+  }, [dispatch, plansStatus, planOptions.length]);
 
   const isAllSelected = orderItems.length > 0 && selectedItemIds.length === orderItems.length;
   const isIndeterminate = selectedItemIds.length > 0 && selectedItemIds.length < orderItems.length;
