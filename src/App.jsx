@@ -550,40 +550,6 @@ export default function App() {
         <main className="main-content">
           {activeNav === "vendor_mgmt" && (
             <>
-              {loadingVendors && (
-                <div
-                  style={{
-                    padding: "12px 20px",
-                    backgroundColor: "#eff6ff",
-                    border: "1px solid #bfdbfe",
-                    color: "#1d4ed8",
-                    borderRadius: "6px",
-                    marginBottom: "15px",
-                    fontSize: "14px",
-                    fontWeight: "500",
-                    textAlign: "center",
-                  }}
-                >
-                  Loading vendors from server...
-                </div>
-              )}
-              {vendorsError && (
-                <div
-                  style={{
-                    padding: "12px 20px",
-                    backgroundColor: "#fee2e2",
-                    border: "1px solid #fca5a5",
-                    color: "#b91c1c",
-                    borderRadius: "6px",
-                    marginBottom: "15px",
-                    fontSize: "14px",
-                    fontWeight: "500",
-                    textAlign: "center",
-                  }}
-                >
-                  Error loading vendors: {vendorsError}
-                </div>
-              )}
               <VendorSearch
                 vendors={vendors}
                 loading={loadingVendors}
