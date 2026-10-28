@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   PlusCircle,
   RefreshCw,
@@ -26,6 +26,9 @@ export default function VendorSearch({
   const [hasSearched, setHasSearched] = useState(false);
   const [phoneError, setPhoneError] = useState("");
   const [codeError, setCodeError] = useState("");
+  const [minimumLoading, setMinimumLoading] = useState(false);
+  const [noResultsAlertShown, setNoResultsAlertShown] = useState(false);
+  const [popupMessage, setPopupMessage] = useState("");
 
   const handleSearch = (e) => {
     if (e) e.preventDefault();
@@ -43,15 +46,24 @@ export default function VendorSearch({
 
     if (queryPhone && !/^\d{10}$/.test(queryPhone)) {
       setPhoneError("Please enter a valid 10-digit contact number.");
+      setPopupMessage("Please enter a valid 10-digit contact number.");
       return;
     }
 
     if (queryCode && !/^[A-Z]{4}-\d{13}$/.test(queryCode)) {
       setCodeError("Please enter a valid Vendor Code.");
+      setPopupMessage("Please enter a valid Vendor Code.");
       return;
     }
 
     setHasSearched(true);
+    setPopupMessage("");
+    setMinimumLoading(true);
+    setNoResultsAlertShown(false);
+
+    setTimeout(() => {
+      setMinimumLoading(false);
+    }, 2000);
 
     const combinedQuery = queryPhone || queryCode;
 
@@ -59,6 +71,19 @@ export default function VendorSearch({
       onSearch(combinedQuery);
     }
   };
+
+  const isSearching = loading || minimumLoading;
+
+  useEffect(() => {
+    if (!hasSearched || isSearching || noResultsAlertShown) {
+      return;
+    }
+
+    if (vendors.length === 0) {
+      setNoResultsAlertShown(true);
+      setPopupMessage("No telecallers found matching your search.");
+    }
+  }, [hasSearched, isSearching, vendors, noResultsAlertShown]);
 
   const handleResetSearch = () => {
     setPhoneSearch("");
@@ -70,6 +95,24 @@ export default function VendorSearch({
     if (onClear) onClear();
     if (onRefresh) onRefresh();
   };
+
+  useEffect(() => {
+    const style = document.createElement("style");
+
+    style.textContent = `
+      @keyframes vendorSearchSpin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    `;
+
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   return (
     <div className="card-panel">
@@ -122,19 +165,6 @@ export default function VendorSearch({
                 setPhoneError("");
               }}
             />
-
-            {phoneError && (
-              <div
-                style={{
-                  color: "#dc2626",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                  marginTop: "4px",
-                }}
-              >
-                {phoneError}
-              </div>
-            )}
           </div>
 
           {/* Vendor Code Search */}
@@ -153,23 +183,10 @@ export default function VendorSearch({
                 setCodeError("");
               }}
             />
-
-            {codeError && (
-              <div
-                style={{
-                  color: "#dc2626",
-                  fontSize: "12px",
-                  fontWeight: "600",
-                  marginTop: "4px",
-                }}
-              >
-                {codeError}
-              </div>
-            )}
           </div>
 
-          <button type="submit" className="btn-orange" disabled={loading}>
-            {loading ? "Searching..." : "Search"}
+          <button type="submit" className="btn-orange" disabled={isSearching}>
+            {isSearching ? "Searching..." : "Search"}
           </button>
         </form>
       </div>
@@ -225,10 +242,31 @@ export default function VendorSearch({
             </tr>
           </thead>
           <tbody>
-            {loading ? (
+            {isSearching ? (
               <tr>
                 <td colSpan="8" className="no-data-row">
-                  Searching records...
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "10px",
+                      padding: "20px 0",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "26px",
+                        height: "26px",
+                        border: "4px solid #fed7aa",
+                        borderTop: "4px solid #ff5500",
+                        borderRadius: "50%",
+                        animation: "vendorSearchSpin 0.8s linear infinite",
+                      }}
+                    />
+                    <span>Searching telecaller</span>
+                  </div>
                 </td>
               </tr>
             ) : !hasSearched ? (
@@ -332,6 +370,47 @@ export default function VendorSearch({
           </tbody>
         </table>
       </div>
+      {popupMessage && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.45)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: "24px",
+              borderRadius: "8px",
+              width: "90%",
+              maxWidth: "400px",
+              textAlign: "center",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+            }}
+          >
+            <p style={{ marginBottom: "20px", color: "#333" }}>
+              {popupMessage}
+            </p>
+
+            <button
+              type="button"
+              className="btn-orange "
+              style={{
+                display: "block",
+                margin: "0 auto",
+              }}
+              onClick={() => setPopupMessage("")}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
