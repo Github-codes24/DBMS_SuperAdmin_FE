@@ -113,7 +113,7 @@ function ReportsPage() {
           <nav className="reports-nav" aria-label="Main navigation">
             <a className="reports-nav-link" href="/users"><span aria-hidden="true">▦</span> Dashboard</a>
             <a className="reports-nav-link" href="/users"><span aria-hidden="true">♙</span> User Management</a>
-            <a className="reports-nav-link" href="/users"><span aria-hidden="true">♧</span> Role &amp; Permission</a>
+            <a className="reports-nav-link" href="/roles-permissions"><span aria-hidden="true">♧</span> Role &amp; Permission</a>
             <a className="reports-nav-link reports-nav-link--active" href="/reports-analytics" aria-current="page">
               <BarChart3 size={15} aria-hidden="true" /> Reports &amp; Analytics
             </a>

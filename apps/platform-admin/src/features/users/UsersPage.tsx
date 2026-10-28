@@ -320,7 +320,7 @@ function UserManagementPage() {
           <nav className="user-admin-nav" aria-label="Main navigation">
             <a className="user-admin-nav-link" href="#dashboard"><span aria-hidden="true">▦</span> Dashboard</a>
             <a className="user-admin-nav-link user-admin-nav-link--active" href="/" aria-current="page"><span aria-hidden="true">♙</span> User Management</a>
-            <a className="user-admin-nav-link" href="#role-permission"><span aria-hidden="true">♧</span> Role &amp; Permission</a>
+            <a className="user-admin-nav-link" href="/roles-permissions"><span aria-hidden="true">♧</span> Role &amp; Permission</a>
             <a className="user-admin-nav-link" href="/reports-analytics"><span aria-hidden="true"><BarChart3 size={15} /></span> Reports &amp; Analytics</a>
           </nav>
           <div className="user-admin-sidebar-profile">
