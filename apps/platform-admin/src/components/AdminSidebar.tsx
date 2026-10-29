@@ -6,7 +6,7 @@ const navigation = [
   { label: 'Dashboard', icon: LayoutDashboard, href: '#dashboard' },
   { label: 'User Management', icon: Users, href: '/users' },
   { label: 'Roles & Permissions', icon: ShieldCheck, href: '/roles-permissions' },
-  { label: 'Reports', icon: BarChart3, href: '#reports' },
+  { label: 'Reports & Analytics', icon: BarChart3, href: '/reports-analytics' },
 ]
 
 interface AdminSidebarProps {

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { BarChart3 } from 'lucide-react'
+import AdminSidebar from '../../components/AdminSidebar'
 import './users.css'
 import {
   createUser,
@@ -311,23 +311,7 @@ function UserManagementPage() {
         <span className="user-admin-navbar-user"><span aria-hidden="true" /> Super Admin</span>
       </header>
       <div className="user-admin-body">
-        <aside className="user-admin-sidebar">
-          <a className="user-admin-brand" href="/" aria-label="DBMS Super Admin">
-            <span className="user-admin-brand-mark">D</span>
-            <span>DBMS <strong>ADMIN</strong></span>
-          </a>
-          <p className="user-admin-nav-label">WORKSPACE</p>
-          <nav className="user-admin-nav" aria-label="Main navigation">
-            <a className="user-admin-nav-link" href="#dashboard"><span aria-hidden="true">▦</span> Dashboard</a>
-            <a className="user-admin-nav-link user-admin-nav-link--active" href="/" aria-current="page"><span aria-hidden="true">♙</span> User Management</a>
-            <a className="user-admin-nav-link" href="/roles-permissions"><span aria-hidden="true">♧</span> Role &amp; Permission</a>
-            <a className="user-admin-nav-link" href="/reports-analytics"><span aria-hidden="true"><BarChart3 size={15} /></span> Reports &amp; Analytics</a>
-          </nav>
-          <div className="user-admin-sidebar-profile">
-            <span className="user-admin-profile-avatar">SA</span>
-            <span><strong>Super Admin</strong><small>Platform administrator</small></span>
-          </div>
-        </aside>
+        <AdminSidebar />
 
         <div className="user-admin-main">
         <main className="page-content user-management-page">

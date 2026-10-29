@@ -14,6 +14,7 @@ import {
   UserRound,
   PhoneCall,
 } from 'lucide-react'
+import AdminSidebar from '../../components/AdminSidebar'
 import './reports.css'
 
 const reportTypes = [
@@ -104,25 +105,7 @@ function ReportsPage() {
         <span className="reports-navbar-user"><span aria-hidden="true" /> Super Admin</span>
       </header>
       <div className="reports-body">
-        <aside className="reports-sidebar">
-          <a className="reports-brand" href="/users" aria-label="DBMS Super Admin">
-            <span className="reports-brand-mark">D</span>
-            <span>DBMS <strong>ADMIN</strong></span>
-          </a>
-          <p className="reports-nav-label">WORKSPACE</p>
-          <nav className="reports-nav" aria-label="Main navigation">
-            <a className="reports-nav-link" href="/users"><span aria-hidden="true">▦</span> Dashboard</a>
-            <a className="reports-nav-link" href="/users"><span aria-hidden="true">♙</span> User Management</a>
-            <a className="reports-nav-link" href="/roles-permissions"><span aria-hidden="true">♧</span> Role &amp; Permission</a>
-            <a className="reports-nav-link reports-nav-link--active" href="/reports-analytics" aria-current="page">
-              <BarChart3 size={15} aria-hidden="true" /> Reports &amp; Analytics
-            </a>
-          </nav>
-          <div className="reports-sidebar-profile">
-            <span className="reports-profile-avatar">SA</span>
-            <span><strong>Super Admin</strong><small>Platform administrator</small></span>
-          </div>
-        </aside>
+        <AdminSidebar />
 
         <div className="reports-main">
           <main className="reports-content">
