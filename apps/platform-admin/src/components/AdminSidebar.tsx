@@ -1,10 +1,10 @@
-import { BarChart3, LayoutDashboard, ShieldCheck, Users } from 'lucide-react'
+import { BarChart3, BriefcaseBusiness, ShieldCheck, Users } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 import './adminSidebar.css'
 
 const navigation = [
-  { label: 'Dashboard', icon: LayoutDashboard, href: '#dashboard' },
   { label: 'User Management', icon: Users, href: '/users' },
+  { label: 'Project Management', icon: BriefcaseBusiness, href: '/projects' },
   { label: 'Roles & Permissions', icon: ShieldCheck, href: '/roles-permissions' },
   { label: 'Reports & Analytics', icon: BarChart3, href: '/reports-analytics' },
 ]
