@@ -25,18 +25,18 @@ clears the stored token.
 | `PATCH` | `/users/:id/status` | Update account status |
 | `POST` | `/users/:id/reset-password` | Reset a user's password |
 | `DELETE` | `/users/:id` | Delete a user |
-| `GET` | `/projects` | Load project assignment options |
 
+The supplied Postman collection does not define a projects endpoint, so the
+page currently uses its local project choices. The backend must accept those
+values in `projectIds` or provide a projects endpoint with valid IDs.
 List responses may be arrays or wrap results in `data`, `users`, or `items`.
-Project lists may be returned as `projects` at the response root or under
-`data`; project options may be strings or objects with `id`/`projectId` and
-`name`/`projectName` fields.
 Pagination metadata may include `total`, `totalCount`, `totalItems`, `page`,
 `limit`, or `pageSize`. User records may use `id` or `_id`, `name` or
 `fullName`, and `isActive` or `status`.
 
-Create requests send `name`, `email`, `password`, `phoneNumber`, `role`,
+Create requests send `name`, `email`, `password`, optional `phoneNumber`, `role`,
 `projectIds`, and `isActive: true`. Update requests send `name`, `email`,
-`phoneNumber`, `role`, and `projectIds`. Status requests send
+optional `phoneNumber`, `role`, and `projectIds`. The displayed `Admin` role
+is sent as `admin` to match the collection. Status requests send
 `{ "isActive": boolean }`. Role names are sent as displayed in the role
 dropdown.

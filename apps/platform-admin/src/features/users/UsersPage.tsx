@@ -5,7 +5,6 @@ import {
   createUser,
   deleteUser,
   getUser,
-  listProjects,
   listUsers,
   resetUserPassword,
   updateUser,
@@ -93,8 +92,7 @@ function UserManagementPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
-  const [projectOptions, setProjectOptions] = useState<SelectOption[]>(DEMO_PROJECT_OPTIONS)
-  const [projectError, setProjectError] = useState('')
+  const projectOptions = DEMO_PROJECT_OPTIONS
   const [form, setForm] = useState<UserFormValues>(emptyForm)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -128,18 +126,6 @@ function UserManagementPage() {
       })
     return () => controller.abort()
   }, [page, projectOptions, refreshKey, roleFilter, search, statusFilter])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    listProjects(controller.signal)
-      .then((projects) => {
-        if (projects.length > 0) setProjectOptions(projects)
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) setProjectError(getErrorMessage(error))
-      })
-    return () => controller.abort()
-  }, [])
 
   const pageCount = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE))
   const pageUsers = users
@@ -484,7 +470,7 @@ function UserManagementPage() {
                 <span className={`field-hint ${formError === 'At least one assigned project is required.' ? 'field-error' : ''}`}>
                   {formError === 'At least one assigned project is required.'
                     ? formError
-                    : projectError || 'Required. Select one or more projects.'}
+                    : 'Required. Select one or more projects.'}
                 </span>
               </label>
               <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closeForm}>Cancel</button><button className="button button--primary" type="submit" disabled={isSaving || projectOptions.length === 0}>{isSaving ? 'Saving...' : editingId ? 'Save changes' : 'Create user'}</button></div>
