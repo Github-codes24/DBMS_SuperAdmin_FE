@@ -8,7 +8,8 @@ import type {
   UserListParams,
   UserListResult,
 } from '../types/user.types'
-import { userApi } from '../user.api'
+import { clearAccessToken, getAccessToken } from '../../auth/authService'
+import { apiBaseUrl } from '../../../api'
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -123,11 +124,64 @@ function mapUser(value: unknown): User {
   }
 }
 
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const accessToken = getAccessToken()
+  if (!accessToken) {
+    throw new Error('Authentication required. Please sign in to continue.')
+  }
+
+  const response = await fetch(`${apiBaseUrl}${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+      ...init?.headers,
+    },
+  })
+
+  if (response.status === 401) {
+    clearAccessToken()
+  }
+
+  if (!response.ok) {
+    let message = `Request failed (${response.status}).`
+    try {
+      const body: unknown = await response.json()
+      const record = asRecord(body)
+      if (typeof record.message === 'string') message = record.message
+      else if (typeof record.error === 'string') message = record.error
+    } catch {
+      if (response.statusText) message = response.statusText
+    }
+    throw new Error(message)
+  }
+
+  if (response.status === 204) return undefined as T
+  const contentType = response.headers.get('content-type') ?? ''
+  if (!contentType.includes('application/json') && !contentType.includes('+json')) {
+    throw new Error('The API returned a non-JSON response. Verify the API base URL and endpoint configuration.')
+  }
+  const responseText = await response.text()
+  if (!responseText) return undefined as T
+  return JSON.parse(responseText) as T
+}
+
 export async function listUsers(
   params: UserListParams,
   signal?: AbortSignal,
 ): Promise<UserListResult> {
-  const raw = await userApi.listUsers(params, signal)
+  const query = new URLSearchParams({
+    page: String(params.page),
+    limit: String(params.pageSize),
+  })
+  if (params.search) query.set('search', params.search)
+  if (params.role) query.set('role', params.role)
+  if (params.status) query.set('isActive', String(params.status === 'active'))
+  query.set('sortBy', 'createdAt')
+  query.set('sortOrder', 'desc')
+
+  const raw: unknown = await request(`/users?${query.toString()}`, { signal })
   const { items, metadata } = unwrapList(raw)
   const pagination =
     typeof metadata.pagination === 'object' && metadata.pagination !== null
@@ -160,37 +214,65 @@ export async function listUsers(
 }
 
 export async function listRoles(signal?: AbortSignal): Promise<SelectOption[]> {
-  const raw = await userApi.listRoles(signal)
+  const raw: unknown = await request('/roles', { signal })
   return unwrapList(raw).items.map(optionName)
 }
 
 export async function listProjects(signal?: AbortSignal): Promise<SelectOption[]> {
-  const raw = await userApi.listProjects(signal)
+  const raw: unknown = await request('/projects', { signal })
   return unwrapList(raw).items.map(optionName)
 }
 
 export async function getUser(id: string): Promise<User> {
-  const raw = await userApi.getUser(id)
+  const raw: unknown = await request(`/users/${encodeURIComponent(id)}`)
   const record = asRecord(raw)
   return mapUser(record.data ?? record.user ?? record)
 }
 
 export async function createUser(input: CreateUserInput): Promise<void> {
-  await userApi.createUser(input)
+  await request('/users', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: input.fullName,
+      email: input.email,
+      password: input.password,
+      phoneNumber: input.phoneNumber,
+      role: input.role,
+      projectIds: input.assignedProjects,
+      isActive: true,
+    }),
+  })
 }
 
 export async function updateUser(id: string, input: UserInput): Promise<void> {
-  await userApi.updateUser(id, input)
+  await request(`/users/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      name: input.fullName,
+      email: input.email,
+      phoneNumber: input.phoneNumber,
+      role: input.role,
+      projectIds: input.assignedProjects,
+    }),
+  })
 }
 
 export async function updateUserStatus(id: string, status: AccountStatus): Promise<void> {
-  await userApi.updateUserStatus(id, status)
+  await request(`/users/${encodeURIComponent(id)}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ isActive: status === 'active' }),
+  })
 }
 
 export async function resetUserPassword(id: string, password: string): Promise<void> {
-  await userApi.resetUserPassword(id, password)
+  await request(`/users/${encodeURIComponent(id)}/reset-password`, {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  })
 }
 
 export async function deleteUser(id: string): Promise<void> {
-  await userApi.deleteUser(id)
+  await request(`/users/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  })
 }
