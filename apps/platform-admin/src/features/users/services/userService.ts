@@ -10,6 +10,13 @@ import type {
 import { clearAccessToken, getAccessToken } from '../../auth/authService'
 import { apiBaseUrl } from '../../../api'
 
+export class AuthenticationError extends Error {
+  constructor() {
+    super('Your session has expired. Please sign in again.')
+    this.name = 'AuthenticationError'
+  }
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new Error('The server returned an invalid response.')
@@ -140,7 +147,7 @@ function mapUser(value: unknown): User {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const accessToken = getAccessToken()
   if (!accessToken) {
-    throw new Error('Authentication required. Please sign in to continue.')
+    throw new AuthenticationError()
   }
 
   const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -155,6 +162,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (response.status === 401) {
     clearAccessToken()
+    throw new AuthenticationError()
   }
 
   if (!response.ok) {

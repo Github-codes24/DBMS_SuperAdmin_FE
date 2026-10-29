@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import AdminSidebar from '../../components/AdminSidebar'
 import './users.css'
 import {
@@ -9,6 +10,7 @@ import {
   resetUserPassword,
   updateUser,
   updateUserStatus,
+  AuthenticationError,
 } from './services/userService'
 import type { SelectOption, User } from './types/user.types'
 
@@ -82,6 +84,7 @@ function initials(name: string) {
 }
 
 function UserManagementPage() {
+  const navigate = useNavigate()
   const [users, setUsers] = useState<UserRecord[]>([])
   const [totalUsers, setTotalUsers] = useState(0)
   const [search, setSearch] = useState('')
@@ -119,13 +122,18 @@ function UserManagementPage() {
         setTotalUsers(result.total)
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setLoadError(getErrorMessage(error))
+        if (controller.signal.aborted) return
+        if (error instanceof AuthenticationError) {
+          navigate('/login', { replace: true })
+          return
+        }
+        setLoadError(getErrorMessage(error))
       })
       .finally(() => {
         if (!controller.signal.aborted) setIsLoading(false)
       })
     return () => controller.abort()
-  }, [page, projectOptions, refreshKey, roleFilter, search, statusFilter])
+  }, [navigate, page, projectOptions, refreshKey, roleFilter, search, statusFilter])
 
   const pageCount = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE))
   const pageUsers = users
@@ -211,6 +219,10 @@ function UserManagementPage() {
       setEditingId(null)
       setIsFormOpen(false)
     } catch (error) {
+      if (error instanceof AuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
       setFormError(getErrorMessage(error))
     } finally {
       setIsSaving(false)
@@ -228,6 +240,10 @@ function UserManagementPage() {
       setLoadError('')
       setRefreshKey((current) => current + 1)
     } catch (error) {
+      if (error instanceof AuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
       setActionError(getErrorMessage(error))
     }
   }
@@ -238,6 +254,10 @@ function UserManagementPage() {
       const details = await getUser(user.id)
       setViewingUser(fromApiUser(details, projectOptions))
     } catch (error) {
+      if (error instanceof AuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
       setActionError(getErrorMessage(error))
     }
   }
@@ -257,6 +277,10 @@ function UserManagementPage() {
       setPasswordResetUser(null)
       setNewPassword('')
     } catch (error) {
+      if (error instanceof AuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
       setPasswordResetError(getErrorMessage(error))
     } finally {
       setIsResettingPassword(false)
@@ -285,6 +309,10 @@ function UserManagementPage() {
         setRefreshKey((current) => current + 1)
       }
     } catch (error) {
+      if (error instanceof AuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
       setActionError(getErrorMessage(error))
     }
   }
