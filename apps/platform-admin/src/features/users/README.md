@@ -2,9 +2,10 @@
 
 The login and user management screens use `VITE_API_BASE_URL` as the API
 prefix. It defaults to `/api`; the Vite development server proxies that prefix
-to `http://localhost:3007`. To connect directly to that backend, set
-`VITE_API_BASE_URL=http://localhost:3007/api`. Set it to the equivalent API
-prefix for another API host.
+to `http://localhost:3007`. To connect directly, set
+`VITE_API_BASE_URL=http://localhost:3007` or
+`VITE_API_BASE_URL=http://localhost:3007/api`; the `/api` suffix is added when
+it is missing.
 
 Login uses `POST /auth/login` relative to the API prefix.
 User Management HTTP requests are implemented in `user.api.ts`; response
