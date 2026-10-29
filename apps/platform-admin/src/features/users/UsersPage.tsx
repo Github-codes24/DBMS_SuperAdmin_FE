@@ -1,17 +1,9 @@
-import { useEffect, useState, type FormEvent } from 'react'
-import { BarChart3 } from 'lucide-react'
+import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { BriefcaseBusiness } from 'lucide-react'
 import './users.css'
-import {
-  createUser,
-  deleteUser,
-  getUser,
-  listProjects,
-  listUsers,
-  resetUserPassword,
-  updateUser,
-  updateUserStatus,
-} from './services/userService'
-import type { SelectOption, User } from './types/user.types'
+import { resetUserPassword } from './services/userService'
+import type { SelectOption } from './types/user.types'
+import { getFromStorage, saveToStorage } from '../../utils/storage'
 
 type UserStatus = 'Active' | 'Inactive'
 const ROLE_OPTIONS = [
@@ -51,27 +43,37 @@ type UserFormValues = Pick<UserRecord, 'name' | 'email' | 'phone' | 'role'> & {
 }
 
 const PAGE_SIZE = 10
+const USERS_STORAGE_KEY = 'platform-admin.users'
 
 const emptyForm: UserFormValues = { name: '', email: '', phone: '', password: '', role: ROLE_OPTIONS[0], projects: [] }
 
+const initialUsers: UserRecord[] = [
+  {
+    id: 'user-demo-1',
+    userId: 'user-demo-1',
+    name: 'Aarav Mehta',
+    email: 'aarav.mehta@example.com',
+    phone: '+91 98765 43210',
+    role: 'Admin',
+    projects: ['DBMS'],
+    status: 'Active',
+    createdAt: '2026-01-15T00:00:00.000Z',
+  },
+  {
+    id: 'user-demo-2',
+    userId: 'user-demo-2',
+    name: 'Diya Sharma',
+    email: 'diya.sharma@example.com',
+    phone: '+91 98765 43211',
+    role: 'Super Admin-CRM',
+    projects: ['CRM'],
+    status: 'Active',
+    createdAt: '2026-02-01T00:00:00.000Z',
+  },
+]
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'An unexpected error occurred.'
-}
-
-function fromApiUser(user: User, projectOptions: SelectOption[]): UserRecord {
-  return {
-    id: user.id,
-    userId: user.id,
-    name: user.fullName,
-    email: user.email,
-    phone: user.phoneNumber,
-    role: ROLE_OPTIONS.find((role) => role.toLowerCase() === user.role.toLowerCase()) ?? user.role,
-    projects: user.assignedProjects.map((project) =>
-      projectOptions.find((option) => option.id === project.id)?.name ?? project.name,
-    ),
-    status: user.status === 'active' ? 'Active' : 'Inactive',
-    createdAt: user.createdAt,
-  }
 }
 
 function formatDate(value: string) {
@@ -83,21 +85,23 @@ function initials(name: string) {
 }
 
 function UserManagementPage() {
-  const [users, setUsers] = useState<UserRecord[]>([])
-  const [totalUsers, setTotalUsers] = useState(0)
+  const [initialUserData] = useState(() => {
+    try {
+      return { users: getFromStorage(USERS_STORAGE_KEY, initialUsers), error: '' }
+    } catch (error) {
+      return { users: initialUsers, error: getErrorMessage(error) }
+    }
+  })
+  const [users, setUsers] = useState(initialUserData.users)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
   const [page, setPage] = useState(1)
-  const [refreshKey, setRefreshKey] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const [loadError, setLoadError] = useState('')
+  const [loadError, setLoadError] = useState(initialUserData.error)
   const [actionError, setActionError] = useState('')
-  const [projectOptions, setProjectOptions] = useState<SelectOption[]>(DEMO_PROJECT_OPTIONS)
-  const [projectError, setProjectError] = useState('')
+  const projectOptions = DEMO_PROJECT_OPTIONS
   const [form, setForm] = useState<UserFormValues>(emptyForm)
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [viewingUser, setViewingUser] = useState<UserRecord | null>(null)
   const [passwordResetUser, setPasswordResetUser] = useState<UserRecord | null>(null)
@@ -108,45 +112,34 @@ function UserManagementPage() {
   const [toast, setToast] = useState('')
 
   useEffect(() => {
-    const controller = new AbortController()
-    listUsers({
-      page,
-      pageSize: PAGE_SIZE,
-      search: search.trim(),
-      role: roleFilter === 'All' ? '' : roleFilter,
-      status: statusFilter === 'All' ? '' : statusFilter.toLowerCase(),
-    }, controller.signal)
-      .then((result) => {
-        setUsers(result.users.map((user) => fromApiUser(user, projectOptions)))
-        setTotalUsers(result.total)
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) setLoadError(getErrorMessage(error))
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false)
-      })
-    return () => controller.abort()
-  }, [page, projectOptions, refreshKey, roleFilter, search, statusFilter])
+    function syncSavedUsers(event: StorageEvent) {
+      if (event.key !== USERS_STORAGE_KEY) return
+      try {
+        setUsers(getFromStorage(USERS_STORAGE_KEY, initialUsers))
+        setLoadError('')
+      } catch (error) {
+        setLoadError(getErrorMessage(error))
+      }
+    }
 
-  useEffect(() => {
-    const controller = new AbortController()
-    listProjects(controller.signal)
-      .then((projects) => {
-        if (projects.length > 0) setProjectOptions(projects)
-      })
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) setProjectError(getErrorMessage(error))
-      })
-    return () => controller.abort()
+    window.addEventListener('storage', syncSavedUsers)
+    return () => window.removeEventListener('storage', syncSavedUsers)
   }, [])
 
+  const filteredUsers = useMemo(() => users.filter((user) => {
+    const query = search.trim().toLowerCase()
+    const matchesSearch = !query || [user.userId, user.name, user.email, user.phone]
+      .some((value) => value.toLowerCase().includes(query))
+    const matchesRole = roleFilter === 'All' || user.role === roleFilter
+    const matchesStatus = statusFilter === 'All' || user.status === statusFilter
+    return matchesSearch && matchesRole && matchesStatus
+  }), [roleFilter, search, statusFilter, users])
+
+  const totalUsers = filteredUsers.length
   const pageCount = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE))
-  const pageUsers = users
+  const pageUsers = filteredUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   function updateFilter(setter: (value: string) => void, value: string) {
-    setIsLoading(true)
-    setLoadError('')
     setter(value)
     setPage(1)
     setToast('')
@@ -181,7 +174,7 @@ function UserManagementPage() {
     setIsFormOpen(true)
   }
 
-  async function saveUser(event: FormEvent<HTMLFormElement>) {
+  function saveUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!form.name.trim()) {
       setFormError('Full name is required.')
@@ -201,59 +194,60 @@ function UserManagementPage() {
       return
     }
 
-    setIsSaving(true)
     setFormError('')
+    const email = form.email.trim().toLowerCase()
+    if (users.some((user) => user.id !== editingId && user.email.toLowerCase() === email)) {
+      setFormError('A user with this email already exists.')
+      return
+    }
+
+    const id = editingId ?? `user-${Date.now()}`
+    const nextUser: UserRecord = {
+      id,
+      userId: id,
+      name: form.name.trim(),
+      email,
+      phone: form.phone.trim(),
+      role: form.role,
+      projects: assignedProjects.map((projectId) =>
+        projectOptions.find((option) => option.id === projectId)?.name ?? projectId,
+      ),
+      status: editingId ? users.find((user) => user.id === editingId)?.status ?? 'Active' : 'Active',
+      createdAt: editingId
+        ? users.find((user) => user.id === editingId)?.createdAt ?? new Date().toISOString()
+        : new Date().toISOString(),
+    }
+    const nextUsers = editingId
+      ? users.map((user) => user.id === editingId ? nextUser : user)
+      : [nextUser, ...users]
     try {
-      const input = {
-        fullName: form.name.trim(),
-        email: form.email.trim(),
-        phoneNumber: form.phone.trim(),
-        role: form.role,
-        assignedProjects,
-      }
-      if (editingId) {
-        await updateUser(editingId, input)
-        setToast('User updated successfully.')
-      } else {
-        await createUser({ ...input, password: form.password })
-        setToast('User created successfully.')
-      }
-      setIsLoading(true)
-      setLoadError('')
+      saveToStorage(USERS_STORAGE_KEY, nextUsers)
+      setUsers(nextUsers)
+      setToast(editingId ? 'User updated successfully.' : 'User created successfully.')
       setPage(1)
-      setRefreshKey((current) => current + 1)
       setEditingId(null)
       setIsFormOpen(false)
     } catch (error) {
       setFormError(getErrorMessage(error))
-    } finally {
-      setIsSaving(false)
     }
   }
 
-  async function toggleStatus(user: UserRecord) {
+  function toggleStatus(user: UserRecord) {
     const nextStatus: UserStatus = user.status === 'Active' ? 'Inactive' : 'Active'
     if (!window.confirm(`${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} ${user.name}?`)) return
     setActionError('')
     try {
-      await updateUserStatus(user.id, nextStatus === 'Active' ? 'inactive' : 'active')
+      const nextUsers = users.map((item) => item.id === user.id ? { ...item, status: nextStatus } : item)
+      saveToStorage(USERS_STORAGE_KEY, nextUsers)
+      setUsers(nextUsers)
       setToast(`User ${nextStatus.toLowerCase()} successfully.`)
-      setIsLoading(true)
-      setLoadError('')
-      setRefreshKey((current) => current + 1)
     } catch (error) {
       setActionError(getErrorMessage(error))
     }
   }
 
-  async function openView(user: UserRecord) {
-    setActionError('')
-    try {
-      const details = await getUser(user.id)
-      setViewingUser(fromApiUser(details, projectOptions))
-    } catch (error) {
-      setActionError(getErrorMessage(error))
-    }
+  function openView(user: UserRecord) {
+    setViewingUser(user)
   }
 
   async function submitPasswordReset(event: FormEvent<HTMLFormElement>) {
@@ -283,20 +277,16 @@ function UserManagementPage() {
     setPasswordResetError('')
   }
 
-  async function removeUser(user: UserRecord) {
+  function removeUser(user: UserRecord) {
     if (!window.confirm(`Delete ${user.name}? This action cannot be undone.`)) return
     setActionError('')
     try {
-      await deleteUser(user.id)
+      const nextUsers = users.filter((item) => item.id !== user.id)
+      saveToStorage(USERS_STORAGE_KEY, nextUsers)
+      setUsers(nextUsers)
       setToast('User deleted successfully.')
       if (page > 1 && totalUsers - 1 <= (page - 1) * PAGE_SIZE) {
-        setIsLoading(true)
-        setLoadError('')
         setPage((current) => current - 1)
-      } else {
-        setIsLoading(true)
-        setLoadError('')
-        setRefreshKey((current) => current + 1)
       }
     } catch (error) {
       setActionError(getErrorMessage(error))
@@ -318,10 +308,9 @@ function UserManagementPage() {
           </a>
           <p className="user-admin-nav-label">WORKSPACE</p>
           <nav className="user-admin-nav" aria-label="Main navigation">
-            <a className="user-admin-nav-link" href="#dashboard"><span aria-hidden="true">▦</span> Dashboard</a>
             <a className="user-admin-nav-link user-admin-nav-link--active" href="/" aria-current="page"><span aria-hidden="true">♙</span> User Management</a>
+            <a className="user-admin-nav-link" href="/projects"><span aria-hidden="true"><BriefcaseBusiness size={15} /></span> Project Management</a>
             <a className="user-admin-nav-link" href="#role-permission"><span aria-hidden="true">♧</span> Role &amp; Permission</a>
-            <a className="user-admin-nav-link" href="/reports-analytics"><span aria-hidden="true"><BarChart3 size={15} /></span> Reports &amp; Analytics</a>
           </nav>
           <div className="user-admin-sidebar-profile">
             <span className="user-admin-profile-avatar">SA</span>
@@ -419,17 +408,16 @@ function UserManagementPage() {
                   </div></td>
                 </tr>
               ))}
-              {isLoading && <tr><td colSpan={9} className="user-no-results">Loading users...</td></tr>}
-              {!isLoading && !loadError && pageUsers.length === 0 && <tr><td colSpan={9} className="user-no-results">No users match your search or filters.</td></tr>}
+              {!loadError && pageUsers.length === 0 && <tr><td colSpan={9} className="user-no-results">No users match your search or filters.</td></tr>}
             </tbody>
           </table>
         </div>
         <div className="table-footer">
           <span>Showing <strong>{totalUsers ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, totalUsers)}</strong> of <strong>{totalUsers}</strong> users</span>
           <div className="pagination">
-            <button className="page-button" type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => { setIsLoading(true); setLoadError(''); setPage((current) => Math.max(1, current - 1)) }}>‹</button>
+            <button className="page-button" type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>‹</button>
             <span>Page <strong>{page}</strong> of <strong>{pageCount}</strong></span>
-            <button className="page-button" type="button" aria-label="Next page" disabled={page >= pageCount} onClick={() => { setIsLoading(true); setLoadError(''); setPage((current) => Math.min(pageCount, current + 1)) }}>›</button>
+            <button className="page-button" type="button" aria-label="Next page" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>›</button>
           </div>
         </div>
       </section>
@@ -446,7 +434,7 @@ function UserManagementPage() {
               <button type="button" className="modal-close" onClick={closeForm} aria-label="Close">×</button>
             </div>
             <form className="user-form modal-body" onSubmit={saveUser} noValidate>
-              <p className="form-demo-hint">Changes are saved to the platform user directory.</p>
+              <p className="form-demo-hint">Demo account data is saved in this browser. Passwords are never stored in localStorage.</p>
               {formError && <div className="inline-alert inline-alert--error" role="alert">{formError}</div>}
               <label className="field"><span>Full name <span className="required-mark">*</span></span><input autoComplete="name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></label>
               <label className="field"><span>Email address <span className="required-mark">*</span></span><input type="email" autoComplete="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></label>
@@ -500,10 +488,10 @@ function UserManagementPage() {
                 <span className={`field-hint ${formError === 'At least one assigned project is required.' ? 'field-error' : ''}`}>
                   {formError === 'At least one assigned project is required.'
                     ? formError
-                    : projectError || 'Required. Select one or more projects.'}
+                    : 'Required. Select one or more projects.'}
                 </span>
               </label>
-              <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closeForm}>Cancel</button><button className="button button--primary" type="submit" disabled={isSaving || projectOptions.length === 0}>{isSaving ? 'Saving...' : editingId ? 'Save changes' : 'Create user'}</button></div>
+              <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closeForm}>Cancel</button><button className="button button--primary" type="submit" disabled={projectOptions.length === 0}>{editingId ? 'Save changes' : 'Create user'}</button></div>
             </form>
           </section>
         </div>
