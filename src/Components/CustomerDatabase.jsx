@@ -933,10 +933,10 @@ function CustomerDatabase({ compact = false }) {
 
   // Download Sample CSV Import Template
   const handleDownloadSampleTemplate = () => {
-    const sampleHeaders = ['Sr No', 'Company Name', 'Mobile', 'Pincode'];
+    const sampleHeaders = ['Sr No', 'Company Name', 'Mobile'];
     const sampleRows = [
-      ['01', 'Global Logistics Ltd', '9876543210', '411001'],
-      ['02', 'Prime Pharma Pvt Ltd', '9876543211', '395001'],
+      ['01', 'Global Logistics Ltd', '9876543210'],
+      ['02', 'Prime Pharma Pvt Ltd', '9876543211'],
     ];
 
     const csvContent =
@@ -1162,7 +1162,6 @@ function CustomerDatabase({ compact = false }) {
           const mobile = getField(row, [/^phone\s*(number)?$/i, /^mobile\s*(number)?$/i, /^contact\s*(number)?$/i, /mobile/i, /phone/i, /contact/i]);
           const state = getField(row, [/^state$/i]);
           const city = getField(row, [/^city$/i]);
-          const pincode = getField(row, [/^pin\s*code$/i, /^pincode$/i, /^zip\s*(code)?$/i]);
           const customerId = getField(row, [/^customer\s*id$/i, /^cust\s*id$/i, /^id$/i]);
           const status = getField(row, [/^status$/i]) || 'Active';
           const telecaller = getField(row, [/^assigned\s*telecaller$/i, /^telecaller$/i, /^caller$/i]) || 'TC014';
@@ -1226,7 +1225,6 @@ function CustomerDatabase({ compact = false }) {
             mobile: mobile || 'ΓÇö',
             state: state || selectedState || 'Maharashtra',
             city: city || selectedCity || 'Mumbai',
-            pincode: pincode || '400001',
             customerId: customerId || `CUST${Math.floor(100 + Math.random() * 900)}`,
             status: status,
             telecaller: telecaller,
@@ -1288,7 +1286,7 @@ function CustomerDatabase({ compact = false }) {
 
     try {
       // Build a clean CSV file containing ONLY the valid NEW records
-      const headers = ['Sr No', 'ID', 'Name', 'Company Name', 'State', 'City', 'Pincode', 'Registration Date', 'Status', 'Telecaller', 'Email', 'Mobile'];
+      const headers = ['Sr No', 'ID', 'Name', 'Company Name', 'State', 'City', 'Registration Date', 'Status', 'Telecaller', 'Email', 'Mobile'];
       const csvRows = validNewRecords.map((r, i) => [
         String(customers.length + i + 1).padStart(2, '0'),
         r.customerId,
@@ -1296,7 +1294,6 @@ function CustomerDatabase({ compact = false }) {
         `"${(r.companyName || '').replace(/"/g, '""')}"`,
         `"${(r.state || selectedState || 'Maharashtra').replace(/"/g, '""')}"`,
         `"${(r.city || selectedCity || 'Mumbai').replace(/"/g, '""')}"`,
-        `"${(r.pincode || '400001').replace(/"/g, '""')}"`,
         importRegistrationDate,
         r.status || 'Active',
         r.telecaller || 'TC014',
@@ -3024,13 +3021,12 @@ function CustomerDatabase({ compact = false }) {
                       <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Sr No</th>
                       <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Company Name</th>
                       <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Mobile</th>
-                      <th className="p-3 text-[11px] font-bold text-slate-600 uppercase tracking-wider">Pincode</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
                     {reviewRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="p-6 text-center text-slate-400">
+                        <td colSpan={3} className="p-6 text-center text-slate-400">
                           No records found to preview.
                         </td>
                       </tr>
@@ -3040,7 +3036,6 @@ function CustomerDatabase({ compact = false }) {
                             <td className="p-3 text-slate-500 font-medium">{item.rowNum}</td>
                             <td className="p-3 text-slate-600">{item.companyName}</td>
                             <td className="p-3 text-slate-600">{item.mobile}</td>
-                            <td className="p-3 text-slate-600">{item.pincode}</td>
                           </tr>
                         ))
                     )}
