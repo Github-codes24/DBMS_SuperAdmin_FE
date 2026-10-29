@@ -236,7 +236,7 @@ function UserManagementPage() {
     if (!window.confirm(`${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} ${user.name}?`)) return
     setActionError('')
     try {
-      await updateUserStatus(user.id, nextStatus === 'Active' ? 'inactive' : 'active')
+      await updateUserStatus(user.id, nextStatus === 'Active' ? 'active' : 'inactive')
       setToast(`User ${nextStatus.toLowerCase()} successfully.`)
       setIsLoading(true)
       setLoadError('')

@@ -1,8 +1,14 @@
 # User management API integration
 
-The user management screen uses `VITE_API_BASE_URL` as the API prefix. It
-defaults to `/api`; the Vite development server proxies that prefix to
-`http://localhost:3007`. Set `VITE_API_BASE_URL` for another API host.
+The login and user management screens use `VITE_API_BASE_URL` as the API
+prefix. It defaults to `/api`; the Vite development server proxies that prefix
+to `http://localhost:3007`. To connect directly to that backend, set
+`VITE_API_BASE_URL=http://localhost:3007/api`. Set it to the equivalent API
+prefix for another API host.
+
+Login uses `POST /auth/login` relative to the API prefix.
+User Management HTTP requests are implemented in `user.api.ts`; response
+normalization and mapping are handled by `services/userService.ts`.
 
 Authentication is handled by the existing login experience. It must store
 the returned Bearer access token in browser `localStorage` under the key

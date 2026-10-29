@@ -9,13 +9,9 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { apiBaseUrl } from "../../api";
 import homeImg from "../../assets/home.png";
 import logo from "../../assets/logo.png";
-
-const baseUrl = (import.meta.env.VITE_API_BASE_URL || "http://localhost:5000").replace(
-  /\/$/,
-  "",
-);
 
 const EMAIL_REGEX =
   /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
@@ -83,10 +79,11 @@ function Login() {
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${baseUrl}/api/auth/login`, {
+      const response = await fetch(`${apiBaseUrl}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify({
           email: email.trim(),

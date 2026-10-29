@@ -8,7 +8,6 @@ import {
   Search,
   ShieldCheck,
   Check,
-  X,
 } from 'lucide-react'
 import AdminSidebar from '../../components/AdminSidebar'
 import CreateRoleModal from './CreateRoleModal'
@@ -220,7 +219,7 @@ function RolesPermissionsPage() {
                               aria-pressed={checked}
                               onClick={() => setPermission(name, permission)}
                             >
-                              {checked ? <Check size={16} strokeWidth={2.6} /> : <X size={15} strokeWidth={2.3} />}
+                              {checked && <Check size={16} strokeWidth={2.6} />}
                             </button>
                           </td>
                         )
