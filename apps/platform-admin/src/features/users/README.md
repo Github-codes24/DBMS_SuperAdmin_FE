@@ -12,14 +12,11 @@ to its origin or API prefix; the `/api` suffix is added when it is missing.
 Direct browser requests require the backend to allow the frontend origin via
 CORS. Restart the development server after changing the root `.env` file.
 
-Login uses `POST /auth/login` relative to the API prefix.
-User Management HTTP requests, response normalization, and mapping are
-implemented in `services/userService.ts`.
-
-Authentication is handled by the existing login experience. It must store
-the returned Bearer access token in browser `localStorage` under the key
-`accessToken`; protected user requests read that token. A `401` response
-clears the stored token.
+Login uses `POST /auth/login` relative to the API prefix. User Management HTTP
+requests, response normalization, and mapping are implemented in
+`services/userService.ts`. User create, update, status, and delete operations
+are persisted by the API. Project management demo data is stored in browser
+`localStorage` under `platform-admin.project-management`.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
