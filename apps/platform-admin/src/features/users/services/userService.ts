@@ -259,8 +259,8 @@ export async function createUser(input: CreateUserInput): Promise<User> {
   return mapUser(record.data ?? record.user ?? record)
 }
 
-export async function updateUser(id: string, input: UserInput): Promise<void> {
-  await request(`/users/${encodeURIComponent(id)}`, {
+export async function updateUser(id: string, input: UserInput): Promise<User> {
+  const raw: unknown = await request(`/users/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify({
       name: input.fullName,
@@ -269,6 +269,8 @@ export async function updateUser(id: string, input: UserInput): Promise<void> {
       projectIds: input.assignedProjects,
     }),
   })
+  const record = asRecord(raw)
+  return mapUser(record.data ?? record.user ?? record)
 }
 
 function apiRole(role: string): string {
@@ -280,11 +282,13 @@ function apiRole(role: string): string {
   throw new Error('Select a role supported by the server.')
 }
 
-export async function updateUserStatus(id: string, status: AccountStatus): Promise<void> {
-  await request(`/users/${encodeURIComponent(id)}/status`, {
+export async function updateUserStatus(id: string, status: AccountStatus): Promise<User> {
+  const raw: unknown = await request(`/users/${encodeURIComponent(id)}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ isActive: status === 'active' }),
   })
+  const record = asRecord(raw)
+  return mapUser(record.data ?? record.user ?? record)
 }
 
 export async function resetUserPassword(id: string, password: string): Promise<void> {

@@ -49,3 +49,7 @@ Create requests send `name`, `email`, `password`, `role`, `projectIds`, and
 `projectIds`. Names must contain 2–100 characters, emails at most 254
 characters, and passwords 8–128 characters. Status requests send
 `{ "isActive": boolean }`.
+
+The status filter above the table only filters users. To change an account's
+status, use the Active/Inactive selector in that user's table row; it sends a
+`PATCH /users/:id/status` request and updates the row from the API response.

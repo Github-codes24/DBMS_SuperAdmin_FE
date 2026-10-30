@@ -3208,6 +3208,26 @@ body {
   padding-inline: 15px;
 }
 
+.user-row-status {
+  max-width: 92px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 20px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.user-row-status.status-badge--active {
+  background: #e8f7ed;
+  color: #16783a;
+}
+
+.user-row-status.status-badge--inactive {
+  background: #f1f3f5;
+  color: #59636e;
+}
+
 .user-page-footer {
   flex: 0 0 auto;
   padding: 0 2px;

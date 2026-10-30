@@ -204,7 +204,11 @@ function UserManagementPage() {
         assignedProjects,
       }
       if (editingId) {
-        await updateUser(editingId, input)
+        const updatedUser = await updateUser(editingId, input)
+        const updatedRecord = fromApiUser(updatedUser, projectOptions)
+        setUsers((current) => current.map((user) =>
+          user.id === updatedRecord.id ? updatedRecord : user,
+        ))
         setToast('User updated successfully.')
       } else {
         const createdUser = await createUser({ ...input, password: form.password })
@@ -218,11 +222,9 @@ function UserManagementPage() {
         setSearch('')
         setRoleFilter('All')
         setStatusFilter('All')
+        setPage(1)
       }
-      setIsLoading(true)
       setLoadError('')
-      setPage(1)
-      setRefreshKey((current) => current + 1)
       setEditingId(null)
       setIsFormOpen(false)
     } catch (error) {
@@ -236,23 +238,29 @@ function UserManagementPage() {
     }
   }
 
-  async function toggleStatus(user: UserRecord) {
-    const nextStatus: UserStatus = user.status === 'Active' ? 'Inactive' : 'Active'
-    if (!window.confirm(`${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} ${user.name}?`)) return
+  async function changeUserStatus(user: UserRecord, nextStatus: UserStatus) {
+    if (nextStatus === user.status) return
     setActionError('')
     try {
-      await updateUserStatus(user.id, nextStatus === 'Active' ? 'active' : 'inactive')
+      const updatedUser = await updateUserStatus(user.id, nextStatus === 'Active' ? 'active' : 'inactive')
+      const updatedRecord = fromApiUser(updatedUser, projectOptions)
+      setUsers((current) => current.map((currentUser) =>
+        currentUser.id === updatedRecord.id ? updatedRecord : currentUser,
+      ))
       setToast(`User ${nextStatus.toLowerCase()} successfully.`)
-      setIsLoading(true)
-      setLoadError('')
-      setRefreshKey((current) => current + 1)
     } catch (error) {
       if (error instanceof AuthenticationError) {
-        navigate('/login', { replace: true })
+        setActionError(getErrorMessage(error))
         return
       }
       setActionError(getErrorMessage(error))
     }
+  }
+
+  async function toggleStatus(user: UserRecord) {
+    const nextStatus: UserStatus = user.status === 'Active' ? 'Inactive' : 'Active'
+    if (!window.confirm(`${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} ${user.name}?`)) return
+    await changeUserStatus(user, nextStatus)
   }
 
   async function openView(user: UserRecord) {
@@ -352,7 +360,14 @@ function UserManagementPage() {
       </section>
 
       {toast && <div className="toast user-toast" role="status">{toast}</div>}
-      {actionError && <div className="inline-alert inline-alert--error" role="alert">{actionError}</div>}
+      {actionError && (
+        <div className="inline-alert inline-alert--error" role="alert">
+          {actionError}
+          {actionError === 'Your session has expired. Please sign in again.' && (
+            <button type="button" onClick={() => navigate('/login', { replace: true })}>Sign in</button>
+          )}
+        </div>
+      )}
       {loadError && (
         <div className="inline-alert inline-alert--error" role="alert">
           {loadError}
@@ -425,7 +440,20 @@ function UserManagementPage() {
                   <td><span className="role-badge"><span className="role-glyph" aria-hidden="true">◈</span>{user.role}</span></td>
                   <td className="secondary-cell">{user.phone || '—'}</td>
                   <td className="project-cell">{user.projects.length ? user.projects.join(', ') : '—'}</td>
-                  <td><span className={`status-badge status-badge--${user.status.toLowerCase()}`}><span className="status-dot" aria-hidden="true" />{user.status}</span></td>
+                  <td>
+                    <select
+                      className={`user-row-status status-badge--${user.status.toLowerCase()}`}
+                      aria-label={`Change ${user.name} status`}
+                      value={user.status}
+                      onChange={(event) => void changeUserStatus(
+                        user,
+                        event.target.value === 'Active' ? 'Active' : 'Inactive',
+                      )}
+                    >
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </td>
                   <td className="secondary-cell date-cell">{formatDate(user.createdAt)}</td>
                   <td><div className="row-actions">
                     <button className="icon-button" type="button" title="View details" aria-label={`View ${user.name}`} onClick={() => void openView(user)}>↗</button>
