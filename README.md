@@ -167,13 +167,25 @@ Environment variables may be used for backend API URLs and other environment-spe
 
 For Vite, frontend environment variables exposed to the application generally use the `VITE_` prefix. The platform-admin app reads them from the repository-root `.env` file. Restart the development server after changing this file.
 
-Example `.env.example`:
+The platform-admin app uses the deployed backend,
+`https://dbms-superadmin-be.onrender.com/api`, by default. During local
+development, requests use the Vite `/api` proxy to avoid browser CORS issues.
+Override the API URL by setting `VITE_API_BASE_URL` to a backend origin or API
+prefix; the `/api` suffix is added when missing.
+
+To use a local backend instead, set `VITE_API_PROXY_TARGET` to an address
+reachable from the machine running the frontend. Use `localhost` only when the
+backend runs on that same machine.
 
 ```env
-VITE_API_BASE_URL=http://localhost:5000
+VITE_API_PROXY_TARGET=http://localhost:3007
 ```
 
-Set this to the backend origin, without a trailing slash or `/api` suffix; the app adds endpoint paths itself.
+If the backend runs on another machine, replace `localhost` with its reachable
+IP or hostname. Keep `VITE_API_PROXY_TARGET` as the backend origin (without
+`/api`). Setting `VITE_API_BASE_URL` to a remote origin bypasses the proxy and
+requires the backend to allow the frontend's origin via CORS. Restart the
+development server after changing the root `.env` file.
 
 Do not put database connection strings, private API secrets, JWT signing secrets, or other server-only credentials in frontend environment variables. Frontend variables can be exposed to users in the built application.
 

@@ -1,19 +1,25 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { BriefcaseBusiness } from 'lucide-react'
+import { useEffect, useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
+import AdminSidebar from '../../components/AdminSidebar'
 import './users.css'
-import { resetUserPassword } from './services/userService'
-import type { SelectOption } from './types/user.types'
-import { getFromStorage, saveToStorage } from '../../utils/storage'
+import {
+  createUser,
+  deleteUser,
+  getUser,
+  listUsers,
+  resetUserPassword,
+  updateUser,
+  updateUserStatus,
+  AuthenticationError,
+} from './services/userService'
+import type { SelectOption, User } from './types/user.types'
 
 type UserStatus = 'Active' | 'Inactive'
 const ROLE_OPTIONS = [
-  'Admin',
-  'Super Admin-LTS',
-  'Super Admin-CRM',
-  'Super Admin-CRS',
-  'Super Admin-Real estate',
-  'Super Admin-Edu-Merit',
-  'Super Admin-Dbms',
+  { value: 'superadmin', label: 'Super Admin' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'user', label: 'User' },
 ] as const
 
 const DEMO_PROJECT_OPTIONS: SelectOption[] = [
@@ -37,43 +43,33 @@ interface UserRecord {
   createdAt: string
 }
 
-type UserFormValues = Pick<UserRecord, 'name' | 'email' | 'phone' | 'role'> & {
+type UserFormValues = Pick<UserRecord, 'name' | 'email' | 'role'> & {
   password: string
   projects: string[]
 }
 
 const PAGE_SIZE = 10
-const USERS_STORAGE_KEY = 'platform-admin.users'
 
-const emptyForm: UserFormValues = { name: '', email: '', phone: '', password: '', role: ROLE_OPTIONS[0], projects: [] }
-
-const initialUsers: UserRecord[] = [
-  {
-    id: 'user-demo-1',
-    userId: 'user-demo-1',
-    name: 'Aarav Mehta',
-    email: 'aarav.mehta@example.com',
-    phone: '+91 98765 43210',
-    role: 'Admin',
-    projects: ['DBMS'],
-    status: 'Active',
-    createdAt: '2026-01-15T00:00:00.000Z',
-  },
-  {
-    id: 'user-demo-2',
-    userId: 'user-demo-2',
-    name: 'Diya Sharma',
-    email: 'diya.sharma@example.com',
-    phone: '+91 98765 43211',
-    role: 'Super Admin-CRM',
-    projects: ['CRM'],
-    status: 'Active',
-    createdAt: '2026-02-01T00:00:00.000Z',
-  },
-]
+const emptyForm: UserFormValues = { name: '', email: '', password: '', role: ROLE_OPTIONS[0].value, projects: [] }
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'An unexpected error occurred.'
+}
+
+function fromApiUser(user: User, projectOptions: SelectOption[]): UserRecord {
+  return {
+    id: user.id,
+    userId: user.id,
+    name: user.fullName,
+    email: user.email,
+    phone: user.phoneNumber,
+    role: ROLE_OPTIONS.find((role) => role.value === user.role.toLowerCase())?.label ?? user.role,
+    projects: user.assignedProjects.map((project) =>
+      projectOptions.find((option) => option.id === project.id)?.name ?? project.name,
+    ),
+    status: user.status === 'active' ? 'Active' : 'Inactive',
+    createdAt: user.createdAt,
+  }
 }
 
 function formatDate(value: string) {
@@ -85,23 +81,21 @@ function initials(name: string) {
 }
 
 function UserManagementPage() {
-  const [initialUserData] = useState(() => {
-    try {
-      return { users: getFromStorage(USERS_STORAGE_KEY, initialUsers), error: '' }
-    } catch (error) {
-      return { users: initialUsers, error: getErrorMessage(error) }
-    }
-  })
-  const [users, setUsers] = useState(initialUserData.users)
+  const navigate = useNavigate()
+  const [users, setUsers] = useState<UserRecord[]>([])
+  const [totalUsers, setTotalUsers] = useState(0)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
   const [page, setPage] = useState(1)
-  const [loadError, setLoadError] = useState(initialUserData.error)
+  const [refreshKey, setRefreshKey] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
   const projectOptions = DEMO_PROJECT_OPTIONS
   const [form, setForm] = useState<UserFormValues>(emptyForm)
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [viewingUser, setViewingUser] = useState<UserRecord | null>(null)
   const [passwordResetUser, setPasswordResetUser] = useState<UserRecord | null>(null)
@@ -112,34 +106,38 @@ function UserManagementPage() {
   const [toast, setToast] = useState('')
 
   useEffect(() => {
-    function syncSavedUsers(event: StorageEvent) {
-      if (event.key !== USERS_STORAGE_KEY) return
-      try {
-        setUsers(getFromStorage(USERS_STORAGE_KEY, initialUsers))
-        setLoadError('')
-      } catch (error) {
+    const controller = new AbortController()
+    listUsers({
+      page,
+      pageSize: PAGE_SIZE,
+      search: search.trim(),
+      role: roleFilter === 'All' ? '' : roleFilter,
+      status: statusFilter === 'All' ? '' : statusFilter.toLowerCase(),
+    }, controller.signal)
+      .then((result) => {
+        setUsers(result.users.map((user) => fromApiUser(user, projectOptions)))
+        setTotalUsers(result.total)
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        if (error instanceof AuthenticationError) {
+          setLoadError(getErrorMessage(error))
+          return
+        }
         setLoadError(getErrorMessage(error))
-      }
-    }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false)
+      })
+    return () => controller.abort()
+  }, [navigate, page, projectOptions, refreshKey, roleFilter, search, statusFilter])
 
-    window.addEventListener('storage', syncSavedUsers)
-    return () => window.removeEventListener('storage', syncSavedUsers)
-  }, [])
-
-  const filteredUsers = useMemo(() => users.filter((user) => {
-    const query = search.trim().toLowerCase()
-    const matchesSearch = !query || [user.userId, user.name, user.email, user.phone]
-      .some((value) => value.toLowerCase().includes(query))
-    const matchesRole = roleFilter === 'All' || user.role === roleFilter
-    const matchesStatus = statusFilter === 'All' || user.status === statusFilter
-    return matchesSearch && matchesRole && matchesStatus
-  }), [roleFilter, search, statusFilter, users])
-
-  const totalUsers = filteredUsers.length
   const pageCount = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE))
-  const pageUsers = filteredUsers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const pageUsers = users
 
   function updateFilter(setter: (value: string) => void, value: string) {
+    setIsLoading(true)
+    setLoadError('')
     setter(value)
     setPage(1)
     setToast('')
@@ -163,8 +161,7 @@ function UserManagementPage() {
     setForm({
       name: user.name,
       email: user.email,
-      phone: user.phone,
-      role: user.role,
+      role: ROLE_OPTIONS.find((role) => role.label === user.role)?.value ?? user.role,
       password: '',
       projects: user.projects.map((projectName) =>
         projectOptions.find((option) => option.name === projectName)?.id ?? projectName,
@@ -174,18 +171,21 @@ function UserManagementPage() {
     setIsFormOpen(true)
   }
 
-  function saveUser(event: FormEvent<HTMLFormElement>) {
+  async function saveUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!form.name.trim()) {
-      setFormError('Full name is required.')
+    if (form.name.trim().length < 2 || form.name.trim().length > 100) {
+      setFormError('Full name must be between 2 and 100 characters.')
       return
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      setFormError('Enter a valid email address.')
+    if (
+      form.email.trim().length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
+    ) {
+      setFormError('Enter a valid email address (maximum 254 characters).')
       return
     }
-    if (!editingId && !form.password.trim()) {
-      setFormError('Password is required.')
+    if (!editingId && (form.password.length < 8 || form.password.length > 128)) {
+      setFormError('Password must be between 8 and 128 characters.')
       return
     }
     const assignedProjects = form.projects.map((project) => project.trim()).filter(Boolean)
@@ -194,66 +194,89 @@ function UserManagementPage() {
       return
     }
 
+    setIsSaving(true)
     setFormError('')
-    const email = form.email.trim().toLowerCase()
-    if (users.some((user) => user.id !== editingId && user.email.toLowerCase() === email)) {
-      setFormError('A user with this email already exists.')
-      return
-    }
-
-    const id = editingId ?? `user-${Date.now()}`
-    const nextUser: UserRecord = {
-      id,
-      userId: id,
-      name: form.name.trim(),
-      email,
-      phone: form.phone.trim(),
-      role: form.role,
-      projects: assignedProjects.map((projectId) =>
-        projectOptions.find((option) => option.id === projectId)?.name ?? projectId,
-      ),
-      status: editingId ? users.find((user) => user.id === editingId)?.status ?? 'Active' : 'Active',
-      createdAt: editingId
-        ? users.find((user) => user.id === editingId)?.createdAt ?? new Date().toISOString()
-        : new Date().toISOString(),
-    }
-    const nextUsers = editingId
-      ? users.map((user) => user.id === editingId ? nextUser : user)
-      : [nextUser, ...users]
     try {
-      saveToStorage(USERS_STORAGE_KEY, nextUsers)
-      setUsers(nextUsers)
-      setToast(editingId ? 'User updated successfully.' : 'User created successfully.')
+      const input = {
+        fullName: form.name.trim(),
+        email: form.email.trim(),
+        role: form.role,
+        assignedProjects,
+      }
+      if (editingId) {
+        await updateUser(editingId, input)
+        setToast('User updated successfully.')
+      } else {
+        const createdUser = await createUser({ ...input, password: form.password })
+        const createdRecord = fromApiUser(createdUser, projectOptions)
+        setUsers((current) => [
+          createdRecord,
+          ...current.filter((user) => user.id !== createdRecord.id),
+        ].slice(0, PAGE_SIZE))
+        setTotalUsers((current) => current + 1)
+        setToast('User created successfully.')
+        setSearch('')
+        setRoleFilter('All')
+        setStatusFilter('All')
+      }
+      setIsLoading(true)
+      setLoadError('')
       setPage(1)
+      setRefreshKey((current) => current + 1)
       setEditingId(null)
       setIsFormOpen(false)
     } catch (error) {
+      if (error instanceof AuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
       setFormError(getErrorMessage(error))
+    } finally {
+      setIsSaving(false)
     }
   }
 
-  function toggleStatus(user: UserRecord) {
+  async function toggleStatus(user: UserRecord) {
     const nextStatus: UserStatus = user.status === 'Active' ? 'Inactive' : 'Active'
     if (!window.confirm(`${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} ${user.name}?`)) return
     setActionError('')
     try {
-      const nextUsers = users.map((item) => item.id === user.id ? { ...item, status: nextStatus } : item)
-      saveToStorage(USERS_STORAGE_KEY, nextUsers)
-      setUsers(nextUsers)
+      await updateUserStatus(user.id, nextStatus === 'Active' ? 'active' : 'inactive')
       setToast(`User ${nextStatus.toLowerCase()} successfully.`)
+      setIsLoading(true)
+      setLoadError('')
+      setRefreshKey((current) => current + 1)
     } catch (error) {
+      if (error instanceof AuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
       setActionError(getErrorMessage(error))
     }
   }
 
-  function openView(user: UserRecord) {
-    setViewingUser(user)
+  async function openView(user: UserRecord) {
+    setActionError('')
+    try {
+      const details = await getUser(user.id)
+      setViewingUser(fromApiUser(details, projectOptions))
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
+      setActionError(getErrorMessage(error))
+    }
   }
 
   async function submitPasswordReset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!passwordResetUser || !newPassword.trim()) {
       setPasswordResetError('A new password is required.')
+      return
+    }
+    if (newPassword.length < 8 || newPassword.length > 128) {
+      setPasswordResetError('Password must be between 8 and 128 characters.')
       return
     }
 
@@ -265,6 +288,10 @@ function UserManagementPage() {
       setPasswordResetUser(null)
       setNewPassword('')
     } catch (error) {
+      if (error instanceof AuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
       setPasswordResetError(getErrorMessage(error))
     } finally {
       setIsResettingPassword(false)
@@ -277,18 +304,26 @@ function UserManagementPage() {
     setPasswordResetError('')
   }
 
-  function removeUser(user: UserRecord) {
+  async function removeUser(user: UserRecord) {
     if (!window.confirm(`Delete ${user.name}? This action cannot be undone.`)) return
     setActionError('')
     try {
-      const nextUsers = users.filter((item) => item.id !== user.id)
-      saveToStorage(USERS_STORAGE_KEY, nextUsers)
-      setUsers(nextUsers)
+      await deleteUser(user.id)
       setToast('User deleted successfully.')
       if (page > 1 && totalUsers - 1 <= (page - 1) * PAGE_SIZE) {
+        setIsLoading(true)
+        setLoadError('')
         setPage((current) => current - 1)
+      } else {
+        setIsLoading(true)
+        setLoadError('')
+        setRefreshKey((current) => current + 1)
       }
     } catch (error) {
+      if (error instanceof AuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
       setActionError(getErrorMessage(error))
     }
   }
@@ -301,22 +336,7 @@ function UserManagementPage() {
         <span className="user-admin-navbar-user"><span aria-hidden="true" /> Super Admin</span>
       </header>
       <div className="user-admin-body">
-        <aside className="user-admin-sidebar">
-          <a className="user-admin-brand" href="/" aria-label="DBMS Super Admin">
-            <span className="user-admin-brand-mark">D</span>
-            <span>DBMS <strong>ADMIN</strong></span>
-          </a>
-          <p className="user-admin-nav-label">WORKSPACE</p>
-          <nav className="user-admin-nav" aria-label="Main navigation">
-            <a className="user-admin-nav-link user-admin-nav-link--active" href="/" aria-current="page"><span aria-hidden="true">♙</span> User Management</a>
-            <a className="user-admin-nav-link" href="/projects"><span aria-hidden="true"><BriefcaseBusiness size={15} /></span> Project Management</a>
-            <a className="user-admin-nav-link" href="#role-permission"><span aria-hidden="true">♧</span> Role &amp; Permission</a>
-          </nav>
-          <div className="user-admin-sidebar-profile">
-            <span className="user-admin-profile-avatar">SA</span>
-            <span><strong>Super Admin</strong><small>Platform administrator</small></span>
-          </div>
-        </aside>
+        <AdminSidebar />
 
         <div className="user-admin-main">
         <main className="page-content user-management-page">
@@ -333,7 +353,14 @@ function UserManagementPage() {
 
       {toast && <div className="toast user-toast" role="status">{toast}</div>}
       {actionError && <div className="inline-alert inline-alert--error" role="alert">{actionError}</div>}
-      {loadError && <div className="inline-alert inline-alert--error" role="alert">{loadError}</div>}
+      {loadError && (
+        <div className="inline-alert inline-alert--error" role="alert">
+          {loadError}
+          {loadError === 'Your session has expired. Please sign in again.' && (
+            <button type="button" onClick={() => navigate('/login', { replace: true })}>Sign in</button>
+          )}
+        </div>
+      )}
 
       <section className="users-card user-filter-card" aria-label="User search and filters">
         <label className="search-box user-search">
@@ -342,6 +369,7 @@ function UserManagementPage() {
           <input
             type="search"
             placeholder="Search by ID, name, email, phone..."
+            maxLength={100}
             value={search}
             onChange={(event) => updateFilter(setSearch, event.target.value)}
           />
@@ -353,7 +381,7 @@ function UserManagementPage() {
             <span className="visually-hidden">Filter by role</span>
             <select value={roleFilter} onChange={(event) => updateFilter(setRoleFilter, event.target.value)}>
               <option value="All">All roles</option>
-              {ROLE_OPTIONS.map((role) => <option key={role} value={role}>{role}</option>)}
+              {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
             </select>
           </label>
           <label className="filter-select">
@@ -408,16 +436,17 @@ function UserManagementPage() {
                   </div></td>
                 </tr>
               ))}
-              {!loadError && pageUsers.length === 0 && <tr><td colSpan={9} className="user-no-results">No users match your search or filters.</td></tr>}
+              {isLoading && <tr><td colSpan={9} className="user-no-results">Loading users...</td></tr>}
+              {!isLoading && !loadError && pageUsers.length === 0 && <tr><td colSpan={9} className="user-no-results">No users match your search or filters.</td></tr>}
             </tbody>
           </table>
         </div>
         <div className="table-footer">
           <span>Showing <strong>{totalUsers ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, totalUsers)}</strong> of <strong>{totalUsers}</strong> users</span>
           <div className="pagination">
-            <button className="page-button" type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>‹</button>
+            <button className="page-button" type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => { setIsLoading(true); setLoadError(''); setPage((current) => Math.max(1, current - 1)) }}>‹</button>
             <span>Page <strong>{page}</strong> of <strong>{pageCount}</strong></span>
-            <button className="page-button" type="button" aria-label="Next page" disabled={page >= pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>›</button>
+            <button className="page-button" type="button" aria-label="Next page" disabled={page >= pageCount} onClick={() => { setIsLoading(true); setLoadError(''); setPage((current) => Math.min(pageCount, current + 1)) }}>›</button>
           </div>
         </div>
       </section>
@@ -434,13 +463,12 @@ function UserManagementPage() {
               <button type="button" className="modal-close" onClick={closeForm} aria-label="Close">×</button>
             </div>
             <form className="user-form modal-body" onSubmit={saveUser} noValidate>
-              <p className="form-demo-hint">Demo account data is saved in this browser. Passwords are never stored in localStorage.</p>
+              <p className="form-demo-hint">Changes are saved to the platform user directory.</p>
               {formError && <div className="inline-alert inline-alert--error" role="alert">{formError}</div>}
-              <label className="field"><span>Full name <span className="required-mark">*</span></span><input autoComplete="name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></label>
-              <label className="field"><span>Email address <span className="required-mark">*</span></span><input type="email" autoComplete="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></label>
-              {!editingId && <label className="field"><span>Password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required /></label>}
-              <label className="field"><span>Phone number <span className="field-optional">Optional</span></span><input type="tel" autoComplete="tel" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} /></label>
-              <label className="field"><span>Role <span className="required-mark">*</span></span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>{ROLE_OPTIONS.map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
+              <label className="field"><span>Full name <span className="required-mark">*</span></span><input autoComplete="name" maxLength={100} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></label>
+              <label className="field"><span>Email address <span className="required-mark">*</span></span><input type="email" autoComplete="email" maxLength={254} value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></label>
+              {!editingId && <label className="field"><span>Password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required /></label>}
+              <label className="field"><span>Role <span className="required-mark">*</span></span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>{ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
               <label className="field assigned-projects-field">
                 <span>Assigned projects <span className="required-mark">*</span></span>
                 <select
@@ -491,7 +519,7 @@ function UserManagementPage() {
                     : 'Required. Select one or more projects.'}
                 </span>
               </label>
-              <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closeForm}>Cancel</button><button className="button button--primary" type="submit" disabled={projectOptions.length === 0}>{editingId ? 'Save changes' : 'Create user'}</button></div>
+              <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closeForm}>Cancel</button><button className="button button--primary" type="submit" disabled={isSaving || projectOptions.length === 0}>{isSaving ? 'Saving...' : editingId ? 'Save changes' : 'Create user'}</button></div>
             </form>
           </section>
         </div>
@@ -535,7 +563,7 @@ function UserManagementPage() {
             <form className="user-form modal-body" onSubmit={submitPasswordReset}>
               <p>Set a new password for {passwordResetUser.name}.</p>
               {passwordResetError && <div className="inline-alert inline-alert--error" role="alert">{passwordResetError}</div>}
-              <label className="field"><span>New password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></label>
+              <label className="field"><span>New password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></label>
               <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closePasswordReset}>Cancel</button><button className="button button--primary" type="submit" disabled={isResettingPassword}>{isResettingPassword ? 'Saving...' : 'Reset password'}</button></div>
             </form>
           </section>

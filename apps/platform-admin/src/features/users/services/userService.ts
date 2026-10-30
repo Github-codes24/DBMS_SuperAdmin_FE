@@ -2,15 +2,20 @@ import type {
   AccountStatus,
   AssignedProject,
   CreateUserInput,
-  SelectOption,
   User,
   UserInput,
   UserListParams,
   UserListResult,
 } from '../types/user.types'
 import { clearAccessToken, getAccessToken } from '../../auth/authService'
+import { apiBaseUrl } from '../../../api'
 
-const apiBaseUrl = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '')
+export class AuthenticationError extends Error {
+  constructor() {
+    super('Your session has expired. Please sign in again.')
+    this.name = 'AuthenticationError'
+  }
+}
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -24,6 +29,35 @@ function asString(value: unknown, field: string): string {
     throw new Error(`The server response is missing ${field}.`)
   }
   return String(value)
+}
+
+function apiErrorMessage(value: unknown, field?: string): string | undefined {
+  if (typeof value === 'string') return field ? `${field}: ${value}` : value
+  if (Array.isArray(value)) {
+    const messages = value
+      .map((item) => apiErrorMessage(item))
+      .filter((message): message is string => Boolean(message))
+    return messages.length ? messages.join('; ') : undefined
+  }
+  if (typeof value !== 'object' || value === null) return undefined
+
+  const record = value as Record<string, unknown>
+  const rawMessage = record.message ?? record.msg
+  const fieldValue = record.field ?? record.path ?? record.param ?? record.property
+  const fieldLabel = Array.isArray(fieldValue) ? fieldValue.join('.') : typeof fieldValue === 'string' ? fieldValue : undefined
+  const message = typeof rawMessage === 'string'
+    ? fieldLabel && !rawMessage.toLowerCase().startsWith(`${fieldLabel.toLowerCase()}:`)
+      ? `${fieldLabel}: ${rawMessage}`
+      : rawMessage
+    : undefined
+  const details = apiErrorMessage(record.errors ?? record.details ?? record.issues)
+  if (message && details && message !== details) return `${message}: ${details}`
+  if (message ?? details) return message ?? details
+
+  const nestedMessages = Object.entries(record)
+    .map(([key, nestedValue]) => apiErrorMessage(nestedValue, key))
+    .filter((entry): entry is string => Boolean(entry))
+  return nestedMessages.length ? nestedMessages.join('; ') : undefined
 }
 
 function unwrapList(value: unknown): { items: unknown[]; metadata: Record<string, unknown> } {
@@ -48,21 +82,6 @@ function unwrapList(value: unknown): { items: unknown[]; metadata: Record<string
     throw new Error('The server returned an invalid list response.')
   }
   return { items, metadata: { ...response, ...nested } }
-}
-
-function optionName(value: unknown): SelectOption {
-  if (typeof value === 'string' || typeof value === 'number') {
-    const name = String(value)
-    return { id: name, name }
-  }
-
-  const option = asRecord(value)
-  const id = option.id ?? option._id ?? option.projectId ?? option.value ?? option.projectName ?? option.name
-  const name = option.name ?? option.projectName ?? option.label ?? option.title
-  return {
-    id: asString(id, 'an option identifier'),
-    name: asString(name, 'an option name'),
-  }
 }
 
 function assignedProjects(value: unknown): AssignedProject[] {
@@ -128,13 +147,14 @@ function mapUser(value: unknown): User {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const accessToken = getAccessToken()
   if (!accessToken) {
-    throw new Error('Authentication required. Please sign in to continue.')
+    throw new AuthenticationError()
   }
 
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
       ...init?.headers,
     },
@@ -142,15 +162,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (response.status === 401) {
     clearAccessToken()
+    throw new AuthenticationError()
   }
 
   if (!response.ok) {
     let message = `Request failed (${response.status}).`
     try {
       const body: unknown = await response.json()
-      const record = asRecord(body)
-      if (typeof record.message === 'string') message = record.message
-      else if (typeof record.error === 'string') message = record.error
+      const bodyMessage = apiErrorMessage(body)
+      if (bodyMessage) message = bodyMessage
+      else if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
+        const error = (body as Record<string, unknown>).error
+        if (typeof error === 'string') message = error
+      }
     } catch {
       if (response.statusText) message = response.statusText
     }
@@ -176,7 +200,7 @@ export async function listUsers(
     limit: String(params.pageSize),
   })
   if (params.search) query.set('search', params.search)
-  if (params.role) query.set('role', params.role)
+  if (params.role) query.set('role', apiRole(params.role))
   if (params.status) query.set('isActive', String(params.status === 'active'))
   query.set('sortBy', 'createdAt')
   query.set('sortOrder', 'desc')
@@ -213,35 +237,26 @@ export async function listUsers(
   }
 }
 
-export async function listRoles(signal?: AbortSignal): Promise<SelectOption[]> {
-  const raw: unknown = await request('/roles', { signal })
-  return unwrapList(raw).items.map(optionName)
-}
-
-export async function listProjects(signal?: AbortSignal): Promise<SelectOption[]> {
-  const raw: unknown = await request('/projects', { signal })
-  return unwrapList(raw).items.map(optionName)
-}
-
 export async function getUser(id: string): Promise<User> {
   const raw: unknown = await request(`/users/${encodeURIComponent(id)}`)
   const record = asRecord(raw)
   return mapUser(record.data ?? record.user ?? record)
 }
 
-export async function createUser(input: CreateUserInput): Promise<void> {
-  await request('/users', {
+export async function createUser(input: CreateUserInput): Promise<User> {
+  const raw: unknown = await request('/users', {
     method: 'POST',
     body: JSON.stringify({
       name: input.fullName,
       email: input.email,
       password: input.password,
-      phoneNumber: input.phoneNumber,
-      role: input.role,
+      role: apiRole(input.role),
       projectIds: input.assignedProjects,
       isActive: true,
     }),
   })
+  const record = asRecord(raw)
+  return mapUser(record.data ?? record.user ?? record)
 }
 
 export async function updateUser(id: string, input: UserInput): Promise<void> {
@@ -250,11 +265,19 @@ export async function updateUser(id: string, input: UserInput): Promise<void> {
     body: JSON.stringify({
       name: input.fullName,
       email: input.email,
-      phoneNumber: input.phoneNumber,
-      role: input.role,
+      role: apiRole(input.role),
       projectIds: input.assignedProjects,
     }),
   })
+}
+
+function apiRole(role: string): string {
+  const normalizedRole = role.toLowerCase().replace(/[\s_-]+/g, '')
+  if (normalizedRole === 'superadmin') return 'superadmin'
+  if (normalizedRole === 'admin') return 'admin'
+  if (normalizedRole === 'manager') return 'manager'
+  if (normalizedRole === 'user') return 'user'
+  throw new Error('Select a role supported by the server.')
 }
 
 export async function updateUserStatus(id: string, status: AccountStatus): Promise<void> {

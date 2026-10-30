@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ChangeEvent, type FormEvent } from "react";
 import {
   Eye,
   EyeOff,
@@ -42,7 +42,7 @@ function Login() {
     return "";
   };
 
-  const handleEmailChange = (e: any) => {
+  const handleEmailChange = (e: ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setEmail(val);
     if (noticeMessage) setNoticeMessage("");
@@ -57,7 +57,7 @@ function Login() {
     }
   };
 
-  const handlePasswordChange = (e: any) => {
+  const handlePasswordChange = (e: ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setPassword(val);
     if (noticeMessage) setNoticeMessage("");
@@ -66,7 +66,7 @@ function Login() {
     }
   };
 
-  const handleSubmit = async (e: any) => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     const emailErr = validateEmailFormat(email);
@@ -94,20 +94,61 @@ function Login() {
         }),
       });
 
-      const result = await response.json();
+      const responseText = await response.text();
+      let result: Record<string, unknown> | undefined;
 
-      if (!response.ok || result.success !== true) {
-        throw new Error(result.message || "Login failed. Please try again.");
+      if (responseText.trim()) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(responseText);
+        } catch {
+          if (response.ok) {
+            throw new Error("Login server returned an invalid response.");
+          }
+        }
+
+        if (parsed !== undefined) {
+          if (
+            typeof parsed !== "object" ||
+            parsed === null ||
+            Array.isArray(parsed)
+          ) {
+            throw new Error("Login server returned an invalid response.");
+          }
+          result = parsed as Record<string, unknown>;
+        }
       }
 
-      const { accessToken, user } = result.data ?? {};
+      if (!response.ok || result?.success === false) {
+        const message =
+          typeof result?.message === "string"
+            ? result.message
+            : typeof result?.error === "string"
+              ? result.error
+              : `Login failed (${response.status}).`;
+        throw new Error(message);
+      }
 
-      if (!accessToken || !user) {
-        throw new Error("Invalid login response from server.");
+      if (!result) {
+        throw new Error("Login server returned an empty response.");
+      }
+
+      const data = result.data;
+      if (typeof data !== "object" || data === null || Array.isArray(data)) {
+        throw new Error("Invalid login response: access token is missing.");
+      }
+      const { accessToken, user } = data as {
+        accessToken?: unknown;
+        user?: unknown;
+      };
+      if (typeof accessToken !== "string" || !accessToken) {
+        throw new Error("Invalid login response: access token is missing.");
       }
 
       localStorage.setItem("accessToken", accessToken);
-      localStorage.setItem("user", JSON.stringify(user));
+      if (user !== undefined) {
+        localStorage.setItem("user", JSON.stringify(user));
+      }
 
       navigate("/users", { replace: true });
     } catch (error) {
