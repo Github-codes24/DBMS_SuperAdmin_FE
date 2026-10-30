@@ -40,7 +40,6 @@ export interface UserListParams {
 export interface UserInput {
   fullName: string
   email: string
-  phoneNumber: string
   role: string
   assignedProjects: string[]
 }

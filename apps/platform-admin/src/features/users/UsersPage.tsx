@@ -16,13 +16,10 @@ import type { SelectOption, User } from './types/user.types'
 
 type UserStatus = 'Active' | 'Inactive'
 const ROLE_OPTIONS = [
-  'Admin',
-  'Super Admin-LTS',
-  'Super Admin-CRM',
-  'Super Admin-CRS',
-  'Super Admin-Real estate',
-  'Super Admin-Edu-Merit',
-  'Super Admin-Dbms',
+  { value: 'superadmin', label: 'Super Admin' },
+  { value: 'admin', label: 'Admin' },
+  { value: 'manager', label: 'Manager' },
+  { value: 'user', label: 'User' },
 ] as const
 
 const DEMO_PROJECT_OPTIONS: SelectOption[] = [
@@ -46,14 +43,14 @@ interface UserRecord {
   createdAt: string
 }
 
-type UserFormValues = Pick<UserRecord, 'name' | 'email' | 'phone' | 'role'> & {
+type UserFormValues = Pick<UserRecord, 'name' | 'email' | 'role'> & {
   password: string
   projects: string[]
 }
 
 const PAGE_SIZE = 10
 
-const emptyForm: UserFormValues = { name: '', email: '', phone: '', password: '', role: ROLE_OPTIONS[0], projects: [] }
+const emptyForm: UserFormValues = { name: '', email: '', password: '', role: ROLE_OPTIONS[0].value, projects: [] }
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'An unexpected error occurred.'
@@ -66,7 +63,7 @@ function fromApiUser(user: User, projectOptions: SelectOption[]): UserRecord {
     name: user.fullName,
     email: user.email,
     phone: user.phoneNumber,
-    role: ROLE_OPTIONS.find((role) => role.toLowerCase() === user.role.toLowerCase()) ?? user.role,
+    role: ROLE_OPTIONS.find((role) => role.value === user.role.toLowerCase())?.label ?? user.role,
     projects: user.assignedProjects.map((project) =>
       projectOptions.find((option) => option.id === project.id)?.name ?? project.name,
     ),
@@ -124,7 +121,7 @@ function UserManagementPage() {
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
         if (error instanceof AuthenticationError) {
-          navigate('/login', { replace: true })
+          setLoadError(getErrorMessage(error))
           return
         }
         setLoadError(getErrorMessage(error))
@@ -164,8 +161,7 @@ function UserManagementPage() {
     setForm({
       name: user.name,
       email: user.email,
-      phone: user.phone,
-      role: user.role,
+      role: ROLE_OPTIONS.find((role) => role.label === user.role)?.value ?? user.role,
       password: '',
       projects: user.projects.map((projectName) =>
         projectOptions.find((option) => option.name === projectName)?.id ?? projectName,
@@ -177,16 +173,19 @@ function UserManagementPage() {
 
   async function saveUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!form.name.trim()) {
-      setFormError('Full name is required.')
+    if (form.name.trim().length < 2 || form.name.trim().length > 100) {
+      setFormError('Full name must be between 2 and 100 characters.')
       return
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
-      setFormError('Enter a valid email address.')
+    if (
+      form.email.trim().length > 254 ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())
+    ) {
+      setFormError('Enter a valid email address (maximum 254 characters).')
       return
     }
-    if (!editingId && !form.password.trim()) {
-      setFormError('Password is required.')
+    if (!editingId && (form.password.length < 8 || form.password.length > 128)) {
+      setFormError('Password must be between 8 and 128 characters.')
       return
     }
     const assignedProjects = form.projects.map((project) => project.trim()).filter(Boolean)
@@ -201,7 +200,6 @@ function UserManagementPage() {
       const input = {
         fullName: form.name.trim(),
         email: form.email.trim(),
-        phoneNumber: form.phone.trim(),
         role: form.role,
         assignedProjects,
       }
@@ -209,8 +207,17 @@ function UserManagementPage() {
         await updateUser(editingId, input)
         setToast('User updated successfully.')
       } else {
-        await createUser({ ...input, password: form.password })
+        const createdUser = await createUser({ ...input, password: form.password })
+        const createdRecord = fromApiUser(createdUser, projectOptions)
+        setUsers((current) => [
+          createdRecord,
+          ...current.filter((user) => user.id !== createdRecord.id),
+        ].slice(0, PAGE_SIZE))
+        setTotalUsers((current) => current + 1)
         setToast('User created successfully.')
+        setSearch('')
+        setRoleFilter('All')
+        setStatusFilter('All')
       }
       setIsLoading(true)
       setLoadError('')
@@ -266,6 +273,10 @@ function UserManagementPage() {
     event.preventDefault()
     if (!passwordResetUser || !newPassword.trim()) {
       setPasswordResetError('A new password is required.')
+      return
+    }
+    if (newPassword.length < 8 || newPassword.length > 128) {
+      setPasswordResetError('Password must be between 8 and 128 characters.')
       return
     }
 
@@ -342,7 +353,14 @@ function UserManagementPage() {
 
       {toast && <div className="toast user-toast" role="status">{toast}</div>}
       {actionError && <div className="inline-alert inline-alert--error" role="alert">{actionError}</div>}
-      {loadError && <div className="inline-alert inline-alert--error" role="alert">{loadError}</div>}
+      {loadError && (
+        <div className="inline-alert inline-alert--error" role="alert">
+          {loadError}
+          {loadError === 'Your session has expired. Please sign in again.' && (
+            <button type="button" onClick={() => navigate('/login', { replace: true })}>Sign in</button>
+          )}
+        </div>
+      )}
 
       <section className="users-card user-filter-card" aria-label="User search and filters">
         <label className="search-box user-search">
@@ -351,6 +369,7 @@ function UserManagementPage() {
           <input
             type="search"
             placeholder="Search by ID, name, email, phone..."
+            maxLength={100}
             value={search}
             onChange={(event) => updateFilter(setSearch, event.target.value)}
           />
@@ -362,7 +381,7 @@ function UserManagementPage() {
             <span className="visually-hidden">Filter by role</span>
             <select value={roleFilter} onChange={(event) => updateFilter(setRoleFilter, event.target.value)}>
               <option value="All">All roles</option>
-              {ROLE_OPTIONS.map((role) => <option key={role} value={role}>{role}</option>)}
+              {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
             </select>
           </label>
           <label className="filter-select">
@@ -446,11 +465,10 @@ function UserManagementPage() {
             <form className="user-form modal-body" onSubmit={saveUser} noValidate>
               <p className="form-demo-hint">Changes are saved to the platform user directory.</p>
               {formError && <div className="inline-alert inline-alert--error" role="alert">{formError}</div>}
-              <label className="field"><span>Full name <span className="required-mark">*</span></span><input autoComplete="name" value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></label>
-              <label className="field"><span>Email address <span className="required-mark">*</span></span><input type="email" autoComplete="email" value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></label>
-              {!editingId && <label className="field"><span>Password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required /></label>}
-              <label className="field"><span>Phone number <span className="field-optional">Optional</span></span><input type="tel" autoComplete="tel" value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} /></label>
-              <label className="field"><span>Role <span className="required-mark">*</span></span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>{ROLE_OPTIONS.map((role) => <option key={role} value={role}>{role}</option>)}</select></label>
+              <label className="field"><span>Full name <span className="required-mark">*</span></span><input autoComplete="name" maxLength={100} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></label>
+              <label className="field"><span>Email address <span className="required-mark">*</span></span><input type="email" autoComplete="email" maxLength={254} value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></label>
+              {!editingId && <label className="field"><span>Password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required /></label>}
+              <label className="field"><span>Role <span className="required-mark">*</span></span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>{ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
               <label className="field assigned-projects-field">
                 <span>Assigned projects <span className="required-mark">*</span></span>
                 <select
@@ -545,7 +563,7 @@ function UserManagementPage() {
             <form className="user-form modal-body" onSubmit={submitPasswordReset}>
               <p>Set a new password for {passwordResetUser.name}.</p>
               {passwordResetError && <div className="inline-alert inline-alert--error" role="alert">{passwordResetError}</div>}
-              <label className="field"><span>New password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></label>
+              <label className="field"><span>New password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></label>
               <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closePasswordReset}>Cancel</button><button className="button button--primary" type="submit" disabled={isResettingPassword}>{isResettingPassword ? 'Saving...' : 'Reset password'}</button></div>
             </form>
           </section>

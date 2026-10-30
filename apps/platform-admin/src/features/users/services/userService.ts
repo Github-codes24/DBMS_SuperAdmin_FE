@@ -200,7 +200,7 @@ export async function listUsers(
     limit: String(params.pageSize),
   })
   if (params.search) query.set('search', params.search)
-  if (params.role) query.set('role', params.role)
+  if (params.role) query.set('role', apiRole(params.role))
   if (params.status) query.set('isActive', String(params.status === 'active'))
   query.set('sortBy', 'createdAt')
   query.set('sortOrder', 'desc')
@@ -243,19 +243,20 @@ export async function getUser(id: string): Promise<User> {
   return mapUser(record.data ?? record.user ?? record)
 }
 
-export async function createUser(input: CreateUserInput): Promise<void> {
-  await request('/users', {
+export async function createUser(input: CreateUserInput): Promise<User> {
+  const raw: unknown = await request('/users', {
     method: 'POST',
     body: JSON.stringify({
       name: input.fullName,
       email: input.email,
       password: input.password,
-      ...(input.phoneNumber.trim() ? { phoneNumber: input.phoneNumber.trim() } : {}),
       role: apiRole(input.role),
       projectIds: input.assignedProjects,
       isActive: true,
     }),
   })
+  const record = asRecord(raw)
+  return mapUser(record.data ?? record.user ?? record)
 }
 
 export async function updateUser(id: string, input: UserInput): Promise<void> {
@@ -264,7 +265,6 @@ export async function updateUser(id: string, input: UserInput): Promise<void> {
     body: JSON.stringify({
       name: input.fullName,
       email: input.email,
-      ...(input.phoneNumber.trim() ? { phoneNumber: input.phoneNumber.trim() } : {}),
       role: apiRole(input.role),
       projectIds: input.assignedProjects,
     }),
@@ -272,7 +272,12 @@ export async function updateUser(id: string, input: UserInput): Promise<void> {
 }
 
 function apiRole(role: string): string {
-  return role.toLowerCase() === 'admin' ? 'admin' : role
+  const normalizedRole = role.toLowerCase().replace(/[\s_-]+/g, '')
+  if (normalizedRole === 'superadmin') return 'superadmin'
+  if (normalizedRole === 'admin') return 'admin'
+  if (normalizedRole === 'manager') return 'manager'
+  if (normalizedRole === 'user') return 'user'
+  throw new Error('Select a role supported by the server.')
 }
 
 export async function updateUserStatus(id: string, status: AccountStatus): Promise<void> {

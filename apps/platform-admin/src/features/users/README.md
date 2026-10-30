@@ -1,11 +1,16 @@
 # User management API integration
 
 The login and user management screens use `VITE_API_BASE_URL` as the API
-prefix. It defaults to `/api`; the Vite development server proxies that prefix
-to `http://localhost:3007`. To connect directly, set
-`VITE_API_BASE_URL=http://localhost:3007` or
-`VITE_API_BASE_URL=http://localhost:3007/api`; the `/api` suffix is added when
-it is missing.
+prefix. It defaults to `/api` in development (proxied by Vite to
+`https://dbms-superadmin-be.onrender.com`) and
+`https://dbms-superadmin-be.onrender.com/api` in production. To proxy to a
+local or different backend, set `VITE_API_PROXY_TARGET` in the repository-root
+`.env` file to its reachable origin, for example `http://localhost:3007`.
+
+To call a backend directly from the browser instead, set `VITE_API_BASE_URL`
+to its origin or API prefix; the `/api` suffix is added when it is missing.
+Direct browser requests require the backend to allow the frontend origin via
+CORS. Restart the development server after changing the root `.env` file.
 
 Login uses `POST /auth/login` relative to the API prefix.
 User Management HTTP requests, response normalization, and mapping are
@@ -26,17 +31,21 @@ clears the stored token.
 | `POST` | `/users/:id/reset-password` | Reset a user's password |
 | `DELETE` | `/users/:id` | Delete a user |
 
-The supplied Postman collection does not define a projects endpoint, so the
-page currently uses its local project choices. The backend must accept those
-values in `projectIds` or provide a projects endpoint with valid IDs.
+The backend accepts the roles `superadmin`, `admin`, `manager`, and `user`.
+The role filters and form submit only these values. User create/update requests
+use strict schemas and accept `name`, `email`, `role`, and `projectIds`; create
+also accepts `password` and `isActive`. Phone numbers are not supported by the
+backend user schemas.
+
+The page currently uses local project choices because the backend does not
+provide a projects endpoint. The backend accepts string values in `projectIds`.
 List responses may be arrays or wrap results in `data`, `users`, or `items`.
 Pagination metadata may include `total`, `totalCount`, `totalItems`, `page`,
 `limit`, or `pageSize`. User records may use `id` or `_id`, `name` or
 `fullName`, and `isActive` or `status`.
 
-Create requests send `name`, `email`, `password`, optional `phoneNumber`, `role`,
-`projectIds`, and `isActive: true`. Update requests send `name`, `email`,
-optional `phoneNumber`, `role`, and `projectIds`. The displayed `Admin` role
-is sent as `admin` to match the collection. Status requests send
-`{ "isActive": boolean }`. Role names are sent as displayed in the role
-dropdown.
+Create requests send `name`, `email`, `password`, `role`, `projectIds`, and
+`isActive: true`. Update requests send `name`, `email`, `role`, and
+`projectIds`. Names must contain 2–100 characters, emails at most 254
+characters, and passwords 8–128 characters. Status requests send
+`{ "isActive": boolean }`.
