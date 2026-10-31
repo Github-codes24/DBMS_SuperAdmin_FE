@@ -9,6 +9,7 @@ import reportsReducer from "./slices/reportsSlice.js";
 import profileReducer from "./slices/profileSlice.js";
 import notificationsReducer from "./slices/notificationsSlice.js";
 import ticketsReducer from "./slices/ticketsSlice.js";
+import telecallerReducer from "./slices/telecallerSlice.js";
 
 export const store = configureStore({
   reducer: {
@@ -21,7 +22,8 @@ export const store = configureStore({
     reports: reportsReducer,
     profile: profileReducer,
     notifications: notificationsReducer,
-    tickets: ticketsReducer
+tickets: ticketsReducer,
+telecaller: telecallerReducer
   }
 });
 

@@ -14,6 +14,7 @@ import { Notifications } from './screens/Notifications';
 import { HelpSupport } from './screens/HelpSupport';
 import { VendorLogout } from './screens/VendorLogout';
 import { SearchResults } from './screens/SearchResults';
+import AddTelecaller from './screens/AddTelecaller';
 
 export const VendorLiveView = ({ activeFlowItem, setActiveFlowItem, onLogout }) => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -25,6 +26,8 @@ export const VendorLiveView = ({ activeFlowItem, setActiveFlowItem, onLogout }) 
   };
   const renderCurrentScreen = () => {
     switch (activeFlowItem) {
+      case '14 Telecaller Management':
+  return <AddTelecaller />;
       case '01 Vendor Login':
         return <VendorLogin onLoginSuccess={() => setActiveFlowItem('02 Vendor Dashboard')} />;
       case '02 Vendor Dashboard':
