@@ -74,7 +74,7 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
     const discountAmount = (unitPrice * discountPercent) / 100;
     const priceAfterDiscount = unitPrice - discountAmount;
     const taxAmount = (priceAfterDiscount * taxPercent) / 100;
-    const total = priceAfterDiscount + taxAmount;
+    const total = Math.round(priceAfterDiscount + taxAmount);
 
     const durationLabel =
       selectedOption.durationLabel ||
@@ -435,11 +435,11 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
                               {item.durationLabel}
                             </span>
                           </td>
-                          <td>₹{item.unitPrice.toFixed(2)}</td>
+                          <td>₹{Math.round(item.unitPrice).toLocaleString('en-IN')}</td>
                           <td>{item.discountPercent}%</td>
                           <td>{item.taxPercent}%</td>
                           <td style={{ fontWeight: 'bold', color: '#0088a8' }}>
-                            ₹{item.total.toFixed(2)}
+                           ₹{item.total.toLocaleString('en-IN')}
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <button
@@ -472,11 +472,11 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
                   <span style={{ marginRight: '16px', fontSize: '13px', color: '#475569' }}>
                     Selected Amount ({selectedItemIds.length} of {orderItems.length}):{' '}
                     <span style={{ color: '#2563eb', fontWeight: '700' }}>
-                      ₹{calculateSelectedTotal().toFixed(2)}
+                     ₹{calculateSelectedTotal().toLocaleString('en-IN')}
                     </span>
                   </span>
                 )}
-                Total Amount(Including Tax): <span style={{ color: '#0088a8' }}>₹{calculateGrandTotal().toFixed(2)}</span>
+                Total Amount(Including Tax): <span style={{ color: '#0088a8' }}>₹{calculateGrandTotal().toLocaleString('en-IN')}</span>
               </div>
             </div>
           </div>
@@ -494,7 +494,7 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
               </span>
             ) : (
               <span>
-                <strong>{selectedItemIds.length}</strong> of <strong>{orderItems.length}</strong> plan(s) selected (Total: <strong style={{ color: '#0088a8' }}>₹{calculateSelectedTotal().toFixed(2)}</strong>)
+                <strong>{selectedItemIds.length}</strong> of <strong>{orderItems.length}</strong> plan(s) selected (Total: <strong style={{ color: '#0088a8' }}>₹{calculateSelectedTotal().toLocaleString('en-IN')}</strong>)
               </span>
             )}
           </div>
