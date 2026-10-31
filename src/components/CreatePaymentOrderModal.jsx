@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { X, Trash2, AlertCircle, RefreshCw, Send, Loader2 } from 'lucide-react';
 import { DISCOUNT_OPTIONS } from '../mockData';
-import { fetchSubscriptionPlans, resetPlansStatus } from '../redux/slices/plansSlice';
+import { fetchSubscriptionPlans } from '../redux/slices/plansSlice';
 
 export default function CreatePaymentOrderModal({ vendor, onClose, onSendPaymentLink }) {
   const dispatch = useDispatch();
@@ -28,20 +28,10 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
   const [actionError, setActionError] = useState(null);
 
   useEffect(() => {
-    // Fetch when: never fetched (idle), previously failed, or
-    // previously "succeeded" but produced 0 options (stale schema mismatch).
-    if (
-      plansStatus === 'idle' ||
-      plansStatus === 'failed' ||
-      (plansStatus === 'succeeded' && planOptions.length === 0)
-    ) {
-      if (plansStatus === 'succeeded') {
-        // Reset to idle first so the condition guard inside the thunk allows the call
-        dispatch(resetPlansStatus());
-      }
+    if (plansStatus === 'idle') {
       dispatch(fetchSubscriptionPlans());
     }
-  }, [dispatch, plansStatus, planOptions.length]);
+  }, [dispatch, plansStatus]);
 
   const isAllSelected = orderItems.length > 0 && selectedItemIds.length === orderItems.length;
   const isIndeterminate = selectedItemIds.length > 0 && selectedItemIds.length < orderItems.length;
@@ -74,7 +64,7 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
     const discountAmount = (unitPrice * discountPercent) / 100;
     const priceAfterDiscount = unitPrice - discountAmount;
     const taxAmount = (priceAfterDiscount * taxPercent) / 100;
-    const total = priceAfterDiscount + taxAmount;
+    const total = Math.round(priceAfterDiscount + taxAmount);
 
     const durationLabel =
       selectedOption.durationLabel ||
@@ -435,11 +425,11 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
                               {item.durationLabel}
                             </span>
                           </td>
-                          <td>₹{item.unitPrice.toFixed(2)}</td>
+                          <td>₹{Math.round(item.unitPrice).toLocaleString('en-IN')}</td>
                           <td>{item.discountPercent}%</td>
                           <td>{item.taxPercent}%</td>
                           <td style={{ fontWeight: 'bold', color: '#0088a8' }}>
-                            ₹{item.total.toFixed(2)}
+                           ₹{item.total.toLocaleString('en-IN')}
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <button
@@ -472,11 +462,11 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
                   <span style={{ marginRight: '16px', fontSize: '13px', color: '#475569' }}>
                     Selected Amount ({selectedItemIds.length} of {orderItems.length}):{' '}
                     <span style={{ color: '#2563eb', fontWeight: '700' }}>
-                      ₹{calculateSelectedTotal().toFixed(2)}
+                     ₹{calculateSelectedTotal().toLocaleString('en-IN')}
                     </span>
                   </span>
                 )}
-                Total Amount(Including Tax): <span style={{ color: '#0088a8' }}>₹{calculateGrandTotal().toFixed(2)}</span>
+                Total Amount(Including Tax): <span style={{ color: '#0088a8' }}>₹{calculateGrandTotal().toLocaleString('en-IN')}</span>
               </div>
             </div>
           </div>
@@ -494,7 +484,7 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
               </span>
             ) : (
               <span>
-                <strong>{selectedItemIds.length}</strong> of <strong>{orderItems.length}</strong> plan(s) selected (Total: <strong style={{ color: '#0088a8' }}>₹{calculateSelectedTotal().toFixed(2)}</strong>)
+                <strong>{selectedItemIds.length}</strong> of <strong>{orderItems.length}</strong> plan(s) selected (Total: <strong style={{ color: '#0088a8' }}>₹{calculateSelectedTotal().toLocaleString('en-IN')}</strong>)
               </span>
             )}
           </div>

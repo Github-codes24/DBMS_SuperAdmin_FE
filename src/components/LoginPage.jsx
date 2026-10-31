@@ -16,6 +16,7 @@ export default function LoginPage({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [financialYear, setFinancialYear] = useState('2026-2027');
   const [localError, setLocalError] = useState('');
+  const [popupMessage, setPopupMessage] = useState('');
 
   // Login Fields
   const [userId, setUserId] = useState('rk@lts.com');
@@ -58,9 +59,17 @@ export default function LoginPage({ onLogin }) {
       }
 
       dispatch(loginTelecaller({
-        email: userId,
-        password: password,
-      }));
+  email: userId,
+  password: password,
+}))
+  .unwrap()
+  .catch((err) => {
+    setPopupMessage(
+      typeof err === 'string' && err
+        ? err
+        : 'Your account has been blocked. Please contact the administrator.'
+    );
+  });
     }
   };
 
@@ -91,9 +100,50 @@ export default function LoginPage({ onLogin }) {
     }
   };
 
-  const displayedError = localError || error;
+  const displayedError = isSignup ? (localError || error) : localError;
 
   return (
+     <>
+    {popupMessage && (
+  <div
+    style={{
+      position: 'fixed',
+      inset: 0,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 9999
+    }}
+  >
+    <div
+      style={{
+        background: '#fff',
+        padding: '25px',
+        borderRadius: '8px',
+        width: '350px',
+        textAlign: 'center',
+        boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
+      }}
+    >
+      <p>{popupMessage}</p>
+      <button
+        onClick={() => setPopupMessage('')}
+        style={{
+          background: '#f97316',
+          color: '#fff',
+          border: 'none',
+          padding: '8px 25px',
+          marginTop:'20px',
+          borderRadius: '5px',
+          cursor: 'pointer'
+        }}
+      >
+        OK
+      </button>
+    </div>
+  </div>
+)}
     <div className="login-wrapper">
       <div className="login-card">
         {/* Header Logo */}
@@ -237,7 +287,7 @@ export default function LoginPage({ onLogin }) {
           Local Trade Street ™ Data Management System &bull; Secure Telecaller Gateway
         </div>
       </div>
-    </div>
+       </div>
+  </>
   );
 }
-

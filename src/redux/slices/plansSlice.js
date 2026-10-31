@@ -5,10 +5,10 @@ import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 // Falls back to the website backend only if the DBMS env var is not set.
 const getPlansBaseUrl = () => {
   return (
-    import.meta.env.VITE_API_BASE_URL ||  // primary: DBMS backend
-    import.meta.env.VITE_WEBSITE_API_BASE_URL ||  // legacy fallback
+    import.meta.env.VITE_API_BASE_URL || // primary: DBMS backend
+    import.meta.env.VITE_WEBSITE_API_BASE_URL || // legacy fallback
     import.meta.env.VITE_SUBSCRIPTION_API_BASE_URL || // legacy fallback
-    "https://lts-dbms-backend.onrender.com"   // hard-coded fallback
+    "https://lts-dbms-backend.onrender.com" // hard-coded fallback
   );
 };
 
@@ -47,85 +47,105 @@ export const fetchSubscriptionPlans = createAsyncThunk(
           p.isDeleted !== true &&
           p.status !== "Inactive",
       );
+      console.log(
+        "API Plan Names:",
+        activePlans.map((p) => p.name),
+      );
 
-      // Build selectable dropdown options.
-      // Supports two backend shapes:
-      //   (A) DBMS backend – flat Plan doc: price, durationInMonths, duration (string), discount, finalAmount. NO nested `durations`.
-      //   (B) Website/legacy backend – each plan has a nested `durations[]` array.
-      const options = [];
+      const selectedPlans = activePlans.filter((plan) => {
+        const name = (plan.name || "").toLowerCase();
 
-      activePlans.forEach((plan) => {
-        const planName =
-          plan.subCategory || plan.name || plan.category || "Subscription Plan";
+        return (
+          name.includes("starter") ||
+          name.includes("silver") ||
+          name.includes("gold") ||
+          name.includes("platinum")
+        );
+      });
 
-        const hasDurationsArray =
-          Array.isArray(plan.durations) && plan.durations.length > 0;
+      // Flatten plans into selectable (plan, duration) option items
 
-        if (hasDurationsArray) {
-          // ── Shape (B): nested durations ──────────────────────────────────────
-          plan.durations.forEach((dur) => {
-            if (!dur || dur.isDeleted === true) return;
+      // Convert API plans into selectable options
 
-            const months =
-              dur.durationInMonths ||
-              (dur.duration ? Math.round(dur.duration / 30) : 1);
-            const durationLabel =
-              months > 0
-                ? `${months} Month${months > 1 ? "s" : ""}`
-                : `${dur.duration || 30} Days`;
-            const price = parseFloat(dur.totalPayable || dur.price) || 0;
-            const taxPercent =
-              dur.gst !== undefined ? parseFloat(dur.gst) || 0 : 0;
+      const options = selectedPlans.flatMap((plan) => {
+        const planName = plan.name || "Subscription Plan";
+        if (planName.toLowerCase().includes("starter")) {
+          const price = Number(plan.finalAmount ?? plan.price) || 0;
 
-            options.push({
-              id: dur._id || `${plan._id}_${dur.duration}`,
-              planId: plan._id,
-              durationId: dur._id,
+          return [
+            {
+              id: plan._id || plan.id || plan.planId,
+              planId: plan._id || plan.id || plan.planId,
+              durationId: plan.planId,
               planName,
               category: plan.category,
               subCategory: plan.subCategory,
-              durationDays: dur.duration,
-              durationInMonths: months,
-              durationLabel,
+              durationDays: 0,
+              durationInMonths: 0,
+              durationLabel: "One Time",
               price,
-              taxPercent,
-              totalPayable: dur.totalPayable,
-              features: dur.features || plan.features || [],
-              label: `${planName} - ${durationLabel} - ₹${Number(price).toLocaleString("en-IN")}`,
-            });
-          });
-        } else {
-          // ── Shape (A): flat DBMS plan ─────────────────────────────────────────
-          // plan.duration is already a human-readable string e.g. "1 Month", "3 Months"
-          const durationLabel =
-            plan.duration ||
-            (plan.durationInMonths
-              ? `${plan.durationInMonths} Month${plan.durationInMonths > 1 ? "s" : ""}`
-              : "N/A");
-          // Use finalAmount (after plan-level discount) as the sellable price;
-          // fall back to price if finalAmount is not set.
-          const price = parseFloat(plan.finalAmount ?? plan.price) || 0;
-          // DBMS Plan schema has no per-plan GST field; default to 0.
-          const taxPercent =
-            plan.gst !== undefined ? parseFloat(plan.gst) || 0 : 0;
+              taxPercent: 0,
+              totalPayable: price,
+              features: plan.features || [],
+              label: `${planName} - ₹${price.toLocaleString("en-IN")}`,
+            },
+          ];
+        }
 
-          options.push({
-            id: plan._id,
-            planId: plan._id,
-            durationId: plan._id,
+        // Membership ka sirf ek option
+        if (planName.toLowerCase().includes("membership")) {
+          const price = Number(plan.finalAmount ?? plan.price) || 0;
+
+          return [
+            {
+              id: plan._id || plan.id || plan.planId,
+              planId: plan._id || plan.id || plan.planId,
+              durationId: plan.planId,
+              planName,
+              category: plan.category,
+              subCategory: plan.subCategory,
+              durationDays: 0,
+              durationInMonths: 0,
+              durationLabel: plan.duration || "One Time",
+              price,
+              taxPercent: 0,
+              totalPayable: price,
+              features: plan.features || [],
+              label: `${planName} - ₹${price.toLocaleString("en-IN")}`,
+            },
+          ];
+        }
+
+        // Silver, Gold, Diamond ke duration options
+        const durations = [1, 6, 12];
+        const originalMonths = Number(plan.durationInMonths) || 1;
+        const originalPrice = Number(plan.finalAmount ?? plan.price) || 0;
+
+        return durations.map((months) => {
+          const price =
+            months === originalMonths
+              ? originalPrice
+              : (originalPrice * months) / originalMonths;
+
+          const durationLabel = `${months} Month${months > 1 ? "s" : ""}`;
+
+          return {
+            id: `${plan._id || plan.id || plan.planId}-${months}`,
+            planId: plan._id || plan.id || plan.planId,
+            durationId: plan.planId,
             planName,
-            category: plan.category || plan.code || "",
-            subCategory: plan.subCategory || "",
-            durationDays: (plan.durationInMonths || 1) * 30,
-            durationInMonths: plan.durationInMonths || 1,
+            category: plan.category,
+            subCategory: plan.subCategory,
+            durationDays: months * 30,
+            durationInMonths: months,
             durationLabel,
             price,
-            taxPercent,
-            totalPayable: plan.finalAmount || plan.price,
+            taxPercent: 0,
+            totalPayable: price,
             features: plan.features || [],
-            label: `${planName} - ${durationLabel} - ₹${Number(price).toLocaleString("en-IN")}`,
-          });
-        }
+            label: `${planName} - ${durationLabel} - ₹${Math.round(price).toLocaleString("en-IN")}`,
+          };
+        });
       });
 
       return {
@@ -140,12 +160,8 @@ export const fetchSubscriptionPlans = createAsyncThunk(
   },
   {
     condition: (_, { getState }) => {
-      const { status, options } = getState().plans;
-      // Allow re-fetch when: not already in-flight, AND either not yet succeeded OR succeeded
-      // but options is empty (meaning previous fetch parsed 0 plans due to a schema mismatch).
-      if (status === "loading") return false;
-      if (status === "succeeded" && options.length > 0) return false;
-      return true;
+      const status = getState().plans.status;
+      return status !== "loading" && status !== "succeeded";
     },
   },
 );
@@ -164,10 +180,6 @@ const plansSlice = createSlice({
   reducers: {
     clearPlansError: (state) => {
       state.error = null;
-    },
-    // Call this to force a re-fetch (e.g. after a schema fix or manual retry)
-    resetPlansStatus: (state) => {
-      state.status = "idle";
     },
   },
   extraReducers: (builder) => {
@@ -191,5 +203,5 @@ const plansSlice = createSlice({
   },
 });
 
-export const { clearPlansError, resetPlansStatus } = plansSlice.actions;
+export const { clearPlansError } = plansSlice.actions;
 export default plansSlice.reducer;
