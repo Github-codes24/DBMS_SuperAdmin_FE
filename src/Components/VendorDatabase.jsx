@@ -473,10 +473,10 @@ function VendorDatabase({ compact = false }) {
       setSelectedVendorIds(failedIds);
       if (updatedCount > 0) {
         dispatch(fetchVendors());
-toast.success(
-  response.message ||
-    `${updatedCount} vendor${updatedCount === 1 ? "" : "s"} updated successfully`
-);
+        toast.success(
+          response.message ||
+            `${updatedCount} vendor${updatedCount === 1 ? "" : "s"} updated successfully`,
+        );
 
         setTimeout(() => setToastMsg(""), 4000);
       }
@@ -976,8 +976,7 @@ toast.success(
       )
         .unwrap()
         .then((response) => {
-         
-toast.success(response?.message || "Vendor updated successfully");
+          toast.success(response?.message || "Vendor updated successfully");
           if (
             selectedVendorDetail &&
             (selectedVendorDetail._id === targetId ||
@@ -2779,11 +2778,7 @@ toast.success(response?.message || "Vendor updated successfully");
         )}
 
         {/* TABLE VIEW */}
-        <div
-          className={`${
-            itemsPerPage === 5 ? "h-[300px]" : "h-[520px]"
-          } overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar transition-all duration-200`}
-        >
+        <div className="h-fit max-h-[520px] overflow-x-auto overflow-y-auto rounded-xl border border-slate-100 mb-4 scroll-smooth custom-scrollbar transition-all duration-200">
           <table className="w-full min-w-[1290px] text-left border-collapse whitespace-nowrap">
             <thead className="sticky top-0 bg-slate-100/90 backdrop-blur-xs z-10">
               <tr className="border-b border-slate-100 text-[10px] font-bold uppercase text-slate-400 tracking-wider">

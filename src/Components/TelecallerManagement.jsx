@@ -117,7 +117,8 @@ function TelecallerManagement({ compact = false }) {
     email: "",
     area: "",
     password: "",
-    status: "Active",
+    // status: "Active",
+    status: "Pending",
   });
 
   const [newPassword, setNewPassword] = useState("");
@@ -488,7 +489,9 @@ function TelecallerManagement({ compact = false }) {
           email: "",
           area: "",
           password: "",
-          status: "Active",
+          // status: "Active",
+          status: "Pending",
+
         });
         const emailSent = res?.data?.emailSent;
         const telecallerName = res?.data?.telecaller?.fullName || newTc.name;
@@ -1088,7 +1091,7 @@ function TelecallerManagement({ compact = false }) {
                   className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-bold cursor-pointer"
                 >
                   <option value="Active">Active</option>
-                  <option value="Disabled">Disabled</option>
+                  <option value="Pending">Pending</option>
                 </select>
               </div>
 
@@ -1370,7 +1373,7 @@ function TelecallerManagement({ compact = false }) {
                   className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 font-bold cursor-pointer"
                 >
                   <option value="Active">Active</option>
-                  <option value="Disabled">Disabled</option>
+                  <option value="Pending">Pending</option>
                 </select>
               </div>
 
@@ -1588,7 +1591,7 @@ function TelecallerManagement({ compact = false }) {
                 className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-[#f26522]/30 disabled:opacity-50"
               >
                 <option value="Active">Active</option>
-                <option value="Disabled">Disabled</option>
+                <option value="Pending">Pending</option>
                 <option value="Blocked">Blocked</option>
               </select>
               <button
@@ -1612,7 +1615,7 @@ function TelecallerManagement({ compact = false }) {
         )}
 
         {/* Table View with required columns: Sr.No, Telecaller Name, Email, Mobile Number, Status, Action */}
-        <div className="max-h-[calc(100vh-280px)] min-h-[350px] overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200/80 mb-4 scroll-smooth custom-scrollbar">
+        <div className="h-fit max-h-[520px] overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200/80 mb-4 scroll-smooth custom-scrollbar">
           <table className="w-full text-left border-collapse min-w-[760px]">
             <thead className="sticky top-0 bg-slate-50/95 backdrop-blur-md z-10">
               <tr className="border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 tracking-wider">
@@ -1713,6 +1716,7 @@ function TelecallerManagement({ compact = false }) {
                             className={`w-1.5 h-1.5 rounded-full ${tc.status === "Active" ? "bg-emerald-500" : "bg-rose-500"}`}
                           />
                           {tc.status}
+                          {/* {tc.status === "Disabled" ? "Pending" : tc.status} */}
                         </span>
                       </td>
 

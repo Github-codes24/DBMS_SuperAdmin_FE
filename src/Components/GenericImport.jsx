@@ -59,7 +59,8 @@ const GenericImport = ({
     () => ({
       total: records.length,
       new: records.filter((record) => record.status === "New").length,
-      duplicate: records.filter((record) => record.status === "Duplicate").length,
+      duplicate: records.filter((record) => record.status === "Duplicate")
+        .length,
       invalid: records.filter((record) => record.status === "Invalid").length,
     }),
     [records],
@@ -167,9 +168,7 @@ const GenericImport = ({
     const normalizedHeader = normalizeHeader(header);
     return normalizedColumns.find((column) => {
       const names = [column.label, column.key, ...column.aliases];
-      return names.some(
-        (name) => normalizeHeader(name) === normalizedHeader,
-      );
+      return names.some((name) => normalizeHeader(name) === normalizedHeader);
     });
   };
 
@@ -220,7 +219,8 @@ const GenericImport = ({
           validationResult.valid === false
         ) {
           status = "Invalid";
-          message = validationResult.message || "Record did not pass validation.";
+          message =
+            validationResult.message || "Record did not pass validation.";
         }
       } catch (error) {
         status = "Invalid";
@@ -338,7 +338,10 @@ const GenericImport = ({
       setIsImportModalOpen(false);
       setIsReviewModalOpen(true);
     } catch (error) {
-      setFileError(error?.message || "Unable to read this file. Please check it and try again.");
+      setFileError(
+        error?.message ||
+          "Unable to read this file. Please check it and try again.",
+      );
     } finally {
       setIsProcessingFile(false);
     }
@@ -399,7 +402,9 @@ const GenericImport = ({
             className={commonClass}
             required={field.required}
           >
-            <option value="">{field.placeholder || `Select ${field.label}`}</option>
+            <option value="">
+              {field.placeholder || `Select ${field.label}`}
+            </option>
             {(field.options || []).map((option) => {
               const optionValue =
                 typeof option === "object" ? option.value : option;
@@ -430,18 +435,16 @@ const GenericImport = ({
       </div>
     );
   };
-
   return (
     <>
       <button
         type="button"
         onClick={openImportModal}
-        className="inline-flex items-center gap-2 rounded-lg bg-[#f26522] px-4 py-2 text-xs font-bold text-white transition hover:bg-orange-600"
+        className="inline-flex items-center gap-2 rounded-lg border border-[#f26522] bg-white px-4 py-2 text-xs font-bold text-[#f26522] transition cursor-pointer"
       >
         <Upload size={14} />
         {buttonLabel}
       </button>
-
       {isImportModalOpen && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 p-3">
           <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
@@ -460,7 +463,6 @@ const GenericImport = ({
                 <X size={18} />
               </button>
             </div>
-
             <div className="space-y-4 px-5 py-4">
               <div className="flex items-center justify-between rounded-xl border border-orange-200/70 bg-orange-50/60 p-3">
                 <div>
@@ -486,7 +488,6 @@ const GenericImport = ({
                   {customFields.map(renderCustomField)}
                 </div>
               )}
-
               {!selectedFile ? (
                 <div
                   onDragOver={(event) => {
@@ -539,7 +540,10 @@ const GenericImport = ({
                   </label>
                   <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex min-w-0 items-center gap-3">
-                      <FileSpreadsheet size={22} className="shrink-0 text-[#f26522]" />
+                      <FileSpreadsheet
+                        size={22}
+                        className="shrink-0 text-[#f26522]"
+                      />
                       <div className="min-w-0">
                         <p className="truncate text-xs font-bold text-slate-800">
                           {selectedFile.name}
@@ -555,7 +559,8 @@ const GenericImport = ({
                       onClick={() => {
                         setSelectedFile(null);
                         setFileError("");
-                        if (fileInputRef.current) fileInputRef.current.value = "";
+                        if (fileInputRef.current)
+                          fileInputRef.current.value = "";
                       }}
                       className="cursor-pointer px-3 py-1 text-xs text-slate-600 hover:text-red-600 disabled:opacity-50"
                     >
@@ -564,7 +569,6 @@ const GenericImport = ({
                   </div>
                 </div>
               )}
-
               {fileError && (
                 <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
                   <AlertCircle size={15} className="mt-0.5 shrink-0" />
@@ -572,7 +576,6 @@ const GenericImport = ({
                 </div>
               )}
             </div>
-
             <div className="flex justify-end gap-2 border-t border-slate-100 px-5 py-4">
               <button
                 type="button"
@@ -588,22 +591,27 @@ const GenericImport = ({
                 disabled={!selectedFile || isProcessingFile}
                 className="inline-flex items-center gap-2 rounded-lg bg-[#f26522] px-4 py-2 text-xs font-bold text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isProcessingFile ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                {isProcessingFile ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Upload size={14} />
+                )}
                 {isProcessingFile ? "Processing..." : "Upload"}
               </button>
             </div>
           </div>
         </div>
       )}
-
       {isReviewModalOpen && (
-        <div className="fixed inset-0 z-[1001] flex items-center justify-center bg-black/50 p-3">
-          <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-100 px-5 py-4">
+        <div className="fixed inset-0 z-[1001] flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="flex max-h-[90vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 bg-slate-50 px-6 py-4">
               <div>
-                <h2 className="text-base font-bold text-slate-800">{reviewTitle}</h2>
-                <p className="mt-1 text-xs text-slate-500">
-                  Review every row before importing. Import is enabled only when all rows are new.
+                <h2 className="text-sm font-bold text-slate-900">
+                  {reviewTitle}
+                </h2>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  Review and verify records before importing.
                 </p>
               </div>
               <button
@@ -616,92 +624,123 @@ const GenericImport = ({
                 <X size={18} />
               </button>
             </div>
-
-            <div className="grid grid-cols-2 gap-3 px-5 py-4 sm:grid-cols-4">
-              {[
-                { label: "Total", value: counts.total, className: "border-slate-200 bg-slate-50 text-slate-700" },
-                { label: "New", value: counts.new, className: "border-green-200 bg-green-50 text-green-700" },
-                { label: "Duplicate", value: counts.duplicate, className: "border-amber-200 bg-amber-50 text-amber-700" },
-                { label: "Invalid", value: counts.invalid, className: "border-red-200 bg-red-50 text-red-700" },
-              ].map((item) => (
-                <div key={item.label} className={`rounded-xl border p-3 ${item.className}`}>
-                  <p className="text-[11px] font-semibold">{item.label}</p>
-                  <p className="mt-1 text-xl font-bold">{item.value}</p>
-                </div>
-              ))}
+            <div className="shrink-0 border-b border-slate-100 bg-slate-50/70 px-6 py-3.5">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  {
+                    label: "Total Records",
+                    value: counts.total,
+                    className: "bg-white border-slate-200 text-slate-900",
+                    labelClass: "text-slate-500",
+                  },
+                  {
+                    label: "New (Eligible)",
+                    value: counts.new,
+                    className:
+                      "bg-emerald-50/60 border-emerald-200/80 text-emerald-800",
+                    labelClass: "text-emerald-700",
+                  },
+                  {
+                    label: "Duplicate (Skipped)",
+                    value: counts.duplicate,
+                    className:
+                      "bg-amber-50/60 border-amber-200/80 text-amber-800",
+                    labelClass: "text-amber-700",
+                  },
+                  {
+                    label: "Invalid (Skipped)",
+                    value: counts.invalid,
+                    className: "bg-rose-50/60 border-rose-200/80 text-rose-800",
+                    labelClass: "text-rose-700",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className={`rounded-xl border p-3 shadow-sm ${item.className}`}
+                  >
+                    <p
+                      className={`text-[11px] font-semibold uppercase tracking-wider ${item.labelClass}`}
+                    >
+                      {item.label}
+                    </p>
+                    <p className="mt-0.5 text-xl font-bold">{item.value}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-
             {fileError && (
               <div className="mx-5 mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
                 <AlertCircle size={15} className="mt-0.5 shrink-0" />
                 <span>{fileError}</span>
               </div>
             )}
-
             <div className="min-h-0 flex-1 overflow-auto px-5 pb-4">
-              <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <div className="max-h-[46vh] overflow-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                 <table className="w-full min-w-[650px] border-collapse text-left">
                   <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50">
                     <tr>
-                      <th className="p-3 text-left text-xs font-bold uppercase text-slate-600">Row</th>
                       {previewColumns.map((column) => (
-                        <th key={column} className="p-3 text-left text-xs font-bold uppercase text-slate-600">
+                        <th
+                          key={column}
+                          className="p-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600"
+                        >
                           {column}
                         </th>
                       ))}
-                      <th className="p-3 text-left text-xs font-bold uppercase text-slate-600">Status</th>
-                      <th className="p-3 text-left text-xs font-bold uppercase text-slate-600">Message</th>
+                      {counts.new > 0 && counts.duplicate > 0 && (
+                        <th className="p-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                          Status
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {records.map((record) => (
                       <tr key={record.id} className="hover:bg-slate-50/70">
-                        <td className="p-3 text-xs text-slate-600">{record.rowNumber}</td>
                         {previewColumns.map((column) => (
-                          <td key={column} className="max-w-[240px] truncate p-3 text-xs text-slate-700">
+                          <td
+                            key={column}
+                            className="max-w-[240px] truncate p-3 text-xs text-slate-700"
+                          >
                             {String(record.rawData?.[column] ?? "")}
                           </td>
                         ))}
-                        <td className="p-3">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${
-                              record.status === "New"
-                                ? "bg-green-50 text-green-700"
-                                : record.status === "Duplicate"
-                                  ? "bg-amber-50 text-amber-700"
-                                  : "bg-red-50 text-red-700"
-                            }`}
-                          >
-                            {record.status === "New" ? (
-                              <CheckCircle2 size={12} />
-                            ) : record.status === "Duplicate" ? (
-                              <Copy size={12} />
-                            ) : (
-                              <AlertCircle size={12} />
-                            )}
-                            {record.status}
-                          </span>
-                        </td>
-                        <td className="max-w-[280px] p-3 text-xs text-slate-500">
-                          {record.message || "—"}
-                        </td>
+                        {counts.new > 0 && counts.duplicate > 0 && (
+                          <td className="p-3">
+                            <span
+                              className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-bold ${
+                                record.status === "New"
+                                  ? "bg-green-50 text-green-700"
+                                  : "bg-amber-50 text-amber-700"
+                              }`}
+                            >
+                              {record.status === "New" ? (
+                                <CheckCircle2 size={12} />
+                              ) : (
+                                <Copy size={12} />
+                              )}
+                              {record.status}
+                            </span>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-
-              {records.length > 0 && !canImport && (
-                <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                  <AlertCircle size={15} className="mt-0.5 shrink-0" />
-                  <span>
-                    Accept & Import is disabled because every row must be New. Fix or remove Duplicate/Invalid rows, then upload the corrected file.
-                  </span>
-                </div>
-              )}
+              {records.length > 0 &&
+                (counts.duplicate > 0 || counts.invalid > 0) && (
+                  <div className="mt-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    <AlertCircle size={15} className="mt-0.5 shrink-0" />
+                    <span>
+                      Accept & Import is disabled because every row must be New.
+                      Fix or remove Duplicate/Invalid rows, then upload the
+                      corrected file.
+                    </span>
+                  </div>
+                )}
             </div>
-
-            <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 px-5 py-4">
+            <div className="flex shrink-0 flex-wrap justify-between gap-2 border-t border-slate-100 bg-white px-6 py-4">
               <button
                 type="button"
                 onClick={() => {
@@ -738,7 +777,11 @@ const GenericImport = ({
                   }
                   className="inline-flex items-center gap-2 rounded-lg bg-[#f26522] px-4 py-2 text-xs font-bold text-white hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isImporting ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                  {isImporting ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Upload size={14} />
+                  )}
                   {isImporting ? "Importing..." : "Accept & Import"}
                 </button>
               </div>

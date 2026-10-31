@@ -1,6 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import * as XLSX from "xlsx";
-import ImportExcel from "./ImportExcel";
+import GenericImport from "./GenericImport";
 import { useDispatch } from "react-redux";
 import { Layers, Loader2, Plus, X, Upload } from "lucide-react";
 import { toast } from "react-toastify";
@@ -125,6 +124,8 @@ function CategorySubcategory() {
   const [newSubcategoryNames, setNewSubcategoryNames] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [previewColumns, setPreviewColumns] = useState([]);
+  const importProjectDataCache = useRef({});
+  const importUploadedKeys = useRef(new Set());
 
   useEffect(() => {
     let isCurrentRequest = true;
@@ -305,6 +306,106 @@ function CategorySubcategory() {
       setError(message);
       toast.error(message);
     }
+  };
+
+  const validateImportRecord = (row) => {
+    const projectName = String(row["Project Name"] ?? "").trim();
+
+    const matchedProject = projects.find(
+      (project) =>
+        String(project.name || project.projectName || project.title || "")
+          .trim()
+          .toLowerCase() === projectName.toLowerCase(),
+    );
+
+    if (!matchedProject) {
+      return `Project "${projectName}" not found.`;
+    }
+
+    const projectId =
+      matchedProject.projectId || matchedProject._id || matchedProject.id;
+
+    if (!projectId) {
+      return "Project ID not found.";
+    }
+
+    if (!String(row["Category Name"] ?? "").trim()) {
+      return "Category Name is required.";
+    }
+
+    if (!String(row["Subcategory Name"] ?? "").trim()) {
+      return "Subcategory Name is required.";
+    }
+
+    return true;
+  };
+
+  const checkImportDuplicate = async (row, { rowNumber }) => {
+    const projectName = String(row["Project Name"] ?? "").trim();
+    const categoryName = String(row["Category Name"] ?? "").trim();
+    const subcategoryName = String(row["Subcategory Name"] ?? "").trim();
+
+    const matchedProject = projects.find(
+      (project) =>
+        String(project.name || project.projectName || project.title || "")
+          .trim()
+          .toLowerCase() === projectName.toLowerCase(),
+    );
+
+    if (!matchedProject) {
+      return false;
+    }
+
+    const projectId =
+      matchedProject.projectId || matchedProject._id || matchedProject.id;
+
+    if (!projectId) {
+      return false;
+    }
+
+    // Har naye upload ki duplicate-checking list reset karo.
+    if (rowNumber === 1) {
+      importUploadedKeys.current = new Set();
+      importProjectDataCache.current = {};
+    }
+
+    const recordKey = [
+      String(projectId).toLowerCase(),
+      categoryName.toLowerCase(),
+      subcategoryName.toLowerCase(),
+    ].join("::");
+
+    if (importUploadedKeys.current.has(recordKey)) {
+      return true;
+    }
+
+    if (!importProjectDataCache.current[projectId]) {
+      importProjectDataCache.current[projectId] =
+        await fetchProjectCategoryData(projectId);
+    }
+
+    const projectData = importProjectDataCache.current[projectId];
+
+    const matchingCategory = projectData.categories.some(
+      (category) =>
+        getCategoryName(category).trim().toLowerCase() ===
+        categoryName.toLowerCase(),
+    );
+
+    const existsInDatabase =
+      matchingCategory &&
+      projectData.subcategories.some(
+        (subcategory) =>
+          String(subcategory.parentCategory || "")
+            .trim()
+            .toLowerCase() === categoryName.toLowerCase() &&
+          getSubcategoryName(subcategory).trim().toLowerCase() ===
+            subcategoryName.toLowerCase(),
+      );
+
+    importUploadedKeys.current.add(recordKey);
+
+    return Boolean(existsInDatabase);
   };
 
   const formatFileSize = (size) => {
@@ -631,6 +732,94 @@ function CategorySubcategory() {
     }
   };
 
+  const handleGenericImport = async (newRecords) => {
+    const groupedRecords = {};
+
+    for (const record of newRecords) {
+      const projectName = String(record["Project Name"] ?? "").trim();
+      const categoryName = String(record["Category Name"] ?? "").trim();
+      const subcategoryName = String(record["Subcategory Name"] ?? "").trim();
+
+      const matchedProject = projects.find(
+        (project) =>
+          String(project.name || project.projectName || project.title || "")
+            .trim()
+            .toLowerCase() === projectName.toLowerCase(),
+      );
+
+      if (!matchedProject) {
+        throw new Error(`Project "${projectName}" not found.`);
+      }
+
+      const projectId =
+        matchedProject.projectId || matchedProject._id || matchedProject.id;
+
+      if (!projectId) {
+        throw new Error(`Project ID not found for "${projectName}".`);
+      }
+
+      const projectLabel =
+        matchedProject.name ||
+        matchedProject.projectName ||
+        matchedProject.title ||
+        projectName;
+
+      const key = `${projectId}_${categoryName.toLowerCase()}`;
+
+      if (!groupedRecords[key]) {
+        groupedRecords[key] = {
+          projectId,
+          projectName: projectLabel,
+          categoryName,
+          subcategories: [],
+        };
+      }
+
+      if (
+        !groupedRecords[key].subcategories.some(
+          (name) => name.toLowerCase() === subcategoryName.toLowerCase(),
+        )
+      ) {
+        groupedRecords[key].subcategories.push(subcategoryName);
+      }
+    }
+
+    const projectCategoryCache = {};
+
+    for (const group of Object.values(groupedRecords)) {
+      if (!projectCategoryCache[group.projectId]) {
+        projectCategoryCache[group.projectId] = await fetchProjectCategoryData(
+          group.projectId,
+        );
+      }
+
+      const existingCategoryNames = new Set(
+        projectCategoryCache[group.projectId].categories.map((category) =>
+          getCategoryName(category).trim().toLowerCase(),
+        ),
+      );
+
+      if (!existingCategoryNames.has(group.categoryName.toLowerCase())) {
+        await api.post(getDashboardApiUrl("/dashboard/categories"), {
+          name: group.categoryName,
+          projectId: group.projectId,
+          projectName: group.projectName,
+        });
+      }
+
+      await api.post(getDashboardApiUrl("/dashboard/subcategories"), {
+        parentCategory: group.categoryName,
+        subcategories: group.subcategories,
+        projectId: group.projectId,
+        projectName: group.projectName,
+      });
+    }
+
+    await refreshProjectCategories();
+
+    toast.success("Categories and subcategories imported successfully.");
+  };
+
   return (
     <div className="min-h-screen md:h-screen bg-[#f4f6f9] flex flex-col font-sans text-slate-800 overflow-x-hidden md:overflow-hidden">
       <Navbar
@@ -658,20 +847,46 @@ function CategorySubcategory() {
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedFile(null);
-                  setFileError("");
-                  setDragActive(false);
-                  setIsImportModalOpen(true);
+              <GenericImport
+                buttonLabel="Import"
+                title="Import Excel"
+                description="Upload your Excel file to import category data."
+                reviewTitle="Import Review & Preview"
+                templateFileName="Sample_Category_Subcategory_Template.csv"
+                validateRecord={validateImportRecord}
+                isDuplicate={checkImportDuplicate}
+                onImport={handleGenericImport}
+                onComplete={() => {
+                  importProjectDataCache.current = {};
+                  importUploadedKeys.current = new Set();
                 }}
-                // disabled={!selectedProjectId}
-                className="px-4 py-2.5 bg-white border border-orange-300 text-[#f26522] text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Upload size={15} />
-                Import
-              </button>
+                columns={[
+                  { key: "Serial No", label: "Serial No" },
+                  {
+                    key: "Project Name",
+                    label: "Project Name",
+                    required: true,
+                  },
+                  {
+                    key: "Category Name",
+                    label: "Category Name",
+                    required: true,
+                  },
+                  {
+                    key: "Subcategory Name",
+                    label: "Subcategory Name",
+                    required: true,
+                  },
+                ]}
+                templateRows={[
+                  {
+                    "Serial No": "1",
+                    "Project Name": "CSR",
+                    "Category Name": "Sample Category",
+                    "Subcategory Name": "Sample Subcategory",
+                  },
+                ]}
+              />
               <select
                 aria-label="Select project"
                 value={selectedProjectId}
