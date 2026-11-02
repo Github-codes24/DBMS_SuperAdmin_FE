@@ -293,7 +293,7 @@ function CustomerDatabase({ compact = false }) {
   const [stateSearch, setStateSearch] = useState("");
 
   const [cities, setCities] = useState([]);
-  const [selectedCity, setSelectedCity] = useState("");
+  const [selectedCity, setSelectedCity] = useState([]);
   const [isCityDropdownOpen, setIsCityDropdownOpen] = useState(false);
   const [citySearch, setCitySearch] = useState("");
 
@@ -1232,7 +1232,7 @@ function CustomerDatabase({ compact = false }) {
     setStateSearch("");
 
     // Reset City
-    setSelectedCity("");
+    setSelectedCity([]);
     setCitySearch("");
     setFileError("");
 
@@ -1247,10 +1247,14 @@ function CustomerDatabase({ compact = false }) {
   };
 
   // Handle City selection
+  // Handle City multi-selection
   const handleSelectCity = (ct) => {
-    setSelectedCity(ct.name);
-    setIsCityDropdownOpen(false);
-    setCitySearch("");
+    setSelectedCity((prevCities) =>
+      prevCities.includes(ct.name)
+        ? prevCities.filter((city) => city !== ct.name)
+        : [...prevCities, ct.name],
+    );
+
     setFileError("");
   };
 
@@ -1281,7 +1285,7 @@ function CustomerDatabase({ compact = false }) {
     setIsStateDropdownOpen(false);
     setStateSearch("");
 
-    setSelectedCity("");
+    setSelectedCity([]);
     setIsCityDropdownOpen(false);
     setCitySearch("");
     setCities([]);
@@ -1310,8 +1314,8 @@ function CustomerDatabase({ compact = false }) {
       setFileError("Please select a state.");
       return;
     }
-    if (!selectedCity) {
-      setFileError("Please select a city.");
+    if (!selectedCity.length) {
+      setFileError("Please select at least one city.");
       return;
     }
     if (!selectedFile) {
@@ -1506,7 +1510,7 @@ function CustomerDatabase({ compact = false }) {
             email: email || "ΓÇö",
             mobile: mobile || "ΓÇö",
             state: state || selectedState || "Maharashtra",
-            city: city || selectedCity || "Mumbai",
+            city: city || selectedCity.join(", ") || "Mumbai",
             pincode: pincode || "400001",
             customerId:
               customerId || `CUST${Math.floor(100 + Math.random() * 900)}`,
@@ -1603,7 +1607,7 @@ function CustomerDatabase({ compact = false }) {
         `"${(r.name || "").replace(/"/g, '""')}"`,
         `"${(r.companyName || "").replace(/"/g, '""')}"`,
         `"${(r.state || selectedState || "Maharashtra").replace(/"/g, '""')}"`,
-        `"${(r.city || selectedCity || "Mumbai").replace(/"/g, '""')}"`,
+        `"${(r.city || selectedCity.join(", ") || "Mumbai").replace(/"/g, '""')}"`,
         `"${(r.pincode || "400001").replace(/"/g, '""')}"`,
         importRegistrationDate,
         r.status || "Active",
@@ -1635,7 +1639,7 @@ function CustomerDatabase({ compact = false }) {
           subCategory: selectedSubCatNames.join(", "),
           subCategoryId: selectedSubCatIds.join(", "),
           state: selectedState,
-          city: selectedCity,
+          city: selectedCity.join(", "),
         }),
       ).unwrap();
 
@@ -3468,14 +3472,14 @@ function CustomerDatabase({ compact = false }) {
                   >
                     <span
                       className={
-                        selectedCity
+                        selectedCity.length
                           ? "text-slate-800 font-semibold truncate"
                           : "text-slate-400"
                       }
                     >
                       {!selectedState
                         ? "Select state first"
-                        : selectedCity || "Select City"}
+                        : selectedCity.join(", ") || "Select City"}
                     </span>
                     <ChevronDown
                       size={14}
@@ -3516,7 +3520,7 @@ function CustomerDatabase({ compact = false }) {
                             );
                           }
                           return filtered.map((c) => {
-                            const isSelected = selectedCity === c.name;
+                            const isSelected = selectedCity.includes(c.name);
                             return (
                               <button
                                 key={c.name}
@@ -3749,7 +3753,7 @@ function CustomerDatabase({ compact = false }) {
                   {selectedCatName && (
                     <div className="flex flex-wrap items-center gap-1.5 mt-1.5 text-[11px]">
                       <span className="bg-orange-50 text-[#f26522] font-bold px-2 py-0.5 rounded-md border border-orange-200/80">
-                        {selectedCatName} &gt; {selectedSubCatNames.join(', ')}
+                        {selectedCatName} &gt; {selectedSubCatNames.join(", ")}
                       </span>
                       <span className="bg-slate-100 text-slate-700 font-bold px-2 py-0.5 rounded-md border border-slate-200">
                         {selectedCity}, {selectedState}
