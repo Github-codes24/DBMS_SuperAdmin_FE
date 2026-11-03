@@ -4,7 +4,7 @@ import './adminSidebar.css'
 
 const navigation = [
   { label: 'User Management', icon: Users, href: '/users' },
-  { label: 'Project Management', icon: BriefcaseBusiness, href: '/projects' },
+  { label: 'Project Management', icon: BriefcaseBusiness, href: '/project-management' },
   { label: 'Roles & Permissions', icon: ShieldCheck, href: '/roles-permissions' },
   { label: 'Reports & Analytics', icon: BarChart3, href: '/reports-analytics' },
 ]
@@ -20,19 +20,17 @@ function AdminSidebar({ drawer = false, open = false, onNavigate }: AdminSidebar
 
   return (
     <aside className={`admin-sidebar${drawer ? ' admin-sidebar--drawer' : ' admin-sidebar--compact'}${open ? ' admin-sidebar--open' : ''}`}>
-      <a className="admin-sidebar-brand" href="/" aria-label="DBMS Super Admin">
+      <Link className="admin-sidebar-brand" to="/users" aria-label="DBMS Super Admin" onClick={onNavigate}>
         <span className="admin-sidebar-brand-mark">D</span>
         <span>DBMS <strong>ADMIN</strong></span>
-      </a>
+      </Link>
       <p className="admin-sidebar-label">WORKSPACE</p>
       <nav className="admin-sidebar-nav" aria-label="Main navigation">
         {navigation.map(({ label, icon: Icon, href }) => {
-          const active = pathname === href
-          const className = `admin-sidebar-link${active ? ' admin-sidebar-link--active' : ''}`
-
-          return href.startsWith('/') ? (
+          const active = pathname === href || (label === 'Project Management' && pathname === '/projects')
+          return (
             <Link
-              className={className}
+              className={`admin-sidebar-link${active ? ' admin-sidebar-link--active' : ''}`}
               to={href}
               key={label}
               aria-current={active ? 'page' : undefined}
@@ -41,11 +39,6 @@ function AdminSidebar({ drawer = false, open = false, onNavigate }: AdminSidebar
               <Icon size={17} strokeWidth={1.8} />
               <span>{label}</span>
             </Link>
-          ) : (
-            <a className={className} href={href} key={label} onClick={onNavigate}>
-              <Icon size={17} strokeWidth={1.8} />
-              <span>{label}</span>
-            </a>
           )
         })}
       </nav>
