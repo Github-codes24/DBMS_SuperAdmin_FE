@@ -55,6 +55,11 @@
   cursor: pointer;
 }
 
+.projects-page button:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
 .projects-page h1,
 .projects-page h2,
 .projects-page p {
@@ -290,6 +295,26 @@
   border-radius: 6px;
   background: transparent;
   color: #4b8c70;
+}
+
+.projects-load-error {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 8px 12px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 10px;
+}
+
+.projects-load-error .projects-button {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 6px 10px;
 }
 
 .projects-summary-grid {
