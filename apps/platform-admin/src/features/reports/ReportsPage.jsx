@@ -15,6 +15,7 @@ import {
   PhoneCall,
 } from 'lucide-react'
 import AdminSidebar from '../../components/AdminSidebar'
+import AuthNavbarAction from '../../components/AuthNavbarAction'
 import './reports.css'
 
 const reportTypes = [
@@ -127,6 +128,7 @@ function ReportsPage() {
           <span>Super Admin</span>
           <ChevronDown size={15} />
         </div>
+        <AuthNavbarAction />
       </header>
 
       <div className="reports-workspace">

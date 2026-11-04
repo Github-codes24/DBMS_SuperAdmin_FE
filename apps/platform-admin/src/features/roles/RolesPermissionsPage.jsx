@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Menu, Pencil, Plus, RotateCcw, Save, Search, ShieldCheck, Check, Trash2, } from 'lucide-react';
 import AdminSidebar from '../../components/AdminSidebar';
+import AuthNavbarAction from '../../components/AuthNavbarAction';
 import CreateRoleModal from './CreateRoleModal';
 import { createProjectRole, deleteProjectRole, getProjectRole, getRoleMatrix, listProjectRoles, listRoleActions, listRoleProjects, savePermissions, updateProjectRole, } from './rolesService';
 import './rolesPermissions.css';
@@ -276,6 +277,7 @@ function RolesPermissionsPage() {
           <span>Super Admin</span>
           <ChevronDown size={15}/>
         </button>
+        <AuthNavbarAction />
       </header>
 
       <div className="roles-workspace">

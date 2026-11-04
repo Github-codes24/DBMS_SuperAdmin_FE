@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react'
 import AdminSidebar from '../../components/AdminSidebar'
+import AuthNavbarAction from '../../components/AuthNavbarAction'
 import {
   initialProjectAdmins,
   initialProjects,
@@ -446,6 +447,7 @@ function ProjectManagementPage() {
         </div>
         <div className="projects-navbar-section">PROJECT MANAGEMENT</div>
         <div className="projects-profile"><span className="projects-profile-avatar">SA</span><span>Super Admin</span></div>
+        <AuthNavbarAction />
       </header>
 
       <div className="projects-workspace">

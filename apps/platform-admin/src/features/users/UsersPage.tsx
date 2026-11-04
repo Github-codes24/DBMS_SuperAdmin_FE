@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import AdminSidebar from '../../components/AdminSidebar'
+import AuthNavbarAction from '../../components/AuthNavbarAction'
 import './users.css'
 import {
   createUser,
@@ -342,6 +343,7 @@ function UserManagementPage() {
         <span className="user-admin-navbar-title">DBMS <strong>SUPER ADMIN</strong></span>
         <span className="user-admin-navbar-section">USER MANAGEMENT</span>
         <span className="user-admin-navbar-user"><span aria-hidden="true" /> Super Admin</span>
+        <AuthNavbarAction />
       </header>
       <div className="user-admin-body">
         <AdminSidebar />

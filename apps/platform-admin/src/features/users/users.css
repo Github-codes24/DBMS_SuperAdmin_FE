@@ -2973,7 +2973,7 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  margin-left: auto;
+  margin-left: 0;
   font-weight: 650;
 }
 
