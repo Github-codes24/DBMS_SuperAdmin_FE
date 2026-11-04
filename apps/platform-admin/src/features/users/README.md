@@ -17,6 +17,10 @@ requests, response normalization, and mapping are implemented in
 `services/userService.ts`. User create, update, status, and delete operations
 are persisted by the API.
 
+Authentication stores the returned access token in browser `localStorage`
+under the key `accessToken`; protected user requests read that token. A `401`
+response clears the stored token.
+
 Project Management uses the shared `VITE_API_BASE_URL` setting (or `/api` by
 default). The app adds `/api` to the configured host if it is missing. The
 project resource uses:
@@ -34,6 +38,10 @@ Project list responses may be an array or wrap results in `data`, `projects`,
 or `items`; records may use `id`/`_id`, `name`/`projectName`, and
 `status`/`projectStatus`. Project Admin demo records remain in browser
 `localStorage` under `platform-admin.project-admins`.
+Authentication is handled by the existing login experience. It must store
+the returned Bearer access token in browser `localStorage` under the key
+`accessToken`; protected user requests read that token. A `401` response
+clears the stored token.
 
 | Method | Endpoint | Purpose |
 |---|---|---|
