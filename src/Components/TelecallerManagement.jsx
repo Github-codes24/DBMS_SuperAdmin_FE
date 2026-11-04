@@ -293,9 +293,12 @@ function TelecallerManagement({ compact = false }) {
       const updatedCount =
         result.updatedCount ?? selectedIds.length - failedIds.size;
 
-        const updatedTelecallerNames = telecallers.filter((telecaller) =>
-              selectedTelecallerIds.has(getTelecallerSelectionId(telecaller)),
-             ).map((telecaller) => telecaller.name || telecaller.fullName).filter(Boolean);
+      const updatedTelecallerNames = telecallers
+        .filter((telecaller) =>
+          selectedTelecallerIds.has(getTelecallerSelectionId(telecaller)),
+        )
+        .map((telecaller) => telecaller.name || telecaller.fullName)
+        .filter(Boolean);
 
       setSelectedTelecallerIds(failedIds);
       if (updatedCount > 0) {
@@ -303,10 +306,9 @@ function TelecallerManagement({ compact = false }) {
           fetchTelecallers(submittedSearch ? { search: submittedSearch } : {}),
         );
         toast.success(
-  response.message ||
-    `${updatedCount} telecaller${updatedCount === 1 ? "" : "s"} updated successfully`
-);
-        
+          response.message ||
+            `${updatedCount} telecaller${updatedCount === 1 ? "" : "s"} updated successfully`,
+        );
       }
       if (failedIds.size > 0) {
         toast.error(
@@ -491,7 +493,6 @@ function TelecallerManagement({ compact = false }) {
           password: "",
           // status: "Active",
           status: "Pending",
-
         });
         const emailSent = res?.data?.emailSent;
         const telecallerName = res?.data?.telecaller?.fullName || newTc.name;
@@ -1868,22 +1869,13 @@ function TelecallerManagement({ compact = false }) {
               </button>
 
               <div className="flex items-center gap-1 px-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (pageNum) => (
-                    <button
-                      key={pageNum}
-                      type="button"
-                      onClick={() => handlePageChange(pageNum)}
-                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                        pageNum === validCurrentPage
-                          ? "bg-[#f26522] text-white shadow-xs"
-                          : "text-slate-600 hover:bg-slate-100"
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  ),
-                )}
+                <button
+                  type="button"
+                  className="w-7 h-7 rounded-lg bg-[#f26522] text-white shadow-xs text-xs font-bold"
+                  disabled
+                >
+                  {validCurrentPage}
+                </button>
               </div>
 
               <button

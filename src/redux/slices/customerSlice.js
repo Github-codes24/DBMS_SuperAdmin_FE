@@ -1,29 +1,34 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import api from '../../services/api';
-import { toast } from 'react-toastify';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import api from "../../services/api";
+import { toast } from "react-toastify";
 
 export const fetchCustomers = createAsyncThunk(
-  'customer/fetchCustomers',
-  async (_, { rejectWithValue }) => {
+  "customer/fetchCustomers",
+  async ({ page = 1, limit = 10 } = {}, { rejectWithValue }) => {
     try {
-      const response = await api.get('/superadmin/customers', {
-        params: { _t: Date.now() },
+      const response = await api.get("/superadmin/customers", {
+        params: {
+          page,
+          limit,
+          _t: Date.now(),
+        },
         headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+          Expires: "0",
         },
       });
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to fetch customer directory.';
+      const message =
+        error.response?.data?.message || "Failed to fetch customer directory.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const createCustomer = createAsyncThunk(
-  'customer/createCustomer',
+  "customer/createCustomer",
   async (customerData, { dispatch, rejectWithValue }) => {
     try {
       const mobileVal =
@@ -37,7 +42,7 @@ export const createCustomer = createAsyncThunk(
         customerData.contactNumber ||
         customerData.contact ||
         customerData.number ||
-        '';
+        "";
 
       const emailVal =
         customerData.email ||
@@ -46,19 +51,19 @@ export const createCustomer = createAsyncThunk(
         customerData.email_id ||
         customerData.mail ||
         customerData.userEmail ||
-        '';
+        "";
 
       const nameVal =
         (customerData.name && customerData.name.trim()) ||
         (customerData.companyName && customerData.companyName.trim()) ||
         (customerData.customerName && customerData.customerName.trim()) ||
         (customerData.ownerName && customerData.ownerName.trim()) ||
-        'Customer';
+        "Customer";
 
       const companyVal =
         (customerData.companyName && customerData.companyName.trim()) ||
         (customerData.name && customerData.name.trim()) ||
-        'Customer Firm';
+        "Customer Firm";
 
       const formattedData = {
         ...customerData,
@@ -66,8 +71,12 @@ export const createCustomer = createAsyncThunk(
         companyName: companyVal,
         customerName: nameVal,
         ownerName: customerData.ownerName || nameVal,
-        category: customerData.category || customerData.serviceCategory || 'General',
-        subCategory: customerData.subCategory || customerData.serviceSubcategory || 'General',
+        category:
+          customerData.category || customerData.serviceCategory || "General",
+        subCategory:
+          customerData.subCategory ||
+          customerData.serviceSubcategory ||
+          "General",
         contactNo: mobileVal,
         mobile: mobileVal,
         mobileNumber: mobileVal,
@@ -81,35 +90,47 @@ export const createCustomer = createAsyncThunk(
         emailAddress: emailVal,
         emailId: emailVal,
         mail: emailVal,
-        state: customerData.state || '',
-        city: customerData.city || '',
-        pincode: customerData.pincode || '',
-        regDate: customerData.regDate || customerData.registrationDate || new Date().toISOString().slice(0, 10),
-        registrationDate: customerData.registrationDate || customerData.regDate || new Date().toISOString().slice(0, 10),
-        status: customerData.status || 'Active',
-        assignedTelecaller: customerData.assignedTelecaller || customerData.telecaller || '',
-        telecaller: customerData.telecaller || customerData.assignedTelecaller || '',
-        completeAddress: customerData.completeAddress || customerData.address || '',
-        gstin: customerData.gstin || customerData.gstNo || ''
+        state: customerData.state || "",
+        city: customerData.city || "",
+        pincode: customerData.pincode || "",
+        regDate:
+          customerData.regDate ||
+          customerData.registrationDate ||
+          new Date().toISOString().slice(0, 10),
+        registrationDate:
+          customerData.registrationDate ||
+          customerData.regDate ||
+          new Date().toISOString().slice(0, 10),
+        status: customerData.status || "Active",
+        assignedTelecaller:
+          customerData.assignedTelecaller || customerData.telecaller || "",
+        telecaller:
+          customerData.telecaller || customerData.assignedTelecaller || "",
+        completeAddress:
+          customerData.completeAddress || customerData.address || "",
+        gstin: customerData.gstin || customerData.gstNo || "",
       };
-      const response = await api.post('/superadmin/customers', formattedData);
-      toast.success(response.data.message || 'Customer created successfully');
+      const response = await api.post("/superadmin/customers", formattedData);
+      toast.success(response.data.message || "Customer created successfully");
       dispatch(fetchCustomers());
       return response.data;
     } catch (error) {
       const message =
         error.response?.data?.error ||
         error.response?.data?.message ||
-        'Failed to create customer.';
+        "Failed to create customer.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const updateCustomer = createAsyncThunk(
-  'customer/updateCustomer',
-  async ({ customerId, updateData, skipRefresh = false, suppressToast = false }, { dispatch, rejectWithValue }) => {
+  "customer/updateCustomer",
+  async (
+    { customerId, updateData, skipRefresh = false, suppressToast = false },
+    { dispatch, rejectWithValue },
+  ) => {
     try {
       const mobileVal =
         updateData.mobile ||
@@ -122,7 +143,7 @@ export const updateCustomer = createAsyncThunk(
         updateData.contactNumber ||
         updateData.contact ||
         updateData.number ||
-        '';
+        "";
 
       const emailVal =
         updateData.email ||
@@ -131,7 +152,7 @@ export const updateCustomer = createAsyncThunk(
         updateData.email_id ||
         updateData.mail ||
         updateData.userEmail ||
-        '';
+        "";
 
       const updatePayload = {
         ...updateData,
@@ -157,7 +178,10 @@ export const updateCustomer = createAsyncThunk(
           : {}),
       };
 
-      const response = await api.patch(`/superadmin/customers/${customerId}`, updatePayload);
+      const response = await api.patch(
+        `/superadmin/customers/${customerId}`,
+        updatePayload,
+      );
       if (!suppressToast) {
         // toast.success(response.data.message || 'Customer updated successfully');
       }
@@ -166,38 +190,52 @@ export const updateCustomer = createAsyncThunk(
       }
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to update customer.';
+      const message =
+        error.response?.data?.message || "Failed to update customer.";
       if (!suppressToast) {
         toast.error(message);
       }
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const bulkUpdateCustomers = createAsyncThunk(
-  'customer/bulkUpdateCustomers',
+  "customer/bulkUpdateCustomers",
   async (customers, { rejectWithValue }) => {
     try {
-      const response = await api.patch('/superadmin/customers/bulk', { customers });
+      const response = await api.patch("/superadmin/customers/bulk", {
+        customers,
+      });
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to update selected customers.';
+      const message =
+        error.response?.data?.message || "Failed to update selected customers.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const deleteCustomer = createAsyncThunk(
-  'customer/deleteCustomer',
+  "customer/deleteCustomer",
   async (customerIdParam, { dispatch, rejectWithValue }) => {
-    const options = typeof customerIdParam === 'object' ? customerIdParam : {};
-    const custId = typeof customerIdParam === 'object'
-      ? (customerIdParam.customerId || customerIdParam.customerCode || (typeof customerIdParam.primaryId === 'string' && customerIdParam.primaryId.startsWith('CUST') ? customerIdParam.primaryId : null))
-      : customerIdParam;
-    const mongoId = typeof customerIdParam === 'object'
-      ? (customerIdParam._id || customerIdParam.id || customerIdParam.secondaryId || customerIdParam.primaryId)
-      : null;
+    const options = typeof customerIdParam === "object" ? customerIdParam : {};
+    const custId =
+      typeof customerIdParam === "object"
+        ? customerIdParam.customerId ||
+          customerIdParam.customerCode ||
+          (typeof customerIdParam.primaryId === "string" &&
+          customerIdParam.primaryId.startsWith("CUST")
+            ? customerIdParam.primaryId
+            : null)
+        : customerIdParam;
+    const mongoId =
+      typeof customerIdParam === "object"
+        ? customerIdParam._id ||
+          customerIdParam.id ||
+          customerIdParam.secondaryId ||
+          customerIdParam.primaryId
+        : null;
 
     const idsToTry = Array.from(new Set([custId, mongoId].filter(Boolean)));
     const attempts = [];
@@ -215,7 +253,9 @@ export const deleteCustomer = createAsyncThunk(
         const response = await makeAttempt();
         if (response.status >= 200 && response.status < 300) {
           if (!options.suppressToast) {
-            toast.success(response.data?.message || 'Customer deleted successfully');
+            toast.success(
+              response.data?.message || "Customer deleted successfully",
+            );
           }
           if (!options.skipRefresh) {
             dispatch(fetchCustomers());
@@ -227,56 +267,60 @@ export const deleteCustomer = createAsyncThunk(
       }
     }
 
-    const message = lastError?.response?.data?.message || 'Failed to delete customer.';
+    const message =
+      lastError?.response?.data?.message || "Failed to delete customer.";
     if (!options.suppressToast) {
       toast.error(message);
     }
     return rejectWithValue(message);
-  }
+  },
 );
 
 export const bulkImportCustomers = createAsyncThunk(
-  'customer/bulkImportCustomers',
+  "customer/bulkImportCustomers",
   async (payload, { dispatch, rejectWithValue }) => {
     try {
       const file = payload instanceof File ? payload : payload?.file || payload;
       if (!(file instanceof File)) {
-        throw new Error('Select a CSV or Excel file before importing..');
+        throw new Error("Select a CSV or Excel file before importing..");
       }
 
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
 
       if (payload && !(payload instanceof File)) {
-        if (payload.projectName) 
-        {
-          formData.append('projectName', payload.projectName);
+        if (payload.projectName) {
+          formData.append("projectName", payload.projectName);
         }
         if (payload.projectId) {
-          formData.append('projectId', payload.projectId);
+          formData.append("projectId", payload.projectId);
         }
         if (payload.category) {
-          formData.append('category', payload.category);
+          formData.append("category", payload.category);
         }
         if (payload.categoryId) {
-          formData.append('categoryId', payload.categoryId);
+          formData.append("categoryId", payload.categoryId);
         }
         if (payload.subCategory) {
-          formData.append('subCategory', payload.subCategory);
+          formData.append("subCategory", payload.subCategory);
         }
         if (payload.subCategoryId) {
-          formData.append('subCategoryId', payload.subCategoryId);
+          formData.append("subCategoryId", payload.subCategoryId);
         }
-        if (payload.state) formData.append('state', payload.state);
-        if (payload.city) formData.append('city', payload.city);
+        if (payload.state) formData.append("state", payload.state);
+        if (payload.city) formData.append("city", payload.city);
       }
 
-      const response = await api.post('/superadmin/customers/import', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
+      const response = await api.post(
+        "/superadmin/customers/import",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         },
-      }); 
-      toast.success(response.data.message || 'Import completed successfully');
+      );
+      toast.success(response.data.message || "Import completed successfully");
       dispatch(fetchCustomers());
       return response.data;
     } catch (error) {
@@ -284,15 +328,15 @@ export const bulkImportCustomers = createAsyncThunk(
         error.response?.data?.error ||
         error.response?.data?.message ||
         error.message ||
-        'Failed to import customer records.';
+        "Failed to import customer records.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const extractMobileNumber = (obj) => {
-  if (!obj) return '';
+  if (!obj) return "";
   const candidates = [
     obj.mobile,
     obj.mobileNumber,
@@ -323,14 +367,14 @@ export const extractMobileNumber = (obj) => {
   for (const val of candidates) {
     if (val !== undefined && val !== null) {
       const strVal = String(val).trim();
-      const cleanDigits = strVal.replace(/\D/g, '');
+      const cleanDigits = strVal.replace(/\D/g, "");
       if (
         strVal &&
-        strVal !== '-' &&
-        strVal !== '—' &&
-        strVal !== 'null' &&
-        strVal !== 'undefined' &&
-        !strVal.toUpperCase().startsWith('CUST') &&
+        strVal !== "-" &&
+        strVal !== "—" &&
+        strVal !== "null" &&
+        strVal !== "undefined" &&
+        !strVal.toUpperCase().startsWith("CUST") &&
         cleanDigits.length >= 7
       ) {
         return strVal;
@@ -339,16 +383,16 @@ export const extractMobileNumber = (obj) => {
   }
   if (obj.name) {
     const strName = String(obj.name).trim();
-    const cleanDigits = strName.replace(/\D/g, '');
+    const cleanDigits = strName.replace(/\D/g, "");
     if (cleanDigits.length >= 7) {
       return strName;
     }
   }
-  return '';
+  return "";
 };
 
 export const extractEmail = (obj) => {
-  if (!obj) return '';
+  if (!obj) return "";
   const candidates = [
     obj.email,
     obj.emailAddress,
@@ -366,25 +410,25 @@ export const extractEmail = (obj) => {
       const strVal = String(val).trim();
       if (
         strVal &&
-        strVal !== '-' &&
-        strVal !== '—' &&
-        strVal !== 'null' &&
-        strVal !== 'undefined' &&
-        strVal.includes('@')
+        strVal !== "-" &&
+        strVal !== "—" &&
+        strVal !== "null" &&
+        strVal !== "undefined" &&
+        strVal.includes("@")
       ) {
         return strVal;
       }
     }
   }
-  if (obj.name && String(obj.name).includes('@')) {
+  if (obj.name && String(obj.name).includes("@")) {
     return String(obj.name).trim();
   }
-  return '';
+  return "";
 };
 
 const getStoredCustomers = () => {
   try {
-    const saved = localStorage.getItem('lts_customer_database_cache');
+    const saved = localStorage.getItem("lts_customer_database_cache");
     return saved ? JSON.parse(saved) : [];
   } catch (err) {
     return [];
@@ -394,10 +438,13 @@ const getStoredCustomers = () => {
 const saveStoredCustomers = (customers) => {
   try {
     if (Array.isArray(customers)) {
-      localStorage.setItem('lts_customer_database_cache', JSON.stringify(customers));
+      localStorage.setItem(
+        "lts_customer_database_cache",
+        JSON.stringify(customers),
+      );
     }
   } catch (err) {
-    console.error('Failed to save customers cache to localStorage', err);
+    console.error("Failed to save customers cache to localStorage", err);
   }
 };
 
@@ -413,7 +460,7 @@ const initialState = {
 };
 
 const customerSlice = createSlice({
-  name: 'customer',
+  name: "customer",
   initialState,
   reducers: {},
   extraReducers: (builder) => {
@@ -425,15 +472,16 @@ const customerSlice = createSlice({
       })
       .addCase(fetchCustomers.fulfilled, (state, action) => {
         state.loading = false;
-        const fetched = action.payload?.customers || action.payload?.data || (Array.isArray(action.payload) ? action.payload : []);
-
+        const fetched = Array.isArray(action.payload?.data)
+          ? action.payload.data
+          : [];
         const validFetched = fetched.filter(
           (f) =>
             !f.isDeleted &&
-            f.status !== 'Deleted' &&
+            f.status !== "Deleted" &&
             !state.deletedCustomerIds.includes(f._id) &&
             !state.deletedCustomerIds.includes(f.customerId) &&
-            !state.deletedCustomerIds.includes(f.id)
+            !state.deletedCustomerIds.includes(f.id),
         );
 
         const mergedFetched = validFetched.map((f) => {
@@ -441,10 +489,13 @@ const customerSlice = createSlice({
             (c) =>
               (c._id && c._id === f._id) ||
               (c.customerId && c.customerId === f.customerId) ||
-              (c.companyName && f.companyName && c.companyName.toLowerCase() === f.companyName.toLowerCase())
+              (c.companyName &&
+                f.companyName &&
+                c.companyName.toLowerCase() === f.companyName.toLowerCase()),
           );
 
-          const fetchedMobile = extractMobileNumber(f) || extractMobileNumber(match);
+          const fetchedMobile =
+            extractMobileNumber(f) || extractMobileNumber(match);
           const fetchedEmail = extractEmail(f) || extractEmail(match);
 
           return {
@@ -466,16 +517,18 @@ const customerSlice = createSlice({
           (c) =>
             c._isLocal &&
             !c.isDeleted &&
-            c.status !== 'Deleted' &&
+            c.status !== "Deleted" &&
             !state.deletedCustomerIds.includes(c._id) &&
             !state.deletedCustomerIds.includes(c.customerId) &&
             !state.deletedCustomerIds.includes(c.id) &&
-            !mergedFetched.some((f) => f._id === c._id || f.customerId === c.customerId)
+            !mergedFetched.some(
+              (f) => f._id === c._id || f.customerId === c.customerId,
+            ),
         );
         state.customers = [...localCreated, ...mergedFetched];
-        state.totalCustomers = action.payload?.totalCustomers || state.customers.length;
-        state.totalPages = action.payload?.totalPages || 1;
-        state.currentPage = action.payload?.currentPage || 1;
+        state.totalCustomers = action.payload?.pagination?.totalCustomers || 0;
+        state.totalPages = action.payload?.pagination?.totalPages || 1;
+        state.currentPage = action.payload?.pagination?.currentPage || 1;
         saveStoredCustomers(state.customers);
       })
       .addCase(fetchCustomers.rejected, (state, action) => {
@@ -488,12 +541,21 @@ const customerSlice = createSlice({
       })
       .addCase(createCustomer.fulfilled, (state, action) => {
         state.isSaving = false;
-        const newCust = action.payload?.customer || action.payload?.data || action.meta?.arg;
+        const newCust =
+          action.payload?.customer || action.payload?.data || action.meta?.arg;
         if (newCust) {
-          const exists = state.customers.some((c) => (c._id && c._id === newCust._id) || (c.customerId && c.customerId === newCust.customerId));
+          const exists = state.customers.some(
+            (c) =>
+              (c._id && c._id === newCust._id) ||
+              (c.customerId && c.customerId === newCust.customerId),
+          );
           if (!exists) {
-            const mobVal = extractMobileNumber(newCust) || extractMobileNumber(action.meta?.arg) || '';
-            const emailVal = extractEmail(newCust) || extractEmail(action.meta?.arg) || '';
+            const mobVal =
+              extractMobileNumber(newCust) ||
+              extractMobileNumber(action.meta?.arg) ||
+              "";
+            const emailVal =
+              extractEmail(newCust) || extractEmail(action.meta?.arg) || "";
             const normalized = {
               ...newCust,
               _isLocal: true,
@@ -525,17 +587,33 @@ const customerSlice = createSlice({
         const arg = action.meta?.arg;
         const targetId = arg?.customerId;
         const updateData = arg?.updateData || {};
-        const apiCustomer = action.payload?.customer || action.payload?.data || {};
+        const apiCustomer =
+          action.payload?.customer || action.payload?.data || {};
 
         state.customers = state.customers.map((c) => {
           const isMatch =
-            (targetId && (c._id === targetId || c.customerId === targetId || c.id === targetId)) ||
-            (updateData.companyName && c.companyName && c.companyName.trim().toLowerCase() === updateData.companyName.trim().toLowerCase()) ||
-            (updateData.name && c.name && c.name.trim().toLowerCase() === updateData.name.trim().toLowerCase());
+            (targetId &&
+              (c._id === targetId ||
+                c.customerId === targetId ||
+                c.id === targetId)) ||
+            (updateData.companyName &&
+              c.companyName &&
+              c.companyName.trim().toLowerCase() ===
+                updateData.companyName.trim().toLowerCase()) ||
+            (updateData.name &&
+              c.name &&
+              c.name.trim().toLowerCase() ===
+                updateData.name.trim().toLowerCase());
 
           if (isMatch) {
-            const newMobile = extractMobileNumber(updateData) || extractMobileNumber(apiCustomer) || extractMobileNumber(c);
-            const newEmail = extractEmail(updateData) || extractEmail(apiCustomer) || extractEmail(c);
+            const newMobile =
+              extractMobileNumber(updateData) ||
+              extractMobileNumber(apiCustomer) ||
+              extractMobileNumber(c);
+            const newEmail =
+              extractEmail(updateData) ||
+              extractEmail(apiCustomer) ||
+              extractEmail(c);
             return {
               ...c,
               ...apiCustomer,
@@ -567,16 +645,30 @@ const customerSlice = createSlice({
         state.isSaving = false;
         const resData = action.payload?.data;
         const arg = action.meta.arg;
-        const primaryId = typeof arg === 'object' ? (arg.primaryId || arg.customerId) : arg;
-        const secondaryId = typeof arg === 'object' ? arg.secondaryId : null;
-        const deletedCustomerId = resData?.customerId || action.payload?.customerId;
+        const primaryId =
+          typeof arg === "object" ? arg.primaryId || arg.customerId : arg;
+        const secondaryId = typeof arg === "object" ? arg.secondaryId : null;
+        const deletedCustomerId =
+          resData?.customerId || action.payload?.customerId;
 
-        const idsToRemove = [primaryId, secondaryId, deletedCustomerId].filter(Boolean);
-        state.deletedCustomerIds = Array.from(new Set([...state.deletedCustomerIds, ...idsToRemove]));
+        const idsToRemove = [primaryId, secondaryId, deletedCustomerId].filter(
+          Boolean,
+        );
+        state.deletedCustomerIds = Array.from(
+          new Set([...state.deletedCustomerIds, ...idsToRemove]),
+        );
 
         if (state.customers && Array.isArray(state.customers)) {
           state.customers = state.customers.filter((c) => {
-            if (idsToRemove.some((id) => c.customerId === id || c._id === id || c.id === id || c.customerCode === id)) {
+            if (
+              idsToRemove.some(
+                (id) =>
+                  c.customerId === id ||
+                  c._id === id ||
+                  c.id === id ||
+                  c.customerCode === id,
+              )
+            ) {
               return false;
             }
             return true;
