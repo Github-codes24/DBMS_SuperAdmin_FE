@@ -337,9 +337,21 @@ export default function App() {
             Authorization: `Bearer ${localStorage.getItem("lts_telecaller_token")}`,
           },
           body: JSON.stringify({
-            vendorId: vendor.id,
-            planId: "PLAN_GOLD_6M",
-            gateway: "Razorpay",
+            vendorId: vendor.id || vendor._id,
+            planId: selectedPlan.planId || selectedPlan.id,
+            duration: selectedPlan.duration,
+            gateway: gateway || "Razorpay",
+            packages: [
+              {
+                name: selectedPlan.productName || selectedPlan.planName,
+                amount: selectedPlan.unitPrice || selectedPlan.price,
+                quantity: 1,
+                planId: selectedPlan.planId,
+                duration: selectedPlan.durationLabel || selectedPlan.duration,
+                durationInMonths: selectedPlan.durationInMonths,
+              },
+            ],
+            discount: selectedPlan.discountPercent ?? 0,
           }),
         },
       );

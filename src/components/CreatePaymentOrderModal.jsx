@@ -11,8 +11,7 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
     status: plansStatus = 'idle',
     loading: loadingPlans = false,
     error: plansError = null,
-  } =
-    useSelector((state) => state.plans || {});
+  } = useSelector((state) => state.plans || {});
 
   const [alternatePhone, setAlternatePhone] = useState(vendor.alternatePhone || vendor.phone || '');
   const [gstNo, setGstNo] = useState(vendor.gstNo || '');
@@ -28,10 +27,9 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
   const [actionError, setActionError] = useState(null);
 
   useEffect(() => {
-    if (plansStatus === 'idle') {
-      dispatch(fetchSubscriptionPlans());
-    }
-  }, [dispatch, plansStatus]);
+    // Always ensure plans are fetched when opening the modal
+    dispatch(fetchSubscriptionPlans());
+  }, [dispatch]);
 
   const isAllSelected = orderItems.length > 0 && selectedItemIds.length === orderItems.length;
   const isIndeterminate = selectedItemIds.length > 0 && selectedItemIds.length < orderItems.length;
@@ -88,7 +86,6 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
     };
 
     setOrderItems((prev) => [...prev, newItem]);
-    // Newly added records start unchecked
     setSelectedPkgId('');
     setSelectedDiscount('1');
     setActionError(null);
@@ -131,7 +128,6 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
     setIsSending(true);
 
     try {
-      // Simulate realistic dispatch latency
       await new Promise((resolve) => setTimeout(resolve, 600));
 
       const selectedTotal = selectedRecords.reduce((sum, it) => sum + it.total, 0);
@@ -178,7 +174,6 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
     }
   };
 
-
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" style={{ maxWidth: '850px' }} onClick={(e) => e.stopPropagation()}>
@@ -200,6 +195,7 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
                 className="form-control"
                 value={alternatePhone}
                 onChange={(e) => setAlternatePhone(e.target.value)}
+                placeholder="10 digit phone number"
               />
             </div>
 
@@ -300,7 +296,7 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
                 </div>
 
                 <div className="form-group" style={{ flex: 1 }}>
-                  <label>Discount (%):</label>
+                  <label>Discount: <span className="required">*</span></label>
                   <select
                     className="form-control"
                     value={selectedDiscount}
@@ -314,140 +310,96 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
                   </select>
                 </div>
 
-                <button className="btn-green" onClick={handleAddItem} style={{ height: '36px' }}>
-                  Add
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={handleAddItem}
+                  disabled={!selectedPkgId || loadingPlans}
+                  style={{
+                    marginBottom: '0',
+                    height: '38px',
+                    padding: '0 20px',
+                    fontWeight: 600,
+                    opacity: (!selectedPkgId || loadingPlans) ? 0.6 : 1,
+                    cursor: (!selectedPkgId || loadingPlans) ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  ADD
                 </button>
               </div>
 
-              {/* Action Error Banner */}
-              {actionError && (
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '8px 12px',
-                    backgroundColor: '#fef2f2',
-                    border: '1px solid #f87171',
-                    borderRadius: '4px',
-                    color: '#991b1b',
-                    fontSize: '12px',
-                    marginBottom: '12px',
-                  }}
-                >
-                  <AlertCircle size={15} />
-                  <span>{actionError}</span>
-                </div>
-              )}
-
-              {/* Items Table */}
-              <div className="table-responsive">
-                <table className="data-table">
+              {/* Table of selected packages */}
+              <div style={{ overflowX: 'auto', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '4px' }}>
+                <table className="data-table" style={{ margin: 0, width: '100%' }}>
                   <thead>
                     <tr>
-                      <th style={{ width: '95px', textAlign: 'center' }}>
-                        <label
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            cursor: orderItems.length === 0 || isSending ? 'not-allowed' : 'pointer',
-                            margin: 0,
-                            fontWeight: '600',
-                            fontSize: '12px',
-                            userSelect: 'none',
+                      <th style={{ width: '40px', textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          checked={isAllSelected}
+                          ref={(el) => {
+                            if (el) el.indeterminate = isIndeterminate;
                           }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isAllSelected}
-                            ref={(el) => {
-                              if (el) el.indeterminate = isIndeterminate;
-                            }}
-                            onChange={handleToggleSelectAll}
-                            disabled={orderItems.length === 0 || isSending}
-                            style={{ cursor: orderItems.length === 0 || isSending ? 'not-allowed' : 'pointer', width: '15px', height: '15px' }}
-                          />
-                          <span>Select All</span>
-                        </label>
+                          onChange={handleToggleSelectAll}
+                          disabled={orderItems.length === 0}
+                          style={{ cursor: orderItems.length === 0 ? 'not-allowed' : 'pointer' }}
+                        />
                       </th>
-                      <th style={{ width: '45px', textAlign: 'center' }}>S.No.</th>
-                      <th>Package</th>
+                      <th>Package Name</th>
                       <th>Duration</th>
-                      <th>Unit Price</th>
-                      <th>Discount</th>
-                      <th>Tax</th>
+                      <th>Rate</th>
+                      <th>Tax %</th>
+                      <th>Discount %</th>
                       <th>Total</th>
-                      <th style={{ textAlign: 'center', width: '65px' }}>Action</th>
+                      <th style={{ width: '40px', textAlign: 'center' }}></th>
                     </tr>
                   </thead>
                   <tbody>
                     {orderItems.length === 0 ? (
                       <tr>
-                        <td colSpan="9" className="no-data-row">
-                          Data Not Exists
+                        <td colSpan="8" style={{ textAlign: 'center', padding: '24px', color: '#94a3b8' }}>
+                          No packages added yet. Select a package above and click "ADD".
                         </td>
                       </tr>
                     ) : (
-                      orderItems.map((item, idx) => (
-                        <tr
-                          key={item.id}
-                          style={{
-                            backgroundColor: selectedItemIds.includes(item.id) ? '#eff6ff' : undefined,
-                            transition: 'background-color 0.15s ease',
-                          }}
-                        >
+                      orderItems.map((item) => (
+                        <tr key={item.id} style={{ background: selectedItemIds.includes(item.id) ? '#eff6ff' : 'transparent' }}>
                           <td style={{ textAlign: 'center' }}>
                             <input
                               type="checkbox"
                               checked={selectedItemIds.includes(item.id)}
                               onChange={() => handleToggleSelect(item.id)}
-                              disabled={isSending}
-                              style={{ cursor: isSending ? 'not-allowed' : 'pointer', width: '15px', height: '15px' }}
-                              aria-label={`Select ${item.planName}`}
+                              style={{ cursor: 'pointer' }}
                             />
                           </td>
-                          <td style={{ textAlign: 'center' }}>{idx + 1}</td>
-                          <td style={{ fontWeight: '600' }}>{item.planName}</td>
+                          <td style={{ fontWeight: 500 }}>{item.productName}</td>
                           <td>
-                            <span
-                              style={{
-                                display: 'inline-block',
-                                padding: '2px 8px',
-                                background: '#f1f5f9',
-                                border: '1px solid #e2e8f0',
-                                borderRadius: '4px',
-                                fontSize: '11px',
-                                fontWeight: '500',
-                                color: '#475569',
-                              }}
-                            >
-                              {item.durationLabel}
-                            </span>
+                            {item.durationLabel ||
+                              (item.durationInMonths ? `${item.durationInMonths} Month(s)` : `${item.duration || 30} Days`)}
                           </td>
-                          <td>₹{Math.round(item.unitPrice).toLocaleString('en-IN')}</td>
-                          <td>{item.discountPercent}%</td>
+                          <td>?{Number(item.unitPrice).toLocaleString('en-IN')}</td>
                           <td>{item.taxPercent}%</td>
-                          <td style={{ fontWeight: 'bold', color: '#0088a8' }}>
-                           ₹{item.total.toLocaleString('en-IN')}
+                          <td>{item.discountPercent}%</td>
+                          <td style={{ fontWeight: 600, color: '#0f172a' }}>
+                            ?{Number(item.total).toLocaleString('en-IN')}
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <button
                               type="button"
                               onClick={() => handleRemoveItem(item.id)}
-                              disabled={isSending}
                               style={{
-                                background: 'none',
+                                background: 'transparent',
                                 border: 'none',
-                                color: isSending ? '#cbd5e1' : '#dc2626',
-                                cursor: isSending ? 'not-allowed' : 'pointer',
+                                color: '#ef4444',
+                                cursor: 'pointer',
                                 padding: '4px',
                                 display: 'inline-flex',
                                 alignItems: 'center',
+                                justifyContent: 'center'
                               }}
                               title="Remove package"
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={15} />
                             </button>
                           </td>
                         </tr>
@@ -457,66 +409,88 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
                 </table>
               </div>
 
-              <div style={{ textAlign: 'right', marginTop: '14px', fontSize: '14px', fontWeight: 'bold', color: '#1e293b' }}>
-                {selectedItemIds.length > 0 && selectedItemIds.length < orderItems.length && (
-                  <span style={{ marginRight: '16px', fontSize: '13px', color: '#475569' }}>
-                    Selected Amount ({selectedItemIds.length} of {orderItems.length}):{' '}
-                    <span style={{ color: '#2563eb', fontWeight: '700' }}>
-                     ₹{calculateSelectedTotal().toLocaleString('en-IN')}
-                    </span>
-                  </span>
-                )}
-                Total Amount(Including Tax): <span style={{ color: '#0088a8' }}>₹{calculateGrandTotal().toLocaleString('en-IN')}</span>
-              </div>
+              {/* Order Items Summary / Totals */}
+              {orderItems.length > 0 && (
+                <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#f8fafc', borderRadius: '4px', fontSize: '13px' }}>
+                  <div style={{ color: '#64748b' }}>
+                    <span>{orderItems.length} package{orderItems.length > 1 ? 's' : ''} added</span>
+                    {selectedItemIds.length > 0 && (
+                      <span style={{ marginLeft: '12px', color: '#2563eb', fontWeight: 600 }}>
+                        � {selectedItemIds.length} selected for link dispatch
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
+                    <div>
+                      <span style={{ color: '#64748b', marginRight: '6px' }}>Grand Total:</span>
+                      <strong style={{ fontSize: '14px', color: '#0f172a' }}>
+                        ?{calculateGrandTotal().toLocaleString('en-IN')}
+                      </strong>
+                    </div>
+                    {selectedItemIds.length > 0 && (
+                      <div style={{ borderLeft: '1px solid #cbd5e1', paddingLeft: '16px' }}>
+                        <span style={{ color: '#2563eb', marginRight: '6px' }}>Selected Total:</span>
+                        <strong style={{ fontSize: '15px', color: '#2563eb' }}>
+                          ?{calculateSelectedTotal().toLocaleString('en-IN')}
+                        </strong>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* Action Error Banner */}
+          {actionError && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', marginTop: '16px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '4px', color: '#991b1b', fontSize: '13px' }}>
+              <AlertCircle size={16} />
+              <span>{actionError}</span>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ fontSize: '12px', color: '#64748b' }}>
-            {orderItems.length === 0 ? (
-              'Select a package above and click "Add" to generate order items.'
-            ) : selectedItemIds.length === 0 ? (
-              <span style={{ color: '#d97706', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                <AlertCircle size={13} />
-                Please select at least one plan to send payment link.
-              </span>
+            {selectedItemIds.length === 0 ? (
+              <span>Select checkbox on item(s) to send payment link</span>
             ) : (
-              <span>
-                <strong>{selectedItemIds.length}</strong> of <strong>{orderItems.length}</strong> plan(s) selected (Total: <strong style={{ color: '#0088a8' }}>₹{calculateSelectedTotal().toLocaleString('en-IN')}</strong>)
-              </span>
+              <span>Ready to send payment link for <strong>{selectedItemIds.length}</strong> selected item(s)</span>
             )}
           </div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <button className="btn-red" onClick={onClose} disabled={isSending}>
-              Close
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onClose}
+              disabled={isSending}
+            >
+              Cancel
             </button>
             <button
               type="button"
-              className="btn-blue"
+              className="btn btn-primary"
               onClick={handleSendBulkLink}
-              disabled={selectedItemIds.length === 0 || isSending}
+              disabled={isSending || selectedItemIds.length === 0}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '6px',
-                opacity: selectedItemIds.length === 0 || isSending ? 0.6 : 1,
-                cursor: selectedItemIds.length === 0 || isSending ? 'not-allowed' : 'pointer',
+                gap: '8px',
+                padding: '0 20px',
+                opacity: (isSending || selectedItemIds.length === 0) ? 0.6 : 1,
+                cursor: (isSending || selectedItemIds.length === 0) ? 'not-allowed' : 'pointer'
               }}
-              title={selectedItemIds.length === 0 ? 'Please select at least one plan' : 'Send payment link for selected plan(s)'}
             >
               {isSending ? (
                 <>
-                  <Loader2 size={15} className="animate-spin" />
-                  Sending...
+                  <Loader2 size={16} className="spin" />
+                  Sending Link...
                 </>
               ) : (
                 <>
                   <Send size={15} />
-                  {selectedItemIds.length > 1
-                    ? `Send Links (${selectedItemIds.length})`
-                    : 'Send Link'}
+                  Send Payment Link {selectedItemIds.length > 0 && `(?${calculateSelectedTotal().toLocaleString('en-IN')})`}
                 </>
               )}
             </button>
