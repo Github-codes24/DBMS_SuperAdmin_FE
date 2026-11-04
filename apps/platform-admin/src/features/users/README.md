@@ -12,10 +12,32 @@ to its origin or API prefix; the `/api` suffix is added when it is missing.
 Direct browser requests require the backend to allow the frontend origin via
 CORS. Restart the development server after changing the root `.env` file.
 
-Login uses `POST /auth/login` relative to the API prefix.
-User Management HTTP requests, response normalization, and mapping are
-implemented in `services/userService.ts`.
+Login uses `POST /auth/login` relative to the API prefix. User Management HTTP
+requests, response normalization, and mapping are implemented in
+`services/userService.ts`. User create, update, status, and delete operations
+are persisted by the API.
 
+Authentication stores the returned access token in browser `localStorage`
+under the key `accessToken`; protected user requests read that token. A `401`
+response clears the stored token.
+
+Project Management uses the shared `VITE_API_BASE_URL` setting (or `/api` by
+default). The app adds `/api` to the configured host if it is missing. The
+project resource uses:
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/projects` | Load projects |
+| `POST` | `/projects` | Create a project |
+| `PUT` | `/projects/:id` | Update a project |
+| `DELETE` | `/projects/:id` | Delete a project |
+
+Create and update requests send `name`, `description`, `startDate`, `endDate`,
+`status` (`active`, `upcoming`, `completed`, or `on_hold`), and `adminId`.
+Project list responses may be an array or wrap results in `data`, `projects`,
+or `items`; records may use `id`/`_id`, `name`/`projectName`, and
+`status`/`projectStatus`. Project Admin demo records remain in browser
+`localStorage` under `platform-admin.project-admins`.
 Authentication is handled by the existing login experience. It must store
 the returned Bearer access token in browser `localStorage` under the key
 `accessToken`; protected user requests read that token. A `401` response

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowDownUp,
   BriefcaseBusiness,
@@ -24,6 +25,7 @@ import {
   X,
 } from 'lucide-react'
 import AdminSidebar from '../../components/AdminSidebar'
+import AuthNavbarAction from '../../components/AuthNavbarAction'
 import {
   initialProjectAdmins,
   initialProjects,
@@ -35,12 +37,20 @@ import {
 } from './projectData'
 import './projectManagement.css'
 import { getFromStorage, saveToStorage } from '../../utils/storage'
+import {
+  createProject,
+  deleteProject as deleteProjectRequest,
+  listProjects,
+  ProjectAuthenticationError,
+  updateProject,
+} from './projectService'
 
 type ProjectForm = Omit<ManagedProject, 'id'>
 type ProjectAdminForm = Omit<ProjectAdmin, 'id'>
 type SortField = 'name' | 'startDate'
 
 const PROJECT_DATA_STORAGE_KEY = 'platform-admin.project-management'
+const PROJECT_ADMINS_STORAGE_KEY = 'platform-admin.project-admins'
 
 interface ProjectManagementData {
   projects: ManagedProject[]
@@ -90,16 +100,25 @@ function isProjectAdminActive(admin: ProjectAdmin) {
 function ProjectManagementPage() {
   const [initialData] = useState(() => {
     try {
-      return { data: getFromStorage(PROJECT_DATA_STORAGE_KEY, initialProjectData), error: '' }
+      const savedData = getFromStorage(PROJECT_DATA_STORAGE_KEY, initialProjectData)
+      return {
+        admins: getFromStorage(PROJECT_ADMINS_STORAGE_KEY, savedData.admins),
+        error: '',
+      }
     } catch (error) {
       return {
-        data: initialProjectData,
+        admins: initialProjectAdmins,
         error: error instanceof Error ? error.message : 'Could not load saved project data.',
       }
     }
   })
-  const [projects, setProjects] = useState(initialData.data.projects)
-  const [admins, setAdmins] = useState(initialData.data.admins)
+  const navigate = useNavigate()
+  const [projects, setProjects] = useState<ManagedProject[]>([])
+  const [admins, setAdmins] = useState(initialData.admins)
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true)
+  const [projectLoadError, setProjectLoadError] = useState('')
+  const [isSavingProject, setIsSavingProject] = useState(false)
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'All' | ProjectStatus>('All')
   const [sortField, setSortField] = useState<SortField>('name')
@@ -117,27 +136,64 @@ function ProjectManagementPage() {
   const [viewAdmin, setViewAdmin] = useState<ProjectAdmin | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  const refreshProjects = useCallback(async () => {
+    setIsLoadingProjects(true)
+    try {
+      const nextProjects = await listProjects()
+      setProjects(nextProjects)
+      setProjectLoadError('')
+      return nextProjects
+    } catch (error) {
+      if (error instanceof ProjectAuthenticationError) {
+        navigate('/login', { replace: true })
+        return null
+      }
+      setProjectLoadError(error instanceof Error ? error.message : 'Could not load projects.')
+      return null
+    } finally {
+      setIsLoadingProjects(false)
+    }
+  }, [navigate])
+
   useEffect(() => {
-    function syncSavedData(event: StorageEvent) {
-      if (event.key !== PROJECT_DATA_STORAGE_KEY) return
+    const controller = new AbortController()
+    listProjects(controller.signal)
+      .then((nextProjects) => {
+        if (controller.signal.aborted) return
+        setProjects(nextProjects)
+        setProjectLoadError('')
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return
+        if (error instanceof ProjectAuthenticationError) {
+          navigate('/login', { replace: true })
+          return
+        }
+        setProjectLoadError(error instanceof Error ? error.message : 'Could not load projects.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoadingProjects(false)
+      })
+    return () => controller.abort()
+  }, [navigate])
+
+  useEffect(() => {
+    function syncSavedAdmins(event: StorageEvent) {
+      if (event.key !== PROJECT_ADMINS_STORAGE_KEY) return
       try {
-        const savedData = getFromStorage(PROJECT_DATA_STORAGE_KEY, initialProjectData)
-        setProjects(savedData.projects)
-        setAdmins(savedData.admins)
-        setNotice('')
+        setAdmins(getFromStorage(PROJECT_ADMINS_STORAGE_KEY, initialProjectData.admins))
       } catch (error) {
-        setNotice(error instanceof Error ? error.message : 'Could not load saved project data.')
+        setNotice(error instanceof Error ? error.message : 'Could not load saved Project Admin data.')
       }
     }
 
-    window.addEventListener('storage', syncSavedData)
-    return () => window.removeEventListener('storage', syncSavedData)
+    window.addEventListener('storage', syncSavedAdmins)
+    return () => window.removeEventListener('storage', syncSavedAdmins)
   }, [])
 
-  function persistProjectData(nextProjects: ManagedProject[], nextAdmins: ProjectAdmin[]) {
+  function persistAdmins(nextAdmins: ProjectAdmin[]) {
     try {
-      saveToStorage(PROJECT_DATA_STORAGE_KEY, { projects: nextProjects, admins: nextAdmins })
-      setProjects(nextProjects)
+      saveToStorage(PROJECT_ADMINS_STORAGE_KEY, nextAdmins)
       setAdmins(nextAdmins)
       return true
     } catch (error) {
@@ -177,6 +233,17 @@ function ProjectManagementPage() {
     return admins.find((admin) => admin.id === adminId)
   }
 
+  function projectAssignedAdmin(project: ManagedProject) {
+    return admins.find((admin) => admin.projectIds.includes(project.id)) ?? assignedAdmin(project.adminId)
+  }
+
+  function assignedProjectIds(admin: ProjectAdmin) {
+    return [...new Set([
+      ...admin.projectIds,
+      ...projects.filter((project) => project.adminId === admin.id).map((project) => project.id),
+    ])]
+  }
+
   function openAddProject() {
     setEditingProjectId(null)
     setProjectForm(emptyProjectForm)
@@ -192,7 +259,7 @@ function ProjectManagementPage() {
     setProjectModalOpen(true)
   }
 
-  function saveProject(event: FormEvent<HTMLFormElement>) {
+  async function saveProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const name = projectForm.name.trim()
     if (!name) {
@@ -204,31 +271,89 @@ function ProjectManagementPage() {
       return
     }
 
-    const projectId = editingProjectId ?? `project-${Date.now()}`
-    const nextProject: ManagedProject = { ...projectForm, id: projectId, name }
-    const nextProjects = editingProjectId
-      ? projects.map((project) => project.id === editingProjectId ? nextProject : project)
-      : [nextProject, ...projects]
-    const nextAdmins = admins.map((admin) => ({
-      ...admin,
-      projectIds: admin.id === nextProject.adminId
-        ? [...new Set([...admin.projectIds, projectId])]
-        : admin.projectIds.filter((assignedId) => assignedId !== projectId),
-    }))
-    if (!persistProjectData(nextProjects, nextAdmins)) return
-    setProjectModalOpen(false)
-    setNotice(editingProjectId ? 'Project updated.' : 'Project added.')
+    setIsSavingProject(true)
+    setProjectError('')
+    const projectValues = { ...projectForm, name }
+    try {
+      if (editingProjectId) {
+        await updateProject(editingProjectId, projectValues)
+      } else {
+        await createProject(projectValues)
+      }
+
+      const refreshedProjects = await refreshProjects()
+      if (!refreshedProjects) {
+        setNotice('Project saved, but the latest project list could not be loaded. Use Retry to refresh.')
+        return
+      }
+
+      const savedProject = editingProjectId
+        ? refreshedProjects.find((project) => project.id === editingProjectId)
+        : [...refreshedProjects].reverse().find((project) =>
+          project.name === projectValues.name &&
+          project.description === projectValues.description &&
+          project.startDate === projectValues.startDate &&
+          project.endDate === projectValues.endDate &&
+          project.status === projectValues.status &&
+          project.adminId === projectValues.adminId,
+        )
+      let assignmentsSaved = true
+      if (savedProject) {
+        const nextAdmins = admins.map((admin) => ({
+          ...admin,
+          projectIds: admin.id === savedProject.adminId
+            ? [...new Set([...admin.projectIds, savedProject.id])]
+            : admin.projectIds.filter((assignedId) => assignedId !== savedProject.id),
+        }))
+        assignmentsSaved = persistAdmins(nextAdmins)
+      }
+
+      setProjectModalOpen(false)
+      if (!assignmentsSaved) {
+        setNotice('Project was saved, but the Project Admin assignment could not be saved in this browser.')
+      } else {
+        setNotice(editingProjectId ? 'Project updated successfully.' : 'Project created successfully.')
+      }
+    } catch (error) {
+      if (error instanceof ProjectAuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
+      setProjectError(error instanceof Error ? error.message : 'Could not save project.')
+    } finally {
+      setIsSavingProject(false)
+    }
   }
 
-  function deleteProject(project: ManagedProject) {
+  async function deleteProject(project: ManagedProject) {
     if (!window.confirm(`Delete “${project.name}”? This will remove its Project Admin assignment.`)) return
-    const nextProjects = projects.filter((item) => item.id !== project.id)
-    const nextAdmins = admins.map((admin) => ({
-      ...admin,
-      projectIds: admin.projectIds.filter((projectId) => projectId !== project.id),
-    }))
-    if (!persistProjectData(nextProjects, nextAdmins)) return
-    setNotice(`“${project.name}” deleted.`)
+    setDeletingProjectId(project.id)
+    setProjectLoadError('')
+    try {
+      await deleteProjectRequest(project.id)
+      setProjects((current) => current.filter((item) => item.id !== project.id))
+      const nextAdmins = admins.map((admin) => ({
+        ...admin,
+        projectIds: admin.projectIds.filter((projectId) => projectId !== project.id),
+      }))
+      const assignmentsCleared = persistAdmins(nextAdmins)
+      const refreshedProjects = await refreshProjects()
+      if (!refreshedProjects) {
+        setNotice(`“${project.name}” was deleted, but the project list could not be refreshed. Use Retry.`)
+        return
+      }
+      setNotice(assignmentsCleared
+        ? `“${project.name}” deleted successfully.`
+        : `“${project.name}” was deleted, but its local Project Admin assignment could not be updated.`)
+    } catch (error) {
+      if (error instanceof ProjectAuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
+      setProjectLoadError(error instanceof Error ? error.message : 'Could not delete project.')
+    } finally {
+      setDeletingProjectId(null)
+    }
   }
 
   function openAddAdmin() {
@@ -272,13 +397,7 @@ function ProjectManagementPage() {
         projectIds: admin.projectIds.filter((projectId) => !adminForm.projectIds.includes(projectId)),
       }))
     const nextAdmins = [nextAdmin, ...withoutSelectedAssignments]
-    const nextProjects = projects.map((project) => {
-      const selectedForProject = adminForm.projectIds.includes(project.id)
-      if (selectedForProject) return { ...project, adminId }
-      if (project.adminId === adminId) return { ...project, adminId: '' }
-      return project
-    })
-    if (!persistProjectData(nextProjects, nextAdmins)) return
+    if (!persistAdmins(nextAdmins)) return
     setAdminModalOpen(false)
     setNotice(editingAdminId ? 'Project Admin updated.' : 'Project Admin added as demo data.')
   }
@@ -287,15 +406,14 @@ function ProjectManagementPage() {
     const nextStatus: ProjectAdminStatus = admin.status === 'Active' ? 'Inactive' : 'Active'
     if (!window.confirm(`${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} ${admin.name}?`)) return
     const nextAdmins = admins.map((item) => item.id === admin.id ? { ...item, status: nextStatus } : item)
-    if (!persistProjectData(projects, nextAdmins)) return
+    if (!persistAdmins(nextAdmins)) return
     setNotice(`${admin.name} is now ${nextStatus.toLowerCase()}.`)
   }
 
   function deleteAdmin(admin: ProjectAdmin) {
     if (!window.confirm(`Delete Project Admin ${admin.name}? Their project assignments will be cleared.`)) return
     const nextAdmins = admins.filter((item) => item.id !== admin.id)
-    const nextProjects = projects.map((project) => project.adminId === admin.id ? { ...project, adminId: '' } : project)
-    if (!persistProjectData(nextProjects, nextAdmins)) return
+    if (!persistAdmins(nextAdmins)) return
     setNotice(`${admin.name} deleted; project assignments cleared.`)
   }
 
@@ -329,6 +447,7 @@ function ProjectManagementPage() {
         </div>
         <div className="projects-navbar-section">PROJECT MANAGEMENT</div>
         <div className="projects-profile"><span className="projects-profile-avatar">SA</span><span>Super Admin</span></div>
+        <AuthNavbarAction />
       </header>
 
       <div className="projects-workspace">
@@ -356,10 +475,11 @@ function ProjectManagementPage() {
 
           <div className="projects-demo-notice">
             <ShieldCheck size={15} aria-hidden="true" />
-            <span>Demo data only — changes are held in this browser session and are not saved to a server.</span>
+            <span>Projects are managed through the API. Project Admin records are demo data saved in this browser.</span>
           </div>
 
           {notice && <div className="projects-toast" role="status"><Check size={15} aria-hidden="true" />{notice}<button type="button" aria-label="Dismiss message" onClick={() => setNotice('')}><X size={14} /></button></div>}
+          {projectLoadError && <div className="projects-load-error" role="alert">{projectLoadError}<button className="projects-button projects-button--secondary" type="button" onClick={() => void refreshProjects()}>Retry</button></div>}
 
           <section className="projects-summary-grid" aria-label="Project summary">
             <SummaryCard title="Total Projects" value={counts.totalProjects} icon={<FolderKanban size={18} />} tone="orange" />
@@ -408,8 +528,9 @@ function ProjectManagementPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {isLoadingProjects && <tr><td className="projects-empty-state" colSpan={7}>Loading projects...</td></tr>}
                   {visibleProjects.map((project) => {
-                    const admin = assignedAdmin(project.adminId)
+                    const admin = projectAssignedAdmin(project)
                     return (
                       <tr key={project.id}>
                         <td><strong className="projects-name">{project.name}</strong></td>
@@ -422,13 +543,13 @@ function ProjectManagementPage() {
                           <div className="projects-row-actions">
                             <button type="button" aria-label={`View ${project.name}`} title="View project" onClick={() => setViewProject(project)}><Eye size={15} /></button>
                             <button type="button" aria-label={`Edit ${project.name}`} title="Edit project" onClick={() => openEditProject(project)}><Pencil size={14} /></button>
-                            <button type="button" aria-label={`Delete ${project.name}`} title="Delete project" onClick={() => deleteProject(project)}><Trash2 size={14} /></button>
+                            <button type="button" aria-label={`Delete ${project.name}`} title="Delete project" disabled={deletingProjectId === project.id} onClick={() => void deleteProject(project)}><Trash2 size={14} /></button>
                           </div>
                         </td>
                       </tr>
                     )
                   })}
-                  {visibleProjects.length === 0 && <tr><td className="projects-empty-state" colSpan={7}>{projects.length === 0 ? 'No projects yet. Add a project to get started.' : 'No projects match your search or filters.'}</td></tr>}
+                  {!isLoadingProjects && !projectLoadError && visibleProjects.length === 0 && <tr><td className="projects-empty-state" colSpan={7}>{projects.length === 0 ? 'No projects yet. Add a project to get started.' : 'No projects match your search or filters.'}</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -449,7 +570,7 @@ function ProjectManagementPage() {
                       <td><span className="projects-admin-person"><span className="projects-avatar">{initials(admin.name)}</span><strong>{admin.name}</strong></span></td>
                       <td>{admin.email}</td>
                       <td>{admin.phone || '—'}</td>
-                      <td>{admin.projectIds.map((id) => projectName(id)).filter(Boolean).join(', ') || <span className="projects-unassigned">Unassigned</span>}</td>
+                      <td>{assignedProjectIds(admin).map((id) => projectName(id)).filter(Boolean).join(', ') || <span className="projects-unassigned">Unassigned</span>}</td>
                       <td><span className={`projects-status projects-status--${admin.status.toLowerCase()}`}>{admin.status}</span></td>
                       <td>
                         <div className="projects-row-actions">
@@ -485,7 +606,11 @@ function ProjectManagementPage() {
                 <label className="projects-field projects-field--wide"><span>Project Admin</span><select value={projectForm.adminId} onChange={(event) => setProjectForm((current) => ({ ...current, adminId: event.target.value }))}><option value="">Select</option>{admins.filter(isProjectAdminActive).map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}</select></label>
               </div>
               {projectError && <p className="projects-form-error" role="alert">{projectError}</p>}
-              <ModalActions onCancel={() => setProjectModalOpen(false)} submitLabel={editingProjectId ? 'Save Changes' : 'Save Project'} />
+              <ModalActions
+                onCancel={() => setProjectModalOpen(false)}
+                submitLabel={isSavingProject ? 'Saving...' : editingProjectId ? 'Save Changes' : 'Save Project'}
+                submitDisabled={isSavingProject}
+              />
             </form>
           </section>
         </div>
@@ -531,7 +656,7 @@ function ProjectManagementPage() {
               <Detail label="Project Status" value={viewProject.status} />
               <Detail label="Start Date" value={formatDate(viewProject.startDate)} />
               <Detail label="End Date" value={formatDate(viewProject.endDate)} />
-              <Detail label="Assigned Admin" value={assignedAdmin(viewProject.adminId)?.name ?? 'Unassigned'} />
+              <Detail label="Assigned Admin" value={projectAssignedAdmin(viewProject)?.name ?? 'Unassigned'} />
             </dl>
             <ModalActions onCancel={() => setViewProject(null)} cancelLabel="Close" hideSubmit />
           </section>
@@ -548,7 +673,7 @@ function ProjectManagementPage() {
               <Detail label="Phone" value={viewAdmin.phone || 'Not provided'} icon={<Phone size={14} />} />
               <Detail label="Username" value={viewAdmin.username || 'Not set'} />
               <Detail label="Account Status" value={viewAdmin.status} />
-              <Detail label="Assigned Projects" value={viewAdmin.projectIds.map((id) => projectName(id)).filter(Boolean).join(', ') || 'Unassigned'} />
+              <Detail label="Assigned Projects" value={assignedProjectIds(viewAdmin).map((id) => projectName(id)).filter(Boolean).join(', ') || 'Unassigned'} />
             </dl>
             <ModalActions onCancel={() => setViewAdmin(null)} cancelLabel="Close" hideSubmit />
           </section>
@@ -589,16 +714,18 @@ function ModalActions({
   submitLabel = 'Save',
   cancelLabel = 'Cancel',
   hideSubmit = false,
+  submitDisabled = false,
 }: {
   onCancel: () => void
   submitLabel?: string
   cancelLabel?: string
   hideSubmit?: boolean
+  submitDisabled?: boolean
 }) {
   return (
     <div className="projects-modal-actions">
       <button className="projects-button projects-button--secondary" type="button" onClick={onCancel}>{cancelLabel}</button>
-      {!hideSubmit && <button className="projects-button projects-button--primary" type="submit"><Check size={15} />{submitLabel}</button>}
+      {!hideSubmit && <button className="projects-button projects-button--primary" type="submit" disabled={submitDisabled}><Check size={15} />{submitLabel}</button>}
     </div>
   )
 }

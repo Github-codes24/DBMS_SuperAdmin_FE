@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiBaseUrl } from "../../api";
+import { setAccessToken } from "./authService";
 import homeImg from "../../assets/home.png";
 import logo from "../../assets/logo.png";
 
@@ -83,6 +84,7 @@ function Login() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "application/json",
         },
         body: JSON.stringify({
           email: email.trim(),
@@ -141,7 +143,7 @@ function Login() {
         throw new Error("Invalid login response: access token is missing.");
       }
 
-      localStorage.setItem("accessToken", accessToken);
+      setAccessToken(accessToken);
       if (user !== undefined) {
         localStorage.setItem("user", JSON.stringify(user));
       }
