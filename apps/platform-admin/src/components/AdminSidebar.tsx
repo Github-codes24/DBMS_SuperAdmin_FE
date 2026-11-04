@@ -3,10 +3,12 @@ import { Link, useLocation } from 'react-router-dom'
 import './adminSidebar.css'
 
 const navigation = [
+   { label: 'Dashboard', icon: ShieldCheck, href: '/dashboard' },
   { label: 'User Management', icon: Users, href: '/users' },
   { label: 'Project Management', icon: BriefcaseBusiness, href: '/project-management' },
   { label: 'Roles & Permissions', icon: ShieldCheck, href: '/roles-permissions' },
   { label: 'Reports & Analytics', icon: BarChart3, href: '/reports-analytics' },
+
 ]
 
 interface AdminSidebarProps {
