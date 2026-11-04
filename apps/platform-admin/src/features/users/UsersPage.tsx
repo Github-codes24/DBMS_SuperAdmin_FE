@@ -31,6 +31,7 @@ const DEMO_PROJECT_OPTIONS: SelectOption[] = [
   'Edu - Merit',
   'DBMS',
 ].map((name) => ({ id: name, name }))
+const projectOptions = DEMO_PROJECT_OPTIONS
 
 interface UserRecord {
   id: string
@@ -93,7 +94,6 @@ function UserManagementPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [actionError, setActionError] = useState('')
-  const projectOptions = DEMO_PROJECT_OPTIONS
   const [form, setForm] = useState<UserFormValues>(emptyForm)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -131,7 +131,7 @@ function UserManagementPage() {
         if (!controller.signal.aborted) setIsLoading(false)
       })
     return () => controller.abort()
-  }, [navigate, page, projectOptions, refreshKey, roleFilter, search, statusFilter])
+  }, [navigate, page, refreshKey, roleFilter, search, statusFilter])
 
   const pageCount = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE))
   const pageUsers = users
@@ -354,10 +354,10 @@ function UserManagementPage() {
         <div>
           <div className="user-heading-kicker"><span className="kicker-line" /> ACCESS CONTROL</div>
           <h1>User Management</h1>
-          <p className="page-description">Create and manage platform super admin accounts.</p>
+          <p className="page-description">Create and manage platform user accounts.</p>
         </div>
         <button className="button button--primary create-button" type="button" onClick={openCreate}>
-          <span aria-hidden="true">＋</span> Create Admin
+          <span aria-hidden="true">＋</span> Create User
         </button>
       </section>
 
