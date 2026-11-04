@@ -8,6 +8,7 @@ import {
   addDashboardSubcategory 
 } from '../redux/slices/dashboardSlice';
 import { fetchVendors } from '../redux/slices/vendorSlice';
+import { fetchTelecallers } from '../redux/slices/telecallerSlice';
 import { fetchCustomers } from '../redux/slices/customerSlice';
 import { ChevronUp, ChevronDown, Plus, X, Layers, MapPin, Filter, Check, Building2, Users, FileText, HelpCircle, ShieldCheck, Activity, Search, Ban, UserCheck, AlertTriangle } from 'lucide-react';
 import Navbar from './Navbar';
@@ -23,6 +24,7 @@ import DataManagement from './DataManagement';
 import { State } from 'country-state-city';
 // import api from '../services/api';
 import api, { getDashboardApiUrl } from "../services/api";
+
 
 
 
@@ -906,12 +908,14 @@ useEffect(() => {
   const dispatch = useDispatch();
   const { stats, cascadeData, loading, error } = useSelector((state) => state.dashboard);
   const { vendors = [] } = useSelector((state) => state.vendor || {});
-  const { customers = [] } = useSelector((state) => state.customer || {});
+  const { customers = [],totalCustomers = 0} = useSelector((state) => state.customer || {});
+  const { telecallers = [] } = useSelector((state) => state.telecaller || {});
 
   useEffect(() => {
     dispatch(fetchDashboardOverview());
     dispatch(fetchVendors());
     dispatch(fetchCustomers());
+    dispatch(fetchTelecallers());
   }, [dispatch]);
 
   // Default Stats fallback
@@ -921,16 +925,28 @@ useEffect(() => {
     newVendorRequests: { count: 0, totalFYRequests: 0 },
     newCustomerQueries: { count: 0, totalQueries: 0 },
     todaysVendorAudit: { count: 0, pendingQuality: 0 },
-    onlineUsersDMS: { count: 0, badgePercentage: '0%', totalUserCount: 0 }
+    onlineUsersDMS: { count: 0, badgePercentage: '0%', totalUserCount: 0 },
+    userKPIs: {vendors: {},customers: {},telecallers: {},},
   };
+  const userKPIs = dStats?.userKPIs || {};
 
-  // Live Database Counts computed from actual records
-  const liveTotalVendors = vendors.length > 0 ? vendors.length : Number(dStats.newVendors?.totalVendors) || 0;
-  const liveActiveVendors = vendors.length > 0 ? vendors.filter(v => (v.status || '').toLowerCase() === 'active').length : Number(dStats.newCustomers?.totalCustomers) || 0;
-  const liveRejectedVendors = vendors.length > 0 ? vendors.filter(v => (v.status || '').toLowerCase() === 'pending' || (v.status || '').toLowerCase() === 'rejected').length : Number(dStats.newVendorRequests?.totalFYRequests) || 0;
-  const liveBlockedVendors = vendors.length > 0 ? vendors.filter(v => (v.status || '').toLowerCase() === 'blocked' || (v.status || '').toLowerCase() === 'inactive' || v.isBlocked === true).length : Number(dStats.newCustomerQueries?.totalQueries) || 0;
+  // Vendor Counts
+const liveTotalVendors = userKPIs.vendors?.total || 0;
+const liveActiveVendors = userKPIs.vendors?.active || 0;
+const livePendingVendors = userKPIs.vendors?.pending || 0;
+const liveBlockedVendors = userKPIs.vendors?.blocked || 0;
 
+// Telecaller Counts
+const liveTotalTelecallers = userKPIs.telecallers?.total || 0;
+const liveActiveTelecallers = userKPIs.telecallers?.active || 0;
+const livePendingTelecallers = userKPIs.telecallers?.pending || 0;
+const liveBlockedTelecallers = userKPIs.telecallers?.blocked || 0;
 
+// Customer Counts
+const liveTotalCustomers = userKPIs.customers?.total || 0;
+const liveActiveCustomers = userKPIs.customers?.active || 0;
+const livePendingCustomers = userKPIs.customers?.pending || 0;
+const liveBlockedCustomers = userKPIs.customers?.blocked || 0;
 
   // Rich master relational dataset for Category & Subcategory cascade filtering ⭐
   const MASTER_CATEGORIES_WITH_SUBCATS = [
@@ -1102,10 +1118,8 @@ useEffect(() => {
     {
       title: 'Total Vendors',
       value: String(Math.round(liveTotalVendors * stateMultiplier)),
-      badge: dStats.newVendors?.badgePercentage || '+10%',
       progress: 'w-[65%]',
       progressBg: 'bg-[#f26522]',
-      subText: selectedState !== 'All' ? `Filtered for ${selectedState}` : `Total Vendors : ${liveTotalVendors}`,
       icon: Building2,
       bgGlow: 'from-orange-500/10 to-transparent',
       iconBg: 'bg-orange-50 text-[#f26522] border-orange-200/60',
@@ -1114,21 +1128,18 @@ useEffect(() => {
     {
       title: 'Active Vendor',
       value: String(Math.round(liveActiveVendors * stateMultiplier)),
-      badge: dStats.newCustomers?.badgePercentage || '+10%',
       progress: 'w-[80%]',
       progressBg: 'bg-emerald-500',
-      subText: selectedState !== 'All' ? `Active Vendors in ${selectedState}` : `Total Active Vendors : ${liveActiveVendors}`,
       icon: UserCheck,
       bgGlow: 'from-emerald-500/10 to-transparent',
       iconBg: 'bg-emerald-50 text-emerald-600 border-emerald-200/60',
       badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     },
     {
-      title: 'Rejected Vendor',
-      value: String(Math.round(liveRejectedVendors * stateMultiplier)),
+      title: 'Pending Vendor',
+      value: String(Math.round(livePendingVendors * stateMultiplier)),
       progress: 'w-[45%]',
       progressBg: 'bg-rose-500',
-      subText: selectedState !== 'All' ? `Rejected Vendors in ${selectedState}` : `Total Rejected Vendors : ${liveRejectedVendors}`,
       icon: AlertTriangle,
       bgGlow: 'from-rose-500/10 to-transparent',
       iconBg: 'bg-rose-50 text-rose-600 border-rose-200/60',
@@ -1139,34 +1150,90 @@ useEffect(() => {
       value: String(Math.round(liveBlockedVendors * stateMultiplier)),
       progress: 'w-[30%]',
       progressBg: 'bg-amber-500',
-      subText: selectedState !== 'All' ? `Blocked Vendors in ${selectedState}` : `Total Blocked Vendors : ${liveBlockedVendors}`,
       icon: Ban,
       bgGlow: 'from-amber-500/10 to-transparent',
       iconBg: 'bg-amber-50 text-amber-700 border-amber-200/60',
       badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
     },
-    {
-      title: "Today's Vendor Audit",
-      value: String(Math.round((Number(dStats.todaysVendorAudit?.count) || 0) * stateMultiplier)),
-      progress: 'w-[60%]',
-      progressBg: 'bg-indigo-500',
-      subText: `Pending Quality : ${Math.round((Number(dStats.todaysVendorAudit?.pendingQuality) || 0) * stateMultiplier)}`,
-      icon: ShieldCheck,
-      bgGlow: 'from-indigo-500/10 to-transparent',
-      iconBg: 'bg-indigo-50 text-indigo-600 border-indigo-200/60',
-      badgeBg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        {
+      title: 'Total Telecallers',
+      value: String(liveTotalTelecallers),
+      progress: 'w-[65%]',
+      progressBg: 'bg-[#f26522]',
+      icon: Building2,
+      bgGlow: 'from-orange-500/10 to-transparent',
+      iconBg: 'bg-orange-50 text-[#f26522] border-orange-200/60',
+      badgeBg: 'bg-orange-50 text-[#f26522] border-orange-200',
     },
     {
-      title: 'Online User in DMS',
-      value: String(Math.round((Number(dStats.onlineUsersDMS?.count) || 0) * stateMultiplier)),
-      badge: dStats.onlineUsersDMS?.badgePercentage || '+100%',
-      progress: 'w-full',
-      progressBg: 'bg-sky-500',
-      subText: selectedState !== 'All' ? `Online Users in ${selectedState}` : `Total User Count : ${dStats.onlineUsersDMS?.totalUserCount ?? 0}`,
-      icon: Activity,
-      bgGlow: 'from-sky-500/10 to-transparent',
-      iconBg: 'bg-sky-50 text-sky-600 border-sky-200/60',
-      badgeBg: 'bg-sky-50 text-sky-700 border-sky-200',
+      title: 'Active Telecallers',
+      value: String(liveActiveTelecallers),
+      progress: 'w-[80%]',
+      progressBg: 'bg-emerald-500',
+      icon: UserCheck,
+      bgGlow: 'from-emerald-500/10 to-transparent',
+      iconBg: 'bg-emerald-50 text-emerald-600 border-emerald-200/60',
+      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    },
+    {
+      title: 'Pending Telecallers',
+      value: String(livePendingTelecallers),
+      progress: 'w-[45%]',
+      progressBg: 'bg-rose-500',
+      icon: AlertTriangle,
+      bgGlow: 'from-rose-500/10 to-transparent',
+      iconBg: 'bg-rose-50 text-rose-600 border-rose-200/60',
+      badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
+    },
+    {
+      title: 'Blocked Telecallers',
+      value: String(liveBlockedTelecallers),
+      progress: 'w-[30%]',
+      progressBg: 'bg-amber-500',
+      icon: Ban,
+      bgGlow: 'from-amber-500/10 to-transparent',
+      iconBg: 'bg-amber-50 text-amber-700 border-amber-200/60',
+      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
+    },
+        {
+      title: 'Total Customers',
+      value: String(liveTotalCustomers),
+      progress: 'w-[65%]',
+      progressBg: 'bg-[#f26522]',
+      icon: Building2,
+      bgGlow: 'from-orange-500/10 to-transparent',
+      iconBg: 'bg-orange-50 text-[#f26522] border-orange-200/60',
+      badgeBg: 'bg-orange-50 text-[#f26522] border-orange-200',
+    },
+    {
+      title: 'Active Customers',
+      value: String(liveActiveCustomers),
+      progress: 'w-[80%]',
+      progressBg: 'bg-emerald-500',
+      icon: UserCheck,
+      bgGlow: 'from-emerald-500/10 to-transparent',
+      iconBg: 'bg-emerald-50 text-emerald-600 border-emerald-200/60',
+      badgeBg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    },
+    {
+      title: 'Pending Customers',
+      value: String(livePendingCustomers),
+      progress: 'w-[45%]',
+      progressBg: 'bg-rose-500',
+      icon: AlertTriangle,
+      bgGlow: 'from-rose-500/10 to-transparent',
+      iconBg: 'bg-rose-50 text-rose-600 border-rose-200/60',
+      badgeBg: 'bg-rose-50 text-rose-700 border-rose-200',
+    },
+    {
+      title: 'Blocked Customers',
+      value: String(liveBlockedCustomers),
+      progress: 'w-[30%]',
+      progressBg: 'bg-amber-500',
+      icon: Ban,
+      bgGlow: 'from-amber-500/10 to-transparent',
+      iconBg: 'bg-amber-50 text-amber-700 border-amber-200/60',
+      badgeBg: 'bg-amber-50 text-amber-700 border-amber-200',
     },
   ];
 
@@ -1400,7 +1467,7 @@ useEffect(() => {
                 </div>
 
                 {/* 1. TOP METRICS GRID (6 CARDS IN 2 ROWS) */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {metrics.map((item, idx) => {
                     const Icon = item.icon;
                     return (
