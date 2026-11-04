@@ -157,6 +157,9 @@ function CustomerDatabase({ compact = false }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const {
     customers: apiCustomers = [],
+    totalCustomers = 0,
+    totalPages: apiTotalPages = 1,
+    currentPage: apiCurrentPage = 1,
     loading = false,
     isSaving = false,
   } = useSelector((state) => state.customer || {});
@@ -508,8 +511,13 @@ function CustomerDatabase({ compact = false }) {
     normalizedRole === "super admin" || normalizedRole === "admin";
 
   useEffect(() => {
-    dispatch(fetchCustomers());
-  }, [dispatch]);
+    dispatch(
+      fetchCustomers({
+        page: currentPage,
+        limit: itemsPerPage,
+      }),
+    );
+  }, [dispatch, currentPage, itemsPerPage]);
 
   const getDisplayNumber = (cust) => {
     if (!cust) return "-";
@@ -832,17 +840,18 @@ function CustomerDatabase({ compact = false }) {
   };
 
   // Calculate pagination boundaries
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredCustomers.length / itemsPerPage),
-  );
-  const validCurrentPage = Math.min(currentPage, totalPages);
-  const indexOfLastItem = validCurrentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentDisplayedCustomers = filteredCustomers.slice(
-    indexOfFirstItem,
-    indexOfLastItem,
-  );
+  const totalPages = Math.max(1, apiTotalPages);
+  const validCurrentPage = apiCurrentPage;
+  const currentDisplayedCustomers = filteredCustomers;
+
+  const pageNumbers = [
+    validCurrentPage,
+    ...(validCurrentPage < totalPages
+      ? [validCurrentPage + 1]
+      : validCurrentPage > 1
+        ? [validCurrentPage - 1]
+        : []),
+  ];
 
   // Submit New Customer Form (Super Admin Access)
   const handleAddCustomerSubmit = (e) => {
@@ -1224,6 +1233,31 @@ function CustomerDatabase({ compact = false }) {
     setFileError("");
   };
 
+  const handleSelectAllSubCategories = (items) => {
+    const itemIds = items.map(
+      (sc) => sc.subcategoryId || sc._id || sc.id || "",
+    );
+    const itemNames = items.map(
+      (sc) => sc.name || sc.subCategoryName || sc.subcategoryName || "",
+    );
+
+    const allSelected = itemIds.every((id) => selectedSubCatIds.includes(id));
+
+    if (allSelected) {
+      setSelectedSubCatIds((prev) =>
+        prev.filter((id) => !itemIds.includes(id)),
+      );
+      setSelectedSubCatNames((prev) =>
+        prev.filter((name) => !itemNames.includes(name)),
+      );
+    } else {
+      setSelectedSubCatIds((prev) => [...new Set([...prev, ...itemIds])]);
+      setSelectedSubCatNames((prev) => [...new Set([...prev, ...itemNames])]);
+    }
+
+    setFileError("");
+  };
+
   // Handle State selection
   const handleSelectState = (st) => {
     setSelectedState(st.name);
@@ -1253,6 +1287,20 @@ function CustomerDatabase({ compact = false }) {
       prevCities.includes(ct.name)
         ? prevCities.filter((city) => city !== ct.name)
         : [...prevCities, ct.name],
+    );
+
+    setFileError("");
+  };
+
+  const handleSelectAllCities = (items) => {
+    const itemNames = items.map((city) => city.name);
+
+    const allSelected = itemNames.every((name) => selectedCity.includes(name));
+
+    setSelectedCity((prev) =>
+      allSelected
+        ? prev.filter((name) => !itemNames.includes(name))
+        : [...new Set([...prev, ...itemNames])],
     );
 
     setFileError("");
@@ -2575,7 +2623,8 @@ function CustomerDatabase({ compact = false }) {
             <tbody className="divide-y divide-slate-100 text-xs font-medium">
               {currentDisplayedCustomers.length > 0 ? (
                 currentDisplayedCustomers.map((cust, idx) => {
-                  const globalIdx = indexOfFirstItem + idx + 1;
+                  const globalIdx =
+                    (validCurrentPage - 1) * itemsPerPage + idx + 1;
                   return (
                     <tr
                       key={cust.id || idx}
@@ -2716,16 +2765,15 @@ function CustomerDatabase({ compact = false }) {
           <span>
             Showing{" "}
             <strong className="text-slate-800">
-              {filteredCustomers.length > 0 ? indexOfFirstItem + 1 : 0}
+              {filteredCustomers.length > 0
+                ? (validCurrentPage - 1) * itemsPerPage + 1
+                : 0}
             </strong>{" "}
             to{" "}
             <strong className="text-slate-800">
-              {Math.min(indexOfLastItem, filteredCustomers.length)}
+              {(validCurrentPage - 1) * itemsPerPage + filteredCustomers.length}
             </strong>{" "}
-            of{" "}
-            <strong className="text-slate-800">
-              {filteredCustomers.length}
-            </strong>{" "}
+            of <strong className="text-slate-800">{totalCustomers}</strong>{" "}
             records
           </span>
           <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
@@ -2758,24 +2806,14 @@ function CustomerDatabase({ compact = false }) {
           </button>
 
           <div className="flex items-center gap-1 px-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-              (pageNum) => (
-                <button
-                  key={pageNum}
-                  type="button"
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    pageNum === validCurrentPage
-                      ? "bg-[#f26522] text-white shadow-xs"
-                      : "text-slate-600 hover:bg-slate-100"
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              ),
-            )}
+            <button
+              type="button"
+              className="w-7 h-7 rounded-lg bg-[#f26522] text-white shadow-xs text-xs font-bold"
+              disabled
+            >
+              {validCurrentPage}
+            </button>
           </div>
-
           <button
             type="button"
             disabled={validCurrentPage === totalPages}
@@ -3311,6 +3349,63 @@ function CustomerDatabase({ compact = false }) {
                                 </div>
                               );
                             }
+                            return (
+                              <>
+                                <label className="flex items-center gap-2 px-3 py-2 cursor-pointer border-b border-gray-300">
+                                  <input
+                                    type="checkbox"
+                                    className="cursor-pointer"
+                                    checked={filtered.every((sc) =>
+                                      selectedSubCatIds.includes(
+                                        sc.subcategoryId ||
+                                          sc._id ||
+                                          sc.id ||
+                                          "",
+                                      ),
+                                    )}
+                                    onChange={() => {
+                                      handleSelectAllSubCategories(filtered);
+                                      setIsSubCatDropdownOpen(false);
+                                    }}
+                                  />
+                                  <span className="text-sm font-semibold">
+                                    Select All
+                                  </span>
+                                </label>
+
+                                {filtered.map((sc) => {
+                                  const name =
+                                    sc.name ||
+                                    sc.subCategoryName ||
+                                    sc.subcategoryName;
+                                  const subId =
+                                    sc.subcategoryId || sc._id || sc.id || "";
+                                  const isSelected =
+                                    selectedSubCatIds.includes(subId);
+
+                                  return (
+                                    <label
+                                      key={subId}
+                                      className={`w-full px-3.5 py-2 text-xs text-left flex items-center gap-2 transition-colors cursor-pointer ${
+                                        isSelected
+                                          ? "bg-orange-50 font-bold text-[#f26522]"
+                                          : "text-slate-700 hover:bg-slate-50 hover:text-[#f26522]"
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        className="cursor-pointer"
+                                        checked={isSelected}
+                                        onChange={() =>
+                                          handleSelectSubCategory(sc)
+                                        }
+                                      />
+                                      <span className="truncate">{name}</span>
+                                    </label>
+                                  );
+                                })}
+                              </>
+                            );
                             return filtered.map((sc) => {
                               const name =
                                 sc.name ||
@@ -3321,26 +3416,21 @@ function CustomerDatabase({ compact = false }) {
                               const isSelected =
                                 selectedSubCatIds.includes(subId);
                               return (
-                                <button
-                                  key={
-                                    sc.subcategoryId || sc._id || sc.id || name
-                                  }
-                                  type="button"
-                                  onClick={() => handleSelectSubCategory(sc)}
-                                  className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${
+                                <label
+                                  key={subId}
+                                  className={`w-full px-3.5 py-2 text-xs text-left flex items-center gap-2 transition-colors cursor-pointer ${
                                     isSelected
                                       ? "bg-orange-50 font-bold text-[#f26522]"
                                       : "text-slate-700 hover:bg-slate-50 hover:text-[#f26522]"
                                   }`}
                                 >
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => handleSelectSubCategory(sc)}
+                                  />
                                   <span className="truncate">{name}</span>
-                                  {isSelected && (
-                                    <Check
-                                      size={13}
-                                      className="text-[#f26522] shrink-0"
-                                    />
-                                  )}
-                                </button>
+                                </label>
                               );
                             });
                           })()
@@ -3519,29 +3609,54 @@ function CustomerDatabase({ compact = false }) {
                               </div>
                             );
                           }
-                          return filtered.map((c) => {
-                            const isSelected = selectedCity.includes(c.name);
-                            return (
-                              <button
-                                key={c.name}
-                                type="button"
-                                onClick={() => handleSelectCity(c)}
-                                className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors cursor-pointer ${
-                                  isSelected
-                                    ? "bg-orange-50 font-bold text-[#f26522]"
-                                    : "text-slate-700 hover:bg-slate-50 hover:text-[#f26522]"
-                                }`}
-                              >
-                                <span className="truncate">{c.name}</span>
-                                {isSelected && (
-                                  <Check
-                                    size={13}
-                                    className="text-[#f26522] shrink-0"
-                                  />
-                                )}
-                              </button>
-                            );
-                          });
+                          return (
+                            <>
+                              <label className="flex items-center gap-2 px-3 py-2 cursor-pointer border-b border-gray-300">
+                                <input
+                                  type="checkbox"
+                                  className="cursor-pointer"
+                                  checked={
+                                    filtered.length > 0 &&
+                                    filtered.every((city) =>
+                                      selectedCity.includes(city.name),
+                                    )
+                                  }
+                                  onChange={() => {
+                                    handleSelectAllCities(filtered);
+                                    setIsCityDropdownOpen(false);
+                                  }}
+                                />
+                                <span className="text-sm font-semibold">
+                                  Select All
+                                </span>
+                              </label>
+
+                              {filtered.map((c) => {
+                                const isSelected = selectedCity.includes(
+                                  c.name,
+                                );
+
+                                return (
+                                  <label
+                                    key={c.name}
+                                    className={`w-full px-3.5 py-2 text-xs text-left flex items-center gap-2 transition-colors cursor-pointer ${
+                                      isSelected
+                                        ? "bg-orange-50 font-bold text-[#f26522]"
+                                        : "text-slate-700 hover:bg-slate-50 hover:text-[#f26522]"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      className="cursor-pointer"
+                                      checked={isSelected}
+                                      onChange={() => handleSelectCity(c)}
+                                    />
+                                    <span className="truncate">{c.name}</span>
+                                  </label>
+                                );
+                              })}
+                            </>
+                          );
                         })()}
                       </div>
                     </div>

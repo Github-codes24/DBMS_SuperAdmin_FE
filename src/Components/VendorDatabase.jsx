@@ -3033,22 +3033,13 @@ function VendorDatabase({ compact = false }) {
           </button>
 
           <div className="flex items-center gap-1 px-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-              (pageNum) => (
-                <button
-                  key={pageNum}
-                  type="button"
-                  onClick={() => handlePageChange(pageNum)}
-                  className={`w-7 h-7 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    pageNum === validCurrentPage
-                      ? "bg-[#f26522] text-white shadow-xs"
-                      : "text-slate-600 hover:bg-slate-100"
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              ),
-            )}
+            <button
+              type="button"
+              className="w-7 h-7 rounded-lg bg-[#f26522] text-white shadow-xs text-xs font-bold"
+              disabled
+            >
+              {validCurrentPage}
+            </button>
           </div>
 
           <button
