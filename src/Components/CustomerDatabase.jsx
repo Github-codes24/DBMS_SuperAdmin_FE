@@ -1358,14 +1358,6 @@ function CustomerDatabase({ compact = false }) {
       setFileError("Please select at least one sub-category.");
       return;
     }
-    if (!selectedState) {
-      setFileError("Please select a state.");
-      return;
-    }
-    if (!selectedCity.length) {
-      setFileError("Please select at least one city.");
-      return;
-    }
     if (!selectedFile) {
       setFileError("Please select an Excel or CSV file.");
       return;
@@ -1557,8 +1549,8 @@ function CustomerDatabase({ compact = false }) {
             companyName: companyName || "ΓÇö",
             email: email || "ΓÇö",
             mobile: mobile || "ΓÇö",
-            state: state || selectedState || "Maharashtra",
-            city: city || selectedCity.join(", ") || "Mumbai",
+            state: state || selectedState || "",
+            city: city || selectedCity.join(", ") || "",
             pincode: pincode || "400001",
             customerId:
               customerId || `CUST${Math.floor(100 + Math.random() * 900)}`,
@@ -1654,8 +1646,8 @@ function CustomerDatabase({ compact = false }) {
         r.customerId,
         `"${(r.name || "").replace(/"/g, '""')}"`,
         `"${(r.companyName || "").replace(/"/g, '""')}"`,
-        `"${(r.state || selectedState || "Maharashtra").replace(/"/g, '""')}"`,
-        `"${(r.city || selectedCity.join(", ") || "Mumbai").replace(/"/g, '""')}"`,
+        `"${(r.state || selectedState || "").replace(/"/g, '""')}"`,
+        `"${(r.city || selectedCity.join(", ") || "").replace(/"/g, '""')}"`,
         `"${(r.pincode || "400001").replace(/"/g, '""')}"`,
         importRegistrationDate,
         r.status || "Active",
@@ -3444,7 +3436,7 @@ function CustomerDatabase({ compact = false }) {
               {/* State Dropdown */}
               <div className="space-y-1.5" ref={stateDropdownRef}>
                 <label className="block text-xs font-bold text-slate-700">
-                  State <span className="text-red-500">*</span>
+                  State
                 </label>
                 <div className="relative">
                   <button
@@ -3541,7 +3533,7 @@ function CustomerDatabase({ compact = false }) {
               {/* City Dropdown */}
               <div className="space-y-1.5" ref={cityDropdownRef}>
                 <label className="block text-xs font-bold text-slate-700">
-                  City <span className="text-red-500">*</span>
+                  City
                 </label>
                 <div className="relative">
                   <button
