@@ -1645,7 +1645,18 @@ function TelecallerManagement({ compact = false }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-semibold">
-              {currentDisplayedTelecallers.length > 0 ? (
+              {loading ? (
+                <tr>
+                  <td colSpan="7" className="py-10 text-center">
+                    <div className="flex flex-col justify-center items-center gap-2 text-[#f26522]">
+                      <Loader2 size={24} className="animate-spin" />
+                      <span className="text-xs font-semibold">
+                        Loading telecallers...
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ) : currentDisplayedTelecallers.length > 0 ? (
                 currentDisplayedTelecallers.map((tc, idx) => {
                   const globalIdx = indexOfFirstItem + idx + 1;
                   return (

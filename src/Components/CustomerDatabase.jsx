@@ -2613,7 +2613,21 @@ function CustomerDatabase({ compact = false }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium">
-              {currentDisplayedCustomers.length > 0 ? (
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={hasAccessPermission ? 9 : 8}
+                    className="py-10 text-center"
+                  >
+                    <div className="flex flex-col justify-center items-center gap-2 text-[#f26522]">
+                      <Loader2 size={24} className="animate-spin" />
+                      <span className="text-xs font-semibold">
+                        Loading customers...
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ) : currentDisplayedCustomers.length > 0 ? (
                 currentDisplayedCustomers.map((cust, idx) => {
                   const globalIdx =
                     (validCurrentPage - 1) * itemsPerPage + idx + 1;

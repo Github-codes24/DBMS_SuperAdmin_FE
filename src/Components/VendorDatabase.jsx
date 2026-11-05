@@ -49,6 +49,7 @@ import {
   Edit2,
   Trash2,
   Ban,
+  Loader2,
   UserCheck,
   AlertTriangle,
   ChevronLeft,
@@ -635,6 +636,20 @@ function VendorDatabase({ compact = false }) {
       alert("Please enter a valid 10-digit contact number");
       return;
     }
+
+    if (newVendor.contactNo) {
+  const enteredContactNo = newVendor.contactNo.trim();
+
+  const isDuplicateContactNo = vendors.some(
+    (vendor) =>
+      String(vendor.contactNo || "").replace(/\D/g, "") === enteredContactNo
+  );
+
+  if (isDuplicateContactNo) {
+    toast.error("This mobile number is already registered.");
+    return;
+  }
+}
 
     dispatch(
       createVendor({
@@ -2901,7 +2916,21 @@ function VendorDatabase({ compact = false }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium">
-              {currentDisplayedVendors.length > 0 ? (
+              {loading ? (
+                <tr>
+                  <td
+                    colSpan={hasAccessPermission ? 14 : 13}
+                    className="py-10 text-center"
+                  >
+                    <div className="flex flex-col justify-center items-center gap-2 text-[#f26522]">
+                      <Loader2 size={20} className="animate-spin" />
+                      <span className="text-xs font-semibold">
+                        Loading vendors...
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ) : currentDisplayedVendors.length > 0 ? (
                 currentDisplayedVendors.map((ven, idx) => {
                   const globalIdx = indexOfFirstItem + idx + 1;
                   return (
