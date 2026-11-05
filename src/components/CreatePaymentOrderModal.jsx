@@ -377,11 +377,11 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
                             {item.durationLabel ||
                               (item.durationInMonths ? `${item.durationInMonths} Month(s)` : `${item.duration || 30} Days`)}
                           </td>
-                          <td>?{Number(item.unitPrice).toLocaleString('en-IN')}</td>
+                          <td>{Number(item.unitPrice).toLocaleString('en-IN')}</td>
                           <td>{item.taxPercent}%</td>
                           <td>{item.discountPercent}%</td>
                           <td style={{ fontWeight: 600, color: '#0f172a' }}>
-                            ?{Number(item.total).toLocaleString('en-IN')}
+                            {Number(item.total).toLocaleString('en-IN')}
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             <button
@@ -416,7 +416,7 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
                     <span>{orderItems.length} package{orderItems.length > 1 ? 's' : ''} added</span>
                     {selectedItemIds.length > 0 && (
                       <span style={{ marginLeft: '12px', color: '#2563eb', fontWeight: 600 }}>
-                        • {selectedItemIds.length} selected for link dispatch
+                        ï¿½ {selectedItemIds.length} selected for link dispatch
                       </span>
                     )}
                   </div>
@@ -424,14 +424,14 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
                     <div>
                       <span style={{ color: '#64748b', marginRight: '6px' }}>Grand Total:</span>
                       <strong style={{ fontSize: '14px', color: '#0f172a' }}>
-                        ?{calculateGrandTotal().toLocaleString('en-IN')}
+                        {calculateGrandTotal().toLocaleString('en-IN')}
                       </strong>
                     </div>
                     {selectedItemIds.length > 0 && (
                       <div style={{ borderLeft: '1px solid #cbd5e1', paddingLeft: '16px' }}>
                         <span style={{ color: '#2563eb', marginRight: '6px' }}>Selected Total:</span>
                         <strong style={{ fontSize: '15px', color: '#2563eb' }}>
-                          ?{calculateSelectedTotal().toLocaleString('en-IN')}
+                          {calculateSelectedTotal().toLocaleString('en-IN')}
                         </strong>
                       </div>
                     )}
@@ -490,7 +490,7 @@ export default function CreatePaymentOrderModal({ vendor, onClose, onSendPayment
               ) : (
                 <>
                   <Send size={15} />
-                  Send Payment Link {selectedItemIds.length > 0 && `(?${calculateSelectedTotal().toLocaleString('en-IN')})`}
+                  Send Payment Link {selectedItemIds.length > 0 && `(${calculateSelectedTotal().toLocaleString('en-IN')})`}
                 </>
               )}
             </button>
