@@ -638,18 +638,19 @@ function VendorDatabase({ compact = false }) {
     }
 
     if (newVendor.contactNo) {
-  const enteredContactNo = newVendor.contactNo.trim();
+      const enteredContactNo = newVendor.contactNo.trim();
 
-  const isDuplicateContactNo = vendors.some(
-    (vendor) =>
-      String(vendor.contactNo || "").replace(/\D/g, "") === enteredContactNo
-  );
+      const isDuplicateContactNo = vendors.some(
+        (vendor) =>
+          String(vendor.contactNo || "").replace(/\D/g, "") ===
+          enteredContactNo,
+      );
 
-  if (isDuplicateContactNo) {
-    toast.error("This mobile number is already registered.");
-    return;
-  }
-}
+      if (isDuplicateContactNo) {
+        toast.error("This mobile number is already registered.");
+        return;
+      }
+    }
 
     dispatch(
       createVendor({
@@ -2340,8 +2341,8 @@ function VendorDatabase({ compact = false }) {
                   <span className="font-mono font-extrabold text-slate-900 text-sm">
                     {ven.password
                       ? showViewPassword
-                        ? ven.password
-                        : "••••••••"
+                        ? "••••••••"
+                        : ven.password
                       : "Not set"}
                   </span>
                   {ven.password && (
