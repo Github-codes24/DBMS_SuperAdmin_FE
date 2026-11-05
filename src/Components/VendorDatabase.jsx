@@ -187,7 +187,13 @@ function VendorDatabase({ compact = false }) {
   const [viewMode, setViewMode] = useState("table");
 
   const handleOpenAddVendor = () => {
-    setViewMode("add-vendor");
+    setNewVendor((prev) => ({
+      ...prev,
+      email: "",
+      password: "",
+      contactNo: "",
+      status: "Pending",
+    }));
     navigate("/vendor-db/add" + location.search);
   };
 
@@ -262,7 +268,7 @@ function VendorDatabase({ compact = false }) {
     pincode: "",
     state: "",
     city: "",
-    status: "Active",
+    status: "Pending",
     customData: {},
   });
 
@@ -1264,7 +1270,11 @@ function VendorDatabase({ compact = false }) {
         </div>
 
         {/* Full Page Add Vendor Form */}
-        <form onSubmit={handleAddVendorSubmit} className="space-y-6">
+        <form
+          onSubmit={handleAddVendorSubmit}
+          autoComplete="off"
+          className="space-y-6"
+        >
           <div className="bg-slate-50/60 p-5 rounded-2xl border border-slate-200/70 space-y-4">
             <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider">
               Primary Details
@@ -1317,7 +1327,7 @@ function VendorDatabase({ compact = false }) {
                 </select>
               </div> */}
 
-              <div>
+              {/* <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   VENDOR CODE
                 </label>
@@ -1330,7 +1340,7 @@ function VendorDatabase({ compact = false }) {
                   }
                   className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
                 />
-              </div>
+              </div> */}
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1356,8 +1366,10 @@ function VendorDatabase({ compact = false }) {
                 </label>
                 <input
                   type="email"
+                  name="vendor_new_email"
+                  autoComplete="off"
                   placeholder="e.g. vendor@example.com"
-                  value={newVendor.email}
+                  value={newVendor.email || ""}
                   onChange={(e) =>
                     setNewVendor({ ...newVendor, email: e.target.value })
                   }
@@ -1428,8 +1440,8 @@ function VendorDatabase({ compact = false }) {
                   }
                   className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
                 >
-                  <option value="Active">Active</option>
                   <option value="Pending">Pending</option>
+                  <option value="Active">Active</option>
                 </select>
               </div>
 
@@ -1440,8 +1452,10 @@ function VendorDatabase({ compact = false }) {
                 <div className="relative">
                   <input
                     type={showAddPassword ? "text" : "password"}
+                    name="vendor_new_password"
+                    autoComplete="new-password"
                     placeholder="Enter vendor login password"
-                    value={newVendor.password}
+                    value={newVendor.password || ""}
                     onChange={(e) =>
                       setNewVendor({ ...newVendor, password: e.target.value })
                     }

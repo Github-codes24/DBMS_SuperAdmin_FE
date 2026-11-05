@@ -57,7 +57,9 @@ export const createVendor = createAsyncThunk(
         city: vendorData.city || '',
         pincode: vendorData.pincode || '',
         completeAddress: vendorData.completeAddress || vendorData.address || '',
-        gstin: vendorData.gstin || vendorData.gstNo || ''
+        gstin: vendorData.gstin || vendorData.gstNo || '',
+        password: vendorData.password || '',
+        status: vendorData.status || 'Pending'
       };
 
       const response = await api.post('/superadmin/vendors', formattedData);
