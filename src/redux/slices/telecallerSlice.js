@@ -1,88 +1,112 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import api from '../../services/api';
-import { toast } from 'react-toastify';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import api from "../../services/api";
+import { toast } from "react-toastify";
 
 export const fetchTelecallers = createAsyncThunk(
-  'telecaller/fetchTelecallers',
+  "telecaller/fetchTelecallers",
   async (params, { rejectWithValue }) => {
     try {
       const config = {};
       if (params) {
         config.params = params;
       }
-      const response = await api.get('/superadmin/telecallers', config);
+      const response = await api.get("/superadmin/telecallers", config);
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to fetch telecallers.';
+      const message =
+        error.response?.data?.message || "Failed to fetch telecallers.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const createTelecaller = createAsyncThunk(
-  'telecaller/createTelecaller',
+  "telecaller/createTelecaller",
   async (telecallerData, { dispatch, rejectWithValue }) => {
     try {
-      const response = await api.post('/superadmin/telecallers', telecallerData);
+      const response = await api.post(
+        "/superadmin/telecallers",
+        telecallerData,
+      );
       const emailSent = response.data.data?.emailSent;
       if (emailSent === true) {
-        toast.success('Telecaller account created successfully. Login credentials have been sent to the registered email address.');
+        toast.success(
+          "Telecaller account created successfully. Login credentials have been sent to the registered email address.",
+        );
       } else if (emailSent === false) {
-        toast.warning('Telecaller account created successfully, but credentials email could not be sent.');
+        toast.warning(
+          "Telecaller account created successfully, but credentials email could not be sent.",
+        );
       } else {
-        toast.success(response.data.message || 'Telecaller created successfully');
+        toast.success(
+          response.data.message || "Telecaller created successfully",
+        );
       }
       dispatch(fetchTelecallers());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to create telecaller account.';
+      const message =
+        error.response?.data?.message || "Failed to create telecaller account.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const updateTelecaller = createAsyncThunk(
-  'telecaller/updateTelecaller',
+  "telecaller/updateTelecaller",
   async ({ userId, updateData }, { dispatch, rejectWithValue }) => {
     try {
-      const response = await api.patch(`/superadmin/telecallers/${userId}`, updateData);
+      const response = await api.patch(
+        `/superadmin/telecallers/${userId}`,
+        updateData,
+      );
       // toast.success(response.data.message || 'Telecaller updated successfully');
       dispatch(fetchTelecallers());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to update telecaller account.';
+      const message =
+        error.response?.data?.message || "Failed to update telecaller account.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const bulkUpdateTelecallerStatus = createAsyncThunk(
-  'telecaller/bulkUpdateStatus',
+  "telecaller/bulkUpdateStatus",
   async ({ telecallers }, { rejectWithValue }) => {
     try {
-      const response = await api.patch('/superadmin/telecallers/bulk-status', {
+      const response = await api.patch("/superadmin/telecallers/bulk-status", {
         telecallers,
       });
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to update selected telecallers.';
+      const message =
+        error.response?.data?.message ||
+        "Failed to update selected telecallers.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const deleteTelecaller = createAsyncThunk(
-  'telecaller/deleteTelecaller',
+  "telecaller/deleteTelecaller",
   async (telecallerParam, { dispatch, rejectWithValue }) => {
     let mongoId = null;
     let userId = null;
 
-    if (typeof telecallerParam === 'object' && telecallerParam !== null) {
-      userId = telecallerParam.userId || telecallerParam.telecallerId || (typeof telecallerParam.id === 'string' && telecallerParam.id.startsWith('TC') ? telecallerParam.id : null);
-      mongoId = telecallerParam._id || telecallerParam.mongoId || telecallerParam.id;
-    } else if (typeof telecallerParam === 'string') {
+    if (typeof telecallerParam === "object" && telecallerParam !== null) {
+      userId =
+        telecallerParam.userId ||
+        telecallerParam.telecallerId ||
+        (typeof telecallerParam.id === "string" &&
+        telecallerParam.id.startsWith("TC")
+          ? telecallerParam.id
+          : null);
+      mongoId =
+        telecallerParam._id || telecallerParam.mongoId || telecallerParam.id;
+    } else if (typeof telecallerParam === "string") {
       if (/^[0-9a-fA-F]{24}$/.test(telecallerParam)) {
         mongoId = telecallerParam;
       } else {
@@ -104,41 +128,54 @@ export const deleteTelecaller = createAsyncThunk(
       try {
         const response = await makeAttempt();
         if (response.status >= 200 && response.status < 300) {
-          toast.success(response.data?.message || 'Telecaller deleted successfully');
+          toast.success(
+            response.data?.message || "Telecaller deleted successfully",
+          );
           dispatch(fetchTelecallers());
-          return { mongoId, userId, targetId: idsToTry[0], data: response.data };
+          return {
+            mongoId,
+            userId,
+            targetId: idsToTry[0],
+            data: response.data,
+          };
         }
       } catch (err) {
         lastError = err;
       }
     }
 
-    const message = lastError?.response?.data?.message || 'Failed to delete telecaller.';
+    const message =
+      lastError?.response?.data?.message || "Failed to delete telecaller.";
     toast.error(message);
     return rejectWithValue(message);
-  }
+  },
 );
 
 export const bulkImportTelecallers = createAsyncThunk(
-  'telecaller/bulkImportTelecallers',
+  "telecaller/bulkImportTelecallers",
   async (file, { dispatch, rejectWithValue }) => {
     try {
       const formData = new FormData();
-      formData.append('file', file);
-      const response = await api.post('/superadmin/telecallers/import', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
+      formData.append("file", file);
+      const response = await api.post(
+        "/superadmin/telecallers/import",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
         },
-      });
-      toast.success(response.data.message || 'Import completed successfully');
+      );
+      toast.success(response.data.message || "Import completed successfully");
       dispatch(fetchTelecallers());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to import telecaller records.';
+      const message =
+        error.response?.data?.message || "Failed to import telecaller records.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 const initialState = {
@@ -154,7 +191,7 @@ const initialState = {
 };
 
 const telecallerSlice = createSlice({
-  name: 'telecaller',
+  name: "telecaller",
   initialState,
   reducers: {
     clearTelecallers: (state) => {
@@ -180,15 +217,18 @@ const telecallerSlice = createSlice({
         state.telecallers = Array.isArray(rawList)
           ? rawList.filter(
               (tc) =>
-                tc.status !== 'Deleted' &&
+                tc.status !== "Deleted" &&
                 !tc.isDeleted &&
                 !state.deletedTelecallerIds.includes(tc._id) &&
                 !state.deletedTelecallerIds.includes(tc.id) &&
-                !state.deletedTelecallerIds.includes(tc.userId)
+                !state.deletedTelecallerIds.includes(tc.userId),
             )
           : [];
-        state.totalTelecallers = action.payload.totalTelecallers || state.telecallers.length;
-        state.activeTelecallersCount = action.payload.activeTelecallersCount || state.telecallers.filter(t => t.status === 'Active').length;
+        state.totalTelecallers =
+          action.payload.totalTelecallers || state.telecallers.length;
+        state.activeTelecallersCount =
+          action.payload.activeTelecallersCount ||
+          state.telecallers.filter((t) => t.status === "Active").length;
         state.totalPages = action.payload.totalPages || 1;
         state.currentPage = action.payload.currentPage || 1;
       })
@@ -224,15 +264,23 @@ const telecallerSlice = createSlice({
         state.isSaving = false;
         const { mongoId, userId, targetId } = action.payload || {};
         const arg = action.meta?.arg;
-        const argId = typeof arg === 'object' ? (arg._id || arg.id || arg.userId) : arg;
+        const argId =
+          typeof arg === "object" ? arg._id || arg.id || arg.userId : arg;
 
         const idsToRemove = [mongoId, userId, targetId, argId].filter(Boolean);
-        state.deletedTelecallerIds = Array.from(new Set([...state.deletedTelecallerIds, ...idsToRemove]));
+        state.deletedTelecallerIds = Array.from(
+          new Set([...state.deletedTelecallerIds, ...idsToRemove]),
+        );
 
         if (state.telecallers && Array.isArray(state.telecallers)) {
           state.telecallers = state.telecallers.filter((tc) => {
-            if (tc.status === 'Deleted' || tc.isDeleted) return false;
-            if (idsToRemove.some((id) => tc._id === id || tc.userId === id || tc.id === id)) return false;
+            if (tc.status === "Deleted" || tc.isDeleted) return false;
+            if (
+              idsToRemove.some(
+                (id) => tc._id === id || tc.userId === id || tc.id === id,
+              )
+            )
+              return false;
             return true;
           });
         }

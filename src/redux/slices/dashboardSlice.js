@@ -15,7 +15,7 @@ export const fetchDashboardStats = createAsyncThunk(
         "Failed to load dashboard stats.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 // 2. Async Thunk: Fetch Cascade Filter Data
@@ -32,7 +32,7 @@ export const fetchCascadeData = createAsyncThunk(
         "Failed to load cascade filter data.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 // 3. Async Thunk: Add State
@@ -42,7 +42,7 @@ export const addState = createAsyncThunk(
     try {
       const response = await api.post("/dashboard/states", {
         name: stateData.name.trim(),
-        vendorCount: Number(stateData.vendorCount) || 0
+        vendorCount: Number(stateData.vendorCount) || 0,
       });
       // Refresh cascade filter data from server
       dispatch(fetchCascadeData());
@@ -54,7 +54,7 @@ export const addState = createAsyncThunk(
         "Failed to add state.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 // 4. Async Thunk: Add Category
@@ -64,7 +64,7 @@ export const addCategory = createAsyncThunk(
     try {
       const response = await api.post("/dashboard/categories", {
         name: categoryData.name.trim(),
-        vendorCount: Number(categoryData.vendorCount) || 0
+        vendorCount: Number(categoryData.vendorCount) || 0,
       });
       // Refresh cascade filter data from server
       dispatch(fetchCascadeData());
@@ -76,7 +76,7 @@ export const addCategory = createAsyncThunk(
         "Failed to add category.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 // 5. Async Thunk: Add Subcategory
@@ -87,7 +87,7 @@ export const addSubcategory = createAsyncThunk(
       const response = await api.post("/dashboard/subcategories", {
         name: subcategoryData.name.trim(),
         parentCategory: subcategoryData.parentCategory,
-        vendorCount: Number(subcategoryData.vendorCount) || 0
+        vendorCount: Number(subcategoryData.vendorCount) || 0,
       });
       // Refresh cascade filter data from server
       dispatch(fetchCascadeData());
@@ -99,7 +99,7 @@ export const addSubcategory = createAsyncThunk(
         "Failed to add subcategory.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 const initialState = {
@@ -110,10 +110,10 @@ const initialState = {
     pendingQueries: 0,
     vendorActivity: 0,
     onlineUsers: 0,
-    pendingVendorPayment:  {
+    pendingVendorPayment: {
       count: 0,
-      totalAmount: 0
-    }
+      totalAmount: 0,
+    },
   },
   states: [],
   categories: [],
@@ -126,7 +126,7 @@ const initialState = {
   error: null,
   statsError: null,
   cascadeError: null,
-  saveError: null
+  saveError: null,
 };
 
 const dashboardSlice = createSlice({
@@ -138,7 +138,7 @@ const dashboardSlice = createSlice({
       state.statsError = null;
       state.cascadeError = null;
       state.saveError = null;
-    }
+    },
   },
   extraReducers: (builder) => {
     // fetchDashboardStats
@@ -151,7 +151,7 @@ const dashboardSlice = createSlice({
         state.statsLoading = false;
         state.stats = {
           ...state.stats,
-          ...action.payload
+          ...action.payload,
         };
         state.statsError = null;
       })
@@ -168,14 +168,21 @@ const dashboardSlice = createSlice({
       })
       .addCase(fetchCascadeData.fulfilled, (state, action) => {
         state.cascadeLoading = false;
-        state.states = Array.isArray(action.payload?.states) ? action.payload.states : [];
-        state.categories = Array.isArray(action.payload?.categories) ? action.payload.categories : [];
-        state.subcategories = Array.isArray(action.payload?.subcategories) ? action.payload.subcategories : [];
+        state.states = Array.isArray(action.payload?.states)
+          ? action.payload.states
+          : [];
+        state.categories = Array.isArray(action.payload?.categories)
+          ? action.payload.categories
+          : [];
+        state.subcategories = Array.isArray(action.payload?.subcategories)
+          ? action.payload.subcategories
+          : [];
         state.cascadeError = null;
       })
       .addCase(fetchCascadeData.rejected, (state, action) => {
         state.cascadeLoading = false;
-        state.cascadeError = action.payload || "Failed to load cascade filter data.";
+        state.cascadeError =
+          action.payload || "Failed to load cascade filter data.";
       });
 
     // addState
@@ -186,7 +193,13 @@ const dashboardSlice = createSlice({
       })
       .addCase(addState.fulfilled, (state, action) => {
         state.saving = false;
-        if (action.payload && !state.states.some((s) => s._id === action.payload._id || s.name === action.payload.name)) {
+        if (
+          action.payload &&
+          !state.states.some(
+            (s) =>
+              s._id === action.payload._id || s.name === action.payload.name,
+          )
+        ) {
           state.states.push(action.payload);
         }
         state.saveError = null;
@@ -204,7 +217,13 @@ const dashboardSlice = createSlice({
       })
       .addCase(addCategory.fulfilled, (state, action) => {
         state.saving = false;
-        if (action.payload && !state.categories.some((c) => c._id === action.payload._id || c.name === action.payload.name)) {
+        if (
+          action.payload &&
+          !state.categories.some(
+            (c) =>
+              c._id === action.payload._id || c.name === action.payload.name,
+          )
+        ) {
           state.categories.push(action.payload);
         }
         state.saveError = null;
@@ -222,7 +241,14 @@ const dashboardSlice = createSlice({
       })
       .addCase(addSubcategory.fulfilled, (state, action) => {
         state.saving = false;
-        if (action.payload && !state.subcategories.some((sub) => sub._id === action.payload._id || sub.name === action.payload.name)) {
+        if (
+          action.payload &&
+          !state.subcategories.some(
+            (sub) =>
+              sub._id === action.payload._id ||
+              sub.name === action.payload.name,
+          )
+        ) {
           state.subcategories.push(action.payload);
         }
         state.saveError = null;
@@ -231,9 +257,8 @@ const dashboardSlice = createSlice({
         state.saving = false;
         state.saveError = action.payload || "Failed to add subcategory.";
       });
-  }
+  },
 });
 
 export const { clearDashboardError } = dashboardSlice.actions;
 export default dashboardSlice.reducer;
-

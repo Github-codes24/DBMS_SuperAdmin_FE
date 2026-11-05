@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   LayoutDashboard,
   Package,
@@ -9,35 +9,39 @@ import {
   Boxes,
   BarChart3,
   UserCheck,
-  Headset,
+  PhoneCall,
   Bell,
   HelpCircle,
   LogOut,
   ChevronRight,
-  ChevronDown
-} from 'lucide-react';
+  ChevronDown,
+} from "lucide-react";
 
 export const sidebarMenuItems = [
-  { id: '02 Vendor Dashboard', label: 'Vendor Dashboard', icon: LayoutDashboard },
   {
-    id: 'products_group',
-    label: 'My Products',
+    id: "02 Vendor Dashboard",
+    label: "Vendor Dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    id: "products_group",
+    label: "My Products",
     icon: Package,
     subItems: [
-      { id: '03 My Products', label: 'All Products', icon: Package },
-      { id: '04 Add Product', label: 'Add Product', icon: PlusCircle },
-      { id: 'categories_screen', label: 'Categories', icon: FolderTree }
-    ]
+      { id: "03 My Products", label: "All Products", icon: Package },
+      { id: "04 Add Product", label: "Add Product", icon: PlusCircle },
+      { id: "categories_screen", label: "Categories", icon: FolderTree },
+    ],
   },
-  { id: '05 Orders', label: 'Orders', icon: ShoppingBag },
-  { id: '06 Customers', label: 'Customer Database', icon: Users },
-  { id: '14 Telecaller Management', label: 'Telecaller Management', icon: Headset },
+  { id: "05 Orders", label: "Orders", icon: ShoppingBag },
+  { id: "06 Customers", label: "Customer Database", icon: Users },
+  { id: "14 Telecaller Management",label: "Telecaller Management",icon: PhoneCall},
   // { id: '07 Inventory', label: 'Vendor Database', icon: Boxes },
-  { id: '08 Sales Reports', label: 'Sales Reports', icon: BarChart3 },
-  { id: '09 Profile & Settings', label: 'Profile & Settings', icon: UserCheck },
-  { id: '10 Notifications', label: 'Notifications', icon: Bell },
-  { id: '11 Help & Support', label: 'Help & Support', icon: HelpCircle },
-  { id: '12 Logout', label: 'Logout', icon: LogOut }
+  { id: "08 Sales Reports", label: "Sales Reports", icon: BarChart3 },
+  { id: "09 Profile & Settings", label: "Profile & Settings", icon: UserCheck },
+  { id: "10 Notifications", label: "Notifications", icon: Bell },
+  { id: "11 Help & Support", label: "Help & Support", icon: HelpCircle },
+  { id: "12 Logout", label: "Logout", icon: LogOut },
 ];
 
 export const VendorSidebar = ({ activeFlowItem, setActiveFlowItem }) => {
@@ -61,19 +65,23 @@ export const VendorSidebar = ({ activeFlowItem, setActiveFlowItem }) => {
           const Icon = item.icon;
 
           if (item.subItems) {
-            const isSubActive = item.subItems.some((sub) => sub.id === activeFlowItem);
+            const isSubActive = item.subItems.some(
+              (sub) => sub.id === activeFlowItem,
+            );
             return (
               <div key={item.id} className="space-y-1">
                 <button
                   onClick={() => setProductsOpen(!productsOpen)}
                   className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all ${
                     isSubActive
-                      ? 'bg-[#FFF7ED] text-[#F97316] font-bold shadow-xs border-l-4 border-[#F97316]'
-                      : 'text-[#64748B] hover:bg-slate-50 hover:text-[#172033]'
+                      ? "bg-[#FFF7ED] text-[#F97316] font-bold shadow-xs border-l-4 border-[#F97316]"
+                      : "text-[#64748B] hover:bg-slate-50 hover:text-[#172033]"
                   }`}
                 >
                   <div className="flex items-center space-x-2.5 truncate">
-                    <Icon className={`w-4 h-4 flex-shrink-0 ${isSubActive ? 'text-[#F97316]' : 'text-slate-400'}`} />
+                    <Icon
+                      className={`w-4 h-4 flex-shrink-0 ${isSubActive ? "text-[#F97316]" : "text-slate-400"}`}
+                    />
                     <span className="truncate">{item.label}</span>
                   </div>
                   {productsOpen ? (
@@ -94,15 +102,19 @@ export const VendorSidebar = ({ activeFlowItem, setActiveFlowItem }) => {
                           onClick={() => setActiveFlowItem(sub.id)}
                           className={`w-full text-left px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between transition-all ${
                             isChildActive
-                              ? 'bg-orange-50 text-[#F97316] font-bold'
-                              : 'text-[#64748B] hover:bg-slate-50 hover:text-[#172033]'
+                              ? "bg-orange-50 text-[#F97316] font-bold"
+                              : "text-[#64748B] hover:bg-slate-50 hover:text-[#172033]"
                           }`}
                         >
                           <div className="flex items-center space-x-2 truncate">
-                            <SubIcon className={`w-3.5 h-3.5 flex-shrink-0 ${isChildActive ? 'text-[#F97316]' : 'text-slate-400'}`} />
+                            <SubIcon
+                              className={`w-3.5 h-3.5 flex-shrink-0 ${isChildActive ? "text-[#F97316]" : "text-slate-400"}`}
+                            />
                             <span className="truncate">{sub.label}</span>
                           </div>
-                          {isChildActive && <ChevronRight className="w-3 h-3 text-[#F97316]" />}
+                          {isChildActive && (
+                            <ChevronRight className="w-3 h-3 text-[#F97316]" />
+                          )}
                         </button>
                       );
                     })}
@@ -120,15 +132,19 @@ export const VendorSidebar = ({ activeFlowItem, setActiveFlowItem }) => {
               onClick={() => setActiveFlowItem(item.id)}
               className={`w-full text-left px-3 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-between transition-all relative ${
                 isActive
-                  ? 'bg-[#FFF7ED] text-[#F97316] font-bold shadow-xs border-l-4 border-[#F97316]'
-                  : 'text-[#64748B] hover:bg-slate-50 hover:text-[#172033]'
+                  ? "bg-[#FFF7ED] text-[#F97316] font-bold shadow-xs border-l-4 border-[#F97316]"
+                  : "text-[#64748B] hover:bg-slate-50 hover:text-[#172033]"
               }`}
             >
               <div className="flex items-center space-x-2.5 truncate">
-                <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-[#F97316]' : 'text-slate-400'}`} />
+                <Icon
+                  className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-[#F97316]" : "text-slate-400"}`}
+                />
                 <span className="truncate">{item.label}</span>
               </div>
-              {isActive && <ChevronRight className="w-3.5 h-3.5 text-[#F97316] flex-shrink-0" />}
+              {isActive && (
+                <ChevronRight className="w-3.5 h-3.5 text-[#F97316] flex-shrink-0" />
+              )}
             </button>
           );
         })}
@@ -142,7 +158,9 @@ export const VendorSidebar = ({ activeFlowItem, setActiveFlowItem }) => {
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               <span>SYSTEM STATUS</span>
             </div>
-            <span className="bg-slate-200 text-slate-700 text-[9px] px-1.5 py-0.5 rounded font-extrabold">v2.4</span>
+            <span className="bg-slate-200 text-slate-700 text-[9px] px-1.5 py-0.5 rounded font-extrabold">
+              v2.4
+            </span>
           </div>
           <p className="text-[9px] text-[#64748B]">All Servers Operational</p>
         </div>

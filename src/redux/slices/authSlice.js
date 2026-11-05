@@ -6,10 +6,11 @@ export const loginVendor = createAsyncThunk(
   "auth/loginVendor",
   async (credentials, { rejectWithValue }) => {
     try {
-      const email = credentials.email || credentials.vendorId || credentials.loginId;
+      const email =
+        credentials.email || credentials.vendorId || credentials.loginId;
       const response = await api.post("/auth/login", {
         email,
-        password: credentials.password
+        password: credentials.password,
       });
 
       if (response.data?.token) {
@@ -24,7 +25,7 @@ export const loginVendor = createAsyncThunk(
         "Login failed. Please verify your credentials.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 // 2. Async Thunk: Fetch Vendor Profile
@@ -44,10 +45,10 @@ export const fetchVendorProfile = createAsyncThunk(
         "Failed to load vendor profile.";
       return rejectWithValue({
         message,
-        status: error.response?.status
+        status: error.response?.status,
       });
     }
-  }
+  },
 );
 
 // 3. Async Thunk: Logout Vendor
@@ -67,7 +68,7 @@ export const logoutVendor = createAsyncThunk(
         "Logout API call failed, session cleared locally.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 const initialToken = localStorage.getItem("token") || null;
@@ -79,7 +80,7 @@ const initialState = {
   error: null,
   user: null,
   token: initialToken,
-  isAuthenticated: !!initialToken
+  isAuthenticated: !!initialToken,
 };
 
 const authSlice = createSlice({
@@ -98,7 +99,7 @@ const authSlice = createSlice({
       state.token = null;
       state.isAuthenticated = false;
       localStorage.removeItem("token");
-    }
+    },
   },
   extraReducers: (builder) => {
     // loginVendor
@@ -133,7 +134,7 @@ const authSlice = createSlice({
         state.isAuthenticated = true;
         state.user = {
           ...state.user,
-          ...action.payload
+          ...action.payload,
         };
       })
       .addCase(fetchVendorProfile.rejected, (state, action) => {
@@ -167,17 +168,19 @@ const authSlice = createSlice({
       });
 
     // Handle updateVendorProfile fulfilled to keep auth.user in sync
-    builder.addCase('profile/updateVendorProfile/fulfilled', (state, action) => {
-      if (action.payload) {
-        state.user = {
-          ...state.user,
-          ...action.payload
-        };
-      }
-    });
-  }
+    builder.addCase(
+      "profile/updateVendorProfile/fulfilled",
+      (state, action) => {
+        if (action.payload) {
+          state.user = {
+            ...state.user,
+            ...action.payload,
+          };
+        }
+      },
+    );
+  },
 });
 
 export const { clearAuthError, resetAuth } = authSlice.actions;
 export default authSlice.reducer;
-

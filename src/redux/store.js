@@ -22,10 +22,9 @@ export const store = configureStore({
     reports: reportsReducer,
     profile: profileReducer,
     notifications: notificationsReducer,
-tickets: ticketsReducer,
-telecaller: telecallerReducer
-  }
+    tickets: ticketsReducer,
+    telecaller: telecallerReducer,
+  },
 });
 
 export default store;
-

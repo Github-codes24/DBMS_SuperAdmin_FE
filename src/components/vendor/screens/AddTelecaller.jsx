@@ -147,22 +147,22 @@ function AddTelecaller({ compact = false }) {
   }, [dispatch, initialSearch]);
 
   // URL updater helper
- const updateUrlParams = (updates) => {
-  const newParams = new URLSearchParams(window.location.search);
+  const updateUrlParams = (updates) => {
+    const newParams = new URLSearchParams(window.location.search);
 
-  Object.entries(updates).forEach(([key, value]) => {
-    if (!value || (value === "1" && key === "page")) {
-      newParams.delete(key);
-    } else {
-      newParams.set(key, value);
-    }
-  });
+    Object.entries(updates).forEach(([key, value]) => {
+      if (!value || (value === "1" && key === "page")) {
+        newParams.delete(key);
+      } else {
+        newParams.set(key, value);
+      }
+    });
 
-  const queryString = newParams.toString();
-  const newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash}`;
+    const queryString = newParams.toString();
+    const newUrl = `${window.location.pathname}${queryString ? `?${queryString}` : ""}${window.location.hash}`;
 
-  window.history.replaceState({}, "", newUrl);
-};
+    window.history.replaceState({}, "", newUrl);
+  };
 
   const handleSearchSubmit = (e) => {
     if (e) e.preventDefault();
@@ -298,9 +298,12 @@ function AddTelecaller({ compact = false }) {
       const updatedCount =
         result.updatedCount ?? selectedIds.length - failedIds.size;
 
-        const updatedTelecallerNames = telecallers.filter((telecaller) =>
-              selectedTelecallerIds.has(getTelecallerSelectionId(telecaller)),
-             ).map((telecaller) => telecaller.name || telecaller.fullName).filter(Boolean);
+      const updatedTelecallerNames = telecallers
+        .filter((telecaller) =>
+          selectedTelecallerIds.has(getTelecallerSelectionId(telecaller)),
+        )
+        .map((telecaller) => telecaller.name || telecaller.fullName)
+        .filter(Boolean);
 
       setSelectedTelecallerIds(failedIds);
       if (updatedCount > 0) {
@@ -308,10 +311,9 @@ function AddTelecaller({ compact = false }) {
           fetchTelecallers(submittedSearch ? { search: submittedSearch } : {}),
         );
         toast.success(
-  response.message ||
-    `${updatedCount} telecaller${updatedCount === 1 ? "" : "s"} updated successfully`
-);
-        
+          response.message ||
+            `${updatedCount} telecaller${updatedCount === 1 ? "" : "s"} updated successfully`,
+        );
       }
       if (failedIds.size > 0) {
         toast.error(
@@ -496,7 +498,6 @@ function AddTelecaller({ compact = false }) {
           password: "",
           // status: "Active",
           status: "Pending",
-
         });
         const emailSent = res?.data?.emailSent;
         const telecallerName = res?.data?.telecaller?.fullName || newTc.name;
@@ -1906,205 +1907,206 @@ function AddTelecaller({ compact = false }) {
       </div>
 
       {/* STEP 1: IMPORT TELECALLERS MODAL */}
-      {isUploadModalOpen && createPortal(
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#f26522]">
-                  <Upload size={18} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-800">
-                    Import Telecallers
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Upload an Excel or CSV file to bulk add telecallers to the
-                    Telecaller Management system.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={handleCancelUpload}
-                disabled={isProcessingFile}
-                className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer p-1 rounded-lg hover:bg-slate-200/50 disabled:opacity-40"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 space-y-4">
-              {/* Sample Template Bar */}
-              <div className="flex items-center justify-between bg-orange-50/60 border border-orange-200/70 rounded-xl p-3 text-xs">
-                <div>
-                  <div className="font-bold text-[#f26522]">
-                    Need standard telecaller template?
+      {isUploadModalOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#f26522]">
+                    <Upload size={18} />
                   </div>
-                  <div className="text-[11px] text-slate-500">
-                    Download formatted CSV template for telecaller import
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">
+                      Import Telecallers
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Upload an Excel or CSV file to bulk add telecallers to the
+                      Telecaller Management system.
+                    </p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  onClick={handleDownloadSampleTemplate}
-                  className="px-3 py-1.5 bg-white border border-orange-300 text-[#f26522] hover:bg-orange-100 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                  onClick={handleCancelUpload}
+                  disabled={isProcessingFile}
+                  className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer p-1 rounded-lg hover:bg-slate-200/50 disabled:opacity-40"
                 >
-                  <FileDown size={13} />
-                  <span>Template</span>
+                  <X size={16} />
                 </button>
               </div>
 
-              {/* Upload Drop Area or Selected File Preview */}
-              {!selectedFile ? (
-                <div
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragActive(true);
-                  }}
-                  onDragLeave={() => setDragActive(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragActive(false);
-                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-                      validateAndSetFile(e.dataTransfer.files[0]);
-                    }
-                  }}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${
-                    dragActive
-                      ? "border-[#f26522] bg-orange-50/40"
-                      : "border-slate-200 hover:border-[#f26522]/50 hover:bg-orange-50/20 bg-slate-50/40"
-                  }`}
-                >
-                  <Upload size={28} className="mx-auto text-slate-400 mb-2" />
-                  <p className="text-xs font-semibold text-slate-700 mb-1">
-                    Drag & Drop CSV or Excel file here
-                  </p>
-                  <p className="text-[11px] text-slate-400 mb-3">
-                    Supports .csv, .xlsx, .xls files up to 10MB
-                  </p>
-
+              {/* Modal Body */}
+              <div className="p-6 space-y-4">
+                {/* Sample Template Bar */}
+                <div className="flex items-center justify-between bg-orange-50/60 border border-orange-200/70 rounded-xl p-3 text-xs">
+                  <div>
+                    <div className="font-bold text-[#f26522]">
+                      Need standard telecaller template?
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      Download formatted CSV template for telecaller import
+                    </div>
+                  </div>
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#f26522] hover:bg-[#e05411] text-white text-xs font-bold rounded-xl transition-all shadow-xs pointer-events-none"
+                    onClick={handleDownloadSampleTemplate}
+                    className="px-3 py-1.5 bg-white border border-orange-300 text-[#f26522] hover:bg-orange-100 rounded-lg text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
                   >
-                    <Upload size={13} />
-                    <span>Browse File</span>
+                    <FileDown size={13} />
+                    <span>Template</span>
                   </button>
-
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={(e) =>
-                      e.target.files && validateAndSetFile(e.target.files[0])
-                    }
-                    className="hidden"
-                  />
                 </div>
-              ) : (
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Excel/CSV File
-                  </label>
-                  <div className="w-full p-4 border border-slate-200 rounded-xl bg-slate-50/80 flex items-center justify-between">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#f26522] shrink-0 border border-orange-100">
-                        <FileSpreadsheet size={20} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-bold text-slate-800 truncate">
-                          {selectedFile.name}
-                        </p>
-                        <p className="text-[11px] text-slate-500 font-medium">
-                          {formatFileSize(selectedFile.size)}
-                        </p>
-                      </div>
-                    </div>
+
+                {/* Upload Drop Area or Selected File Preview */}
+                {!selectedFile ? (
+                  <div
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragActive(true);
+                    }}
+                    onDragLeave={() => setDragActive(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setDragActive(false);
+                      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        validateAndSetFile(e.dataTransfer.files[0]);
+                      }
+                    }}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer ${
+                      dragActive
+                        ? "border-[#f26522] bg-orange-50/40"
+                        : "border-slate-200 hover:border-[#f26522]/50 hover:bg-orange-50/20 bg-slate-50/40"
+                    }`}
+                  >
+                    <Upload size={28} className="mx-auto text-slate-400 mb-2" />
+                    <p className="text-xs font-semibold text-slate-700 mb-1">
+                      Drag & Drop CSV or Excel file here
+                    </p>
+                    <p className="text-[11px] text-slate-400 mb-3">
+                      Supports .csv, .xlsx, .xls files up to 10MB
+                    </p>
+
                     <button
                       type="button"
-                      disabled={isProcessingFile}
-                      onClick={() => {
-                        setSelectedFile(null);
-                        setFileError("");
-                        if (fileInputRef.current)
-                          fileInputRef.current.value = "";
-                      }}
-                      className="px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-red-600 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#f26522] hover:bg-[#e05411] text-white text-xs font-bold rounded-xl transition-all shadow-xs pointer-events-none"
                     >
-                      Change
+                      <Upload size={13} />
+                      <span>Browse File</span>
                     </button>
+
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={(e) =>
+                        e.target.files && validateAndSetFile(e.target.files[0])
+                      }
+                      className="hidden"
+                    />
                   </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls,.csv"
-                    onChange={(e) =>
-                      e.target.files && validateAndSetFile(e.target.files[0])
-                    }
-                    className="hidden"
-                  />
-                </div>
-              )}
-
-              {/* Error Message */}
-              {fileError && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-xs text-red-600 font-medium">
-                  <AlertCircle size={15} className="shrink-0 text-red-500" />
-                  <span>{fileError}</span>
-                </div>
-              )}
-
-              {/* Processing Progress Status */}
-              {isProcessingFile && (
-                <div className="p-3 bg-orange-50/60 border border-orange-200/80 rounded-xl flex items-center gap-2.5 text-xs text-orange-800 font-medium">
-                  <Loader2
-                    size={15}
-                    className="animate-spin text-[#f26522] shrink-0"
-                  />
-                  <span>
-                    Verifying structure and validating telecaller records...
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="flex items-center justify-end gap-2 px-6 py-3.5 border-t border-slate-100 bg-slate-50">
-              <button
-                type="button"
-                disabled={isProcessingFile}
-                onClick={handleCancelUpload}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!selectedFile || isProcessingFile}
-                onClick={handleProcessUploadFile}
-                className="px-5 py-2 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
-              >
-                {isProcessingFile ? (
-                  <>
-                    <Loader2 size={13} className="animate-spin" />
-                    <span>Processing...</span>
-                  </>
                 ) : (
-                  <>
-                    <Upload size={13} />
-                    <span>Upload File</span>
-                  </>
-                )}
-              </button>
-            </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700">
+                      Excel/CSV File
+                    </label>
+                    <div className="w-full p-4 border border-slate-200 rounded-xl bg-slate-50/80 flex items-center justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-[#f26522] shrink-0 border border-orange-100">
+                          <FileSpreadsheet size={20} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-800 truncate">
+                            {selectedFile.name}
+                          </p>
+                          <p className="text-[11px] text-slate-500 font-medium">
+                            {formatFileSize(selectedFile.size)}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isProcessingFile}
+                        onClick={() => {
+                          setSelectedFile(null);
+                          setFileError("");
+                          if (fileInputRef.current)
+                            fileInputRef.current.value = "";
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:text-red-600 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        Change
+                      </button>
                     </div>
-        </div>,
-        document.body
-      )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={(e) =>
+                        e.target.files && validateAndSetFile(e.target.files[0])
+                      }
+                      className="hidden"
+                    />
+                  </div>
+                )}
+
+                {/* Error Message */}
+                {fileError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-center gap-2 text-xs text-red-600 font-medium">
+                    <AlertCircle size={15} className="shrink-0 text-red-500" />
+                    <span>{fileError}</span>
+                  </div>
+                )}
+
+                {/* Processing Progress Status */}
+                {isProcessingFile && (
+                  <div className="p-3 bg-orange-50/60 border border-orange-200/80 rounded-xl flex items-center gap-2.5 text-xs text-orange-800 font-medium">
+                    <Loader2
+                      size={15}
+                      className="animate-spin text-[#f26522] shrink-0"
+                    />
+                    <span>
+                      Verifying structure and validating telecaller records...
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-2 px-6 py-3.5 border-t border-slate-100 bg-slate-50">
+                <button
+                  type="button"
+                  disabled={isProcessingFile}
+                  onClick={handleCancelUpload}
+                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedFile || isProcessingFile}
+                  onClick={handleProcessUploadFile}
+                  className="px-5 py-2 text-xs font-bold text-white bg-[#f26522] hover:bg-[#e05411] rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-xs"
+                >
+                  {isProcessingFile ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin" />
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={13} />
+                      <span>Upload File</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {/* STEP 2: IMPORT REVIEW & PREVIEW MODAL */}
       {isReviewModalOpen && (
