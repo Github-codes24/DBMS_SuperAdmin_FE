@@ -147,6 +147,7 @@ export default function EditVendorModal({
       state: formData.state,
       city: formData.city,
       locality: formData.locality,
+      pinCode: formData.pinCode,
       isPaidVendor: formData.paid === "Yes",
       address: formData.address,
       fullAddress: formData.address,
@@ -448,7 +449,8 @@ export default function EditVendorModal({
                     <input
                       type="text"
                       className="form-control"
-                      value={formData.vendorCode}
+                      // value={formData.vendorCode || formData.customerId || vendor.customerId || ""}
+                      value={vendor?.customerId || formData.customerId || ""}
                       disabled
                       readOnly
                       title="Vendor Code cannot be edited"
@@ -554,7 +556,18 @@ export default function EditVendorModal({
                       placeholder="Locality"
                     />
                   </div>
-
+                  <div className="form-group">
+                    <label>Pin Code:</label>
+                    <input
+                      type="text"
+                      name="pinCode"
+                      className="form-control"
+                      value={formData.pinCode || ""}
+                      onChange={handleChange}
+                      placeholder="Enter Pin Code"
+                      maxLength={6}
+                    />
+                  </div>
                   <div className="form-group">
                     <label>Email:</label>
                     <input

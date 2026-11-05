@@ -115,7 +115,7 @@ export default function App() {
 
       const mappedVendors = apiVendors.map((createdVendor) => ({
         id: createdVendor._id,
-         status: createdVendor.status || "",
+        status: createdVendor.status || "",
         vendorCode:
           createdVendor.vendorCode ||
           createdVendor.vendorId ||
@@ -156,18 +156,17 @@ export default function App() {
       }));
 
       const finalVendors = mappedVendors.filter(
-  (v) =>
-    v.status?.toLowerCase() !== "blocked" &&
-    (
-      (v.phone && v.phone.toLowerCase().includes(term)) ||
-      (v.alternatePhone && v.alternatePhone.toLowerCase().includes(term)) ||
-      (v.whatsappNo && v.whatsappNo.toLowerCase().includes(term)) ||
-      (v.vendorCode && v.vendorCode.toLowerCase().includes(term)) ||
-      (v.company && v.company.toLowerCase().includes(term)) ||
-      (v.vendorName && v.vendorName.toLowerCase().includes(term)) ||
-      (v.city && v.city.toLowerCase().includes(term))
-    ),
-);
+        (v) =>
+          v.status?.toLowerCase() !== "blocked" &&
+          ((v.phone && v.phone.toLowerCase().includes(term)) ||
+            (v.alternatePhone &&
+              v.alternatePhone.toLowerCase().includes(term)) ||
+            (v.whatsappNo && v.whatsappNo.toLowerCase().includes(term)) ||
+            (v.vendorCode && v.vendorCode.toLowerCase().includes(term)) ||
+            (v.company && v.company.toLowerCase().includes(term)) ||
+            (v.vendorName && v.vendorName.toLowerCase().includes(term)) ||
+            (v.city && v.city.toLowerCase().includes(term))),
+      );
       setVendors(finalVendors);
     } catch (err) {
       console.error(err);
@@ -233,7 +232,13 @@ export default function App() {
       if (createdVendor) {
         const mappedVendor = {
           id: createdVendor._id,
-          vendorCode: createdVendor.vendorId,
+          // vendorCode: createdVendor.vendorId,
+          vendorCode:
+            createdVendor.vendorCode ||
+            createdVendor.vendorId ||
+            createdVendor.customerId ||
+            "",
+          customerId: createdVendor.customerId || "",
           // company: createdVendor.storeName || '',
           company: createdVendor.companyName || createdVendor.storeName || "",
           vendorName:
