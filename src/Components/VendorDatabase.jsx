@@ -228,13 +228,6 @@ function VendorDatabase({ compact = false }) {
       placeholder: "e.g. 102 Commerce Hub, MG Road",
       required: false,
     },
-    {
-      id: "field-3",
-      label: "Pincode",
-      type: "text",
-      placeholder: "e.g. 400001",
-      required: false,
-    },
   ]);
   const [isCustomFieldModalOpen, setIsCustomFieldModalOpen] = useState(false);
   const [newCustomField, setNewCustomField] = useState({
@@ -246,6 +239,7 @@ function VendorDatabase({ compact = false }) {
 
   // Add Vendor Form State
   const [showAddPassword, setShowAddPassword] = useState(false);
+  const [showViewPassword, setShowViewPassword] = useState(true);
   const [newVendor, setNewVendor] = useState({
     srNo: "",
     vendorCode: "",
@@ -351,7 +345,8 @@ function VendorDatabase({ compact = false }) {
       email: v.email || "-",
       gstNo: v.gstin || "-",
       address: v.completeAddress || "-",
-      pincode: v.pincode || "-",
+      pincode: v.pinCode || v.pincode || "-",
+      pinCode: v.pinCode || v.pincode || "-",
       status: v.status,
       state: v.state || "-",
       city: v.city || "-",
@@ -359,6 +354,7 @@ function VendorDatabase({ compact = false }) {
       referCode: v.referCode || v.referralCode || v.refCode || "-",
       agentName: v.agentName || v.assignedAgent || v.agent || "-",
       mappedCustomers: v.mappedCustomers ?? 0,
+      password: v.password || "",
     };
   });
 
@@ -622,12 +618,16 @@ function VendorDatabase({ compact = false }) {
 
   const handleAddVendorSubmit = (e) => {
     e.preventDefault();
-    // if (!newVendor.name || !newVendor.category) {
-    //   alert("Please fill in Vendor Name and Category");
-    //   return;
-    // }
+    if (!newVendor.name || !newVendor.category) {
+      alert("Please fill in Vendor Name and Category");
+      return;
+    }
     if (!newVendor.name) {
       alert("Please fill in Vendor Name");
+      return;
+    }
+    if (!newVendor.state) {
+      alert("Please fill in State");
       return;
     }
 
@@ -653,6 +653,8 @@ function VendorDatabase({ compact = false }) {
         password: newVendor.password,
         state: newVendor.state,
         city: newVendor.city,
+        pincode: newVendor.pincode,
+        pinCode: newVendor.pincode,
         status: newVendor.status,
       }),
     )
@@ -1264,7 +1266,7 @@ function VendorDatabase({ compact = false }) {
               className="px-3.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-[#f26522] border border-orange-200/80 rounded-xl text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
             >
               <Plus size={15} />
-              <span>+ Add Custom Field</span>
+              <span>Add Custom Field</span>
             </button>
           </div>
         </div>
@@ -1297,7 +1299,7 @@ function VendorDatabase({ compact = false }) {
               </div>
 
               {/* Category section commented out */}
-              {/* <div>
+              <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Category *
                 </label>
@@ -1325,7 +1327,7 @@ function VendorDatabase({ compact = false }) {
                     </option>
                   ))}
                 </select>
-              </div> */}
+              </div>
 
               {/* <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -1379,9 +1381,36 @@ function VendorDatabase({ compact = false }) {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
-                  State
+                  Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showAddPassword ? "text" : "password"}
+                    name="vendor_new_password"
+                    autoComplete="new-password"
+                    placeholder="Enter vendor login password"
+                    value={newVendor.password || ""}
+                    onChange={(e) =>
+                      setNewVendor({ ...newVendor, password: e.target.value })
+                    }
+                    className="w-full px-3.5 py-2 pr-8 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAddPassword(!showAddPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showAddPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  State *
                 </label>
                 <select
+                  required
                   value={newVendor.state}
                   onChange={(e) =>
                     setNewVendor({
@@ -1431,6 +1460,23 @@ function VendorDatabase({ compact = false }) {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Pincode
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  placeholder="e.g. 110001"
+                  value={newVendor.pincode || ""}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                    setNewVendor({ ...newVendor, pincode: val });
+                  }}
+                  className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
                   Status
                 </label>
                 <select
@@ -1443,32 +1489,6 @@ function VendorDatabase({ compact = false }) {
                   <option value="Pending">Pending</option>
                   <option value="Active">Active</option>
                 </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showAddPassword ? "text" : "password"}
-                    name="vendor_new_password"
-                    autoComplete="new-password"
-                    placeholder="Enter vendor login password"
-                    value={newVendor.password || ""}
-                    onChange={(e) =>
-                      setNewVendor({ ...newVendor, password: e.target.value })
-                    }
-                    className="w-full px-3.5 py-2 pr-8 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowAddPassword(!showAddPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                  >
-                    {showAddPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                </div>
               </div>
 
               <div className="md:col-span-2">
@@ -1508,7 +1528,7 @@ function VendorDatabase({ compact = false }) {
                 className="px-3 py-1.5 bg-orange-100 hover:bg-[#f26522] text-[#f26522] hover:text-white rounded-xl text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
               >
                 <Plus size={14} />
-                <span>+ Add Field</span>
+                <span>Add Field</span>
               </button>
             </div>
 
@@ -2281,6 +2301,54 @@ function VendorDatabase({ compact = false }) {
               </div>
             </div>
           </div>
+
+          {/* Credentials */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-5 space-y-3 md:col-span-2">
+            <h3 className="text-xs font-black uppercase text-slate-700 tracking-wider flex items-center gap-2">
+              <Key size={15} className="text-[#f26522]" />
+              <span>Credentials</span>
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div>
+                <span className="text-[10px] text-slate-500 block font-bold uppercase">
+                  Username
+                </span>
+                <span className="font-extrabold text-slate-900 text-sm">
+                  {ven.email && ven.email !== "-" ? ven.email : "N/A"}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 block font-bold uppercase">
+                  Password
+                </span>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="font-mono font-extrabold text-slate-900 text-sm">
+                    {ven.password
+                      ? showViewPassword
+                        ? ven.password
+                        : "••••••••"
+                      : "Not set"}
+                  </span>
+                  {ven.password && (
+                    <button
+                      type="button"
+                      onClick={() => setShowViewPassword(!showViewPassword)}
+                      className="text-slate-400 hover:text-slate-600 cursor-pointer p-0.5 transition-colors"
+                      title={
+                        showViewPassword ? "Hide password" : "Show password"
+                      }
+                    >
+                      {showViewPassword ? (
+                        <EyeOff size={14} />
+                      ) : (
+                        <Eye size={14} />
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -2359,7 +2427,7 @@ function VendorDatabase({ compact = false }) {
             </div>
 
             {/* Category section commented out */}
-            {/* <div>
+            <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
                 Category *
               </label>
@@ -2375,7 +2443,7 @@ function VendorDatabase({ compact = false }) {
                 }
                 className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
               />
-            </div> */}
+            </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -2383,14 +2451,10 @@ function VendorDatabase({ compact = false }) {
               </label>
               <input
                 type="text"
+                disabled
+                readOnly
                 value={editingVendor.vendorCode}
-                onChange={(e) =>
-                  setEditingVendor({
-                    ...editingVendor,
-                    vendorCode: e.target.value,
-                  })
-                }
-                className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
+                className="w-full px-3.5 py-2 text-xs bg-slate-100 text-slate-500 border border-slate-200 rounded-xl cursor-not-allowed focus:outline-none select-none"
               />
             </div>
 

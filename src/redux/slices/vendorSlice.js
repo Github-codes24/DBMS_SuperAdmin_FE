@@ -1,178 +1,228 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import api from '../../services/api';
-import { toast } from 'react-toastify';
+import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import api from "../../services/api";
+import { toast } from "react-toastify";
 
 // 19. Search / List Vendors API
 export const fetchVendors = createAsyncThunk(
-  'vendor/fetchVendors',
+  "vendor/fetchVendors",
   async (queryParams = {}, { rejectWithValue }) => {
     try {
       const params = {};
       if (queryParams.search) params.search = queryParams.search;
-      if (queryParams.state && queryParams.state !== 'All') params.state = queryParams.state;
-      if (queryParams.city && queryParams.city !== 'All') params.city = queryParams.city;
+      if (queryParams.state && queryParams.state !== "All")
+        params.state = queryParams.state;
+      if (queryParams.city && queryParams.city !== "All")
+        params.city = queryParams.city;
       if (queryParams.page) params.page = queryParams.page;
       if (queryParams.limit) params.limit = queryParams.limit || 10;
 
-      const response = await api.get('/superadmin/vendors', { params });
+      const response = await api.get("/superadmin/vendors", { params });
       return response.data;
     } catch (error) {
       // Fallback to legacy get route if search route fails
       try {
-        const fallbackRes = await api.get('/superadmin/vendors');
+        const fallbackRes = await api.get("/superadmin/vendors");
         return fallbackRes.data;
       } catch (e) {
-        const message = error.response?.data?.message || 'Failed to fetch vendors list.';
+        const message =
+          error.response?.data?.message || "Failed to fetch vendors list.";
         return rejectWithValue(message);
       }
     }
-  }
+  },
 );
 
 export const fetchVendorDetail = createAsyncThunk(
-  'vendor/fetchVendorDetail',
+  "vendor/fetchVendorDetail",
   async (vendorId, { rejectWithValue }) => {
     try {
       const response = await api.get(`/superadmin/vendors/${vendorId}`);
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to fetch vendor details.';
+      const message =
+        error.response?.data?.message || "Failed to fetch vendor details.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 // 17. Create Vendor API
 export const createVendor = createAsyncThunk(
-  'vendor/createVendor',
+  "vendor/createVendor",
   async (vendorData, { dispatch, rejectWithValue }) => {
     try {
       const formattedData = {
         vendorName: vendorData.vendorName || vendorData.name,
-        ownerName: vendorData.ownerName || '',
-        category: vendorData.category || '',
-        contactNo: vendorData.contactNo || vendorData.mobile || '',
-        email: vendorData.email || '',
-        state: vendorData.state || '',
-        city: vendorData.city || '',
-        pincode: vendorData.pincode || '',
-        completeAddress: vendorData.completeAddress || vendorData.address || '',
-        gstin: vendorData.gstin || vendorData.gstNo || '',
-        password: vendorData.password || '',
-        status: vendorData.status || 'Pending'
+        ownerName: vendorData.ownerName || "",
+        category: vendorData.category || "",
+        contactNo: vendorData.contactNo || vendorData.mobile || "",
+        email: vendorData.email || "",
+        state: vendorData.state || "",
+        city: vendorData.city || "",
+        pincode: vendorData.pincode || vendorData.pinCode || "",
+        pinCode: vendorData.pinCode || vendorData.pincode || "",
+        completeAddress: vendorData.completeAddress || vendorData.address || "",
+        gstin: vendorData.gstin || vendorData.gstNo || "",
+        password: vendorData.password || "",
+        status: vendorData.status || "Pending",
       };
 
-      const response = await api.post('/superadmin/vendors', formattedData);
-      toast.success(response.data.message || 'Vendor created successfully and is pending approval.');
+      const response = await api.post("/superadmin/vendors", formattedData);
+      toast.success(
+        response.data.message ||
+          "Vendor created successfully and is pending approval.",
+      );
       dispatch(fetchVendors());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to create vendor.';
+      const message =
+        error.response?.data?.message || "Failed to create vendor.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 // 18. Activate Vendor API
 export const activateVendor = createAsyncThunk(
-  'vendor/activateVendor',
+  "vendor/activateVendor",
   async (vendorId, { dispatch, rejectWithValue }) => {
     try {
-      const response = await api.patch(`/superadmin/vendors/${vendorId}/activate`);
+      const response = await api.patch(
+        `/superadmin/vendors/${vendorId}/activate`,
+      );
       const emailSent = response.data.data?.emailSent;
       if (emailSent === true) {
-        toast.success('Vendor activated and credentials sent successfully.');
+        toast.success("Vendor activated and credentials sent successfully.");
       } else {
-        toast.success(response.data.message || 'Vendor activated successfully.');
+        toast.success(
+          response.data.message || "Vendor activated successfully.",
+        );
       }
       dispatch(fetchVendors());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to activate vendor.';
+      const message =
+        error.response?.data?.message || "Failed to activate vendor.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const updateVendor = createAsyncThunk(
-  'vendor/updateVendor',
+  "vendor/updateVendor",
   async ({ vendorId, updateData }, { dispatch, rejectWithValue }) => {
     try {
-      const response = await api.patch(`/superadmin/vendors/${vendorId}`, updateData);
+      const response = await api.patch(
+        `/superadmin/vendors/${vendorId}`,
+        updateData,
+      );
       // toast.success(response.data.message || 'Vendor updated successfully');
       dispatch(fetchVendors());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to update vendor.';
+      const message =
+        error.response?.data?.message || "Failed to update vendor.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const bulkUpdateVendorStatuses = createAsyncThunk(
-  'vendor/bulkUpdateStatuses',
+  "vendor/bulkUpdateStatuses",
   async (vendors, { rejectWithValue }) => {
     try {
-      const response = await api.patch('/superadmin/vendors/bulk-status', { vendors });
+      const response = await api.patch("/superadmin/vendors/bulk-status", {
+        vendors,
+      });
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to update selected vendor statuses.';
+      const message =
+        error.response?.data?.message ||
+        "Failed to update selected vendor statuses.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const bulkDeleteVendors = createAsyncThunk(
-  'vendor/bulkDelete',
+  "vendor/bulkDelete",
   async (vendorIds, { rejectWithValue }) => {
     try {
-      const response = await api.patch('/superadmin/vendors/bulk-delete', { vendorIds });
+      const response = await api.patch("/superadmin/vendors/bulk-delete", {
+        vendorIds,
+      });
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to delete selected vendors.';
+      const message =
+        error.response?.data?.message || "Failed to delete selected vendors.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const changeVendorPassword = createAsyncThunk(
-  'vendor/changeVendorPassword',
-  async ({ vendorId, password, newPassword, notifyVendor }, { dispatch, rejectWithValue }) => {
+  "vendor/changeVendorPassword",
+  async (
+    { vendorId, password, newPassword, notifyVendor },
+    { dispatch, rejectWithValue },
+  ) => {
     const pwdToSet = newPassword || password;
     try {
       let response;
       try {
-        response = await api.patch(`/superadmin/vendors/${vendorId}/password`, { newPassword: pwdToSet });
+        response = await api.patch(`/superadmin/vendors/${vendorId}/password`, {
+          newPassword: pwdToSet,
+        });
       } catch (err) {
         try {
-          response = await api.patch(`/superadmin/vendors/${vendorId}/change-password`, { password: pwdToSet, newPassword: pwdToSet, notifyVendor });
+          response = await api.patch(
+            `/superadmin/vendors/${vendorId}/change-password`,
+            { password: pwdToSet, newPassword: pwdToSet, notifyVendor },
+          );
         } catch (err2) {
-          response = await api.patch(`/superadmin/vendors/${vendorId}`, { password: pwdToSet, newPassword: pwdToSet, notifyVendor });
+          response = await api.patch(`/superadmin/vendors/${vendorId}`, {
+            password: pwdToSet,
+            newPassword: pwdToSet,
+            notifyVendor,
+          });
         }
       }
-      toast.success(response.data?.message || 'Vendor password changed successfully');
+      toast.success(
+        response.data?.message || "Vendor password changed successfully",
+      );
       dispatch(fetchVendors());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to change vendor password.';
+      const message =
+        error.response?.data?.message || "Failed to change vendor password.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 export const deleteVendor = createAsyncThunk(
-  'vendor/deleteVendor',
+  "vendor/deleteVendor",
   async (vendorIdParam, { dispatch, rejectWithValue }) => {
-    const vCode = typeof vendorIdParam === 'object'
-      ? (vendorIdParam.vendorCode || vendorIdParam.vendorId || (typeof vendorIdParam.primaryId === 'string' && vendorIdParam.primaryId.startsWith('VEN') ? vendorIdParam.primaryId : null))
-      : vendorIdParam;
-    const mongoId = typeof vendorIdParam === 'object'
-      ? (vendorIdParam._id || vendorIdParam.id || vendorIdParam.secondaryId || vendorIdParam.primaryId)
-      : null;
+    const vCode =
+      typeof vendorIdParam === "object"
+        ? vendorIdParam.vendorCode ||
+          vendorIdParam.vendorId ||
+          (typeof vendorIdParam.primaryId === "string" &&
+          vendorIdParam.primaryId.startsWith("VEN")
+            ? vendorIdParam.primaryId
+            : null)
+        : vendorIdParam;
+    const mongoId =
+      typeof vendorIdParam === "object"
+        ? vendorIdParam._id ||
+          vendorIdParam.id ||
+          vendorIdParam.secondaryId ||
+          vendorIdParam.primaryId
+        : null;
 
     const idsToTry = Array.from(new Set([vCode, mongoId].filter(Boolean)));
 
@@ -190,7 +240,9 @@ export const deleteVendor = createAsyncThunk(
       try {
         const response = await makeAttempt();
         if (response.status >= 200 && response.status < 300) {
-          toast.success(response.data?.message || 'Vendor deleted successfully');
+          toast.success(
+            response.data?.message || "Vendor deleted successfully",
+          );
           dispatch(fetchVendors());
           return response.data;
         }
@@ -199,97 +251,117 @@ export const deleteVendor = createAsyncThunk(
       }
     }
 
-    const message = lastError?.response?.data?.message || 'Failed to delete vendor.';
+    const message =
+      lastError?.response?.data?.message || "Failed to delete vendor.";
     toast.error(message);
     return rejectWithValue(message);
-  }
+  },
 );
 
 export const bulkImportVendors = createAsyncThunk(
-  'vendor/bulkImportVendors',
+  "vendor/bulkImportVendors",
   async (file, { dispatch, rejectWithValue }) => {
     try {
       const formData = new FormData();
-      formData.append('file', file);
-      const response = await api.post('/superadmin/vendors/import', formData, {
+      formData.append("file", file);
+      const response = await api.post("/superadmin/vendors/import", formData, {
         headers: {
-          'Content-Type': 'multipart/form-data',
+          "Content-Type": "multipart/form-data",
         },
       });
-      toast.success(response.data.message || 'Import completed successfully');
+      toast.success(response.data.message || "Import completed successfully");
       dispatch(fetchVendors());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to import vendor records.';
+      const message =
+        error.response?.data?.message || "Failed to import vendor records.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 // 20. Get Vendor Form Fields API
 export const fetchVendorFormFields = createAsyncThunk(
-  'vendor/fetchVendorFormFields',
+  "vendor/fetchVendorFormFields",
   async (_, { rejectWithValue }) => {
     try {
-      const response = await api.get('/superadmin/vendors/form-fields');
+      const response = await api.get("/superadmin/vendors/form-fields");
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to fetch vendor form fields.';
+      const message =
+        error.response?.data?.message || "Failed to fetch vendor form fields.";
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 // 21. Create Vendor Form Field API
 export const createVendorFormField = createAsyncThunk(
-  'vendor/createVendorFormField',
+  "vendor/createVendorFormField",
   async (fieldData, { dispatch, rejectWithValue }) => {
     try {
-      const response = await api.post('/superadmin/vendors/form-fields', fieldData);
-      toast.success(response.data.message || 'Vendor form field created successfully.');
+      const response = await api.post(
+        "/superadmin/vendors/form-fields",
+        fieldData,
+      );
+      toast.success(
+        response.data.message || "Vendor form field created successfully.",
+      );
       dispatch(fetchVendorFormFields());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to create vendor form field.';
+      const message =
+        error.response?.data?.message || "Failed to create vendor form field.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 // 22. Update Vendor Form Field API
 export const updateVendorFormField = createAsyncThunk(
-  'vendor/updateVendorFormField',
+  "vendor/updateVendorFormField",
   async ({ fieldId, updateData }, { dispatch, rejectWithValue }) => {
     try {
-      const response = await api.patch(`/superadmin/vendors/form-fields/${fieldId}`, updateData);
-      toast.success(response.data.message || 'Vendor form field updated successfully.');
+      const response = await api.patch(
+        `/superadmin/vendors/form-fields/${fieldId}`,
+        updateData,
+      );
+      toast.success(
+        response.data.message || "Vendor form field updated successfully.",
+      );
       dispatch(fetchVendorFormFields());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to update vendor form field.';
+      const message =
+        error.response?.data?.message || "Failed to update vendor form field.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 // 23. Delete Vendor Form Field API
 export const deleteVendorFormField = createAsyncThunk(
-  'vendor/deleteVendorFormField',
+  "vendor/deleteVendorFormField",
   async (fieldId, { dispatch, rejectWithValue }) => {
     try {
-      const response = await api.delete(`/superadmin/vendors/form-fields/${fieldId}`);
-      toast.success(response.data.message || 'Vendor form field removed successfully.');
+      const response = await api.delete(
+        `/superadmin/vendors/form-fields/${fieldId}`,
+      );
+      toast.success(
+        response.data.message || "Vendor form field removed successfully.",
+      );
       dispatch(fetchVendorFormFields());
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to delete vendor form field.';
+      const message =
+        error.response?.data?.message || "Failed to delete vendor form field.";
       toast.error(message);
       return rejectWithValue(message);
     }
-  }
+  },
 );
 
 const initialState = {
@@ -308,12 +380,12 @@ const initialState = {
 };
 
 const vendorSlice = createSlice({
-  name: 'vendor',
+  name: "vendor",
   initialState,
   reducers: {
     clearSelectedVendor: (state) => {
       state.selectedVendor = null;
-    }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -324,17 +396,24 @@ const vendorSlice = createSlice({
       })
       .addCase(fetchVendors.fulfilled, (state, action) => {
         state.loading = false;
-        const raw = action.payload.data || action.payload.vendors || (Array.isArray(action.payload) ? action.payload : []);
-        state.vendors = Array.isArray(raw) ? raw.filter((v) =>
-          !v.isDeleted &&
-          v.status !== 'Deleted' &&
-          !state.deletedVendorIds.includes(v._id) &&
-          !state.deletedVendorIds.includes(v.vendorId) &&
-          !state.deletedVendorIds.includes(v.vendorCode) &&
-          !state.deletedVendorIds.includes(v.id)
-        ) : [];
+        const raw =
+          action.payload.data ||
+          action.payload.vendors ||
+          (Array.isArray(action.payload) ? action.payload : []);
+        state.vendors = Array.isArray(raw)
+          ? raw.filter(
+              (v) =>
+                !v.isDeleted &&
+                v.status !== "Deleted" &&
+                !state.deletedVendorIds.includes(v._id) &&
+                !state.deletedVendorIds.includes(v.vendorId) &&
+                !state.deletedVendorIds.includes(v.vendorCode) &&
+                !state.deletedVendorIds.includes(v.id),
+            )
+          : [];
         const pag = action.payload.pagination;
-        state.totalVendors = pag?.total || action.payload.totalVendors || state.vendors.length;
+        state.totalVendors =
+          pag?.total || action.payload.totalVendors || state.vendors.length;
         state.totalPages = pag?.totalPages || action.payload.totalPages || 1;
         state.currentPage = pag?.page || action.payload.currentPage || 1;
       })
@@ -401,16 +480,29 @@ const vendorSlice = createSlice({
         state.isSaving = false;
         const resData = action.payload?.data;
         const arg = action.meta.arg;
-        const primaryId = typeof arg === 'object' ? (arg.primaryId || arg.vendorId) : arg;
-        const secondaryId = typeof arg === 'object' ? arg.secondaryId : null;
+        const primaryId =
+          typeof arg === "object" ? arg.primaryId || arg.vendorId : arg;
+        const secondaryId = typeof arg === "object" ? arg.secondaryId : null;
         const deletedVendorId = resData?.vendorId || action.payload?.vendorId;
 
-        const idsToRemove = [primaryId, secondaryId, deletedVendorId].filter(Boolean);
-        state.deletedVendorIds = Array.from(new Set([...state.deletedVendorIds, ...idsToRemove]));
+        const idsToRemove = [primaryId, secondaryId, deletedVendorId].filter(
+          Boolean,
+        );
+        state.deletedVendorIds = Array.from(
+          new Set([...state.deletedVendorIds, ...idsToRemove]),
+        );
 
         if (state.vendors && Array.isArray(state.vendors)) {
           state.vendors = state.vendors.filter((v) => {
-            if (idsToRemove.some((id) => v.vendorId === id || v.vendorCode === id || v._id === id || v.id === id)) {
+            if (
+              idsToRemove.some(
+                (id) =>
+                  v.vendorId === id ||
+                  v.vendorCode === id ||
+                  v._id === id ||
+                  v.id === id,
+              )
+            ) {
               return false;
             }
             return true;
