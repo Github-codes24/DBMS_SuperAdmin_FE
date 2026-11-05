@@ -14,7 +14,7 @@ export const fetchVendors = createAsyncThunk(
       if (queryParams.page) params.page = queryParams.page;
       if (queryParams.limit) params.limit = queryParams.limit || 10;
 
-      const response = await api.get('/superadmin/vendors/search', { params });
+      const response = await api.get('/superadmin/vendors', { params });
       return response.data;
     } catch (error) {
       // Fallback to legacy get route if search route fails

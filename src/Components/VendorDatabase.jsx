@@ -583,7 +583,7 @@ function VendorDatabase({ compact = false }) {
       try {
         const response = await api.get(
           getDashboardApiUrl(
-            `/dashboard/projects/${encodeURIComponent("PID-005")}/categories`,
+            `/dashboard/${encodeURIComponent("PID-005")}/categories`,
           ),
           { params: { limit: 100 } },
         );
@@ -622,6 +622,11 @@ function VendorDatabase({ compact = false }) {
     // }
     if (!newVendor.name) {
       alert("Please fill in Vendor Name");
+      return;
+    }
+
+    if (newVendor.contactNo && !/^\d{10}$/.test(newVendor.contactNo.trim())) {
+      alert("Please enter a valid 10-digit contact number");
       return;
     }
 
@@ -1333,11 +1338,14 @@ function VendorDatabase({ compact = false }) {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. +91 98765 43210"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="e.g. 9876543210"
                   value={newVendor.contactNo}
-                  onChange={(e) =>
-                    setNewVendor({ ...newVendor, contactNo: e.target.value })
-                  }
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    setNewVendor({ ...newVendor, contactNo: val });
+                  }}
                   className="w-full px-3.5 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#f26522]/30"
                 />
               </div>
