@@ -1,14 +1,25 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowDownUp,
+  ArrowLeft,
   BriefcaseBusiness,
+  Calendar,
   Check,
   ChevronDown,
   CircleCheck,
   Clock3,
-  Eye,
+  ExternalLink,
   FolderKanban,
+  LayoutGrid,
+  Link as LinkIcon,
   Mail,
   Menu,
   CalendarClock,
@@ -21,19 +32,22 @@ import {
   Trash2,
   UserRound,
   UserRoundPlus,
+  Users,
   UsersRound,
   X,
 } from 'lucide-react'
 import AdminSidebar from '../../components/AdminSidebar'
 import AuthNavbarAction from '../../components/AuthNavbarAction'
 import {
+  DEFAULT_PROJECT_THEME,
   initialProjectAdmins,
-  initialProjects,
   projectStatuses,
   type ManagedProject,
+  type PanelLink,
   type ProjectAdmin,
   type ProjectAdminStatus,
   type ProjectStatus,
+  type UserType,
 } from './projectData'
 import './projectManagement.css'
 import { getFromStorage, saveToStorage } from '../../utils/storage'
@@ -45,30 +59,24 @@ import {
   updateProject,
 } from './projectService'
 
+// ─── Types ───────────────────────────────────────────────────────────────────
 type ProjectForm = Omit<ManagedProject, 'id'>
 type ProjectAdminForm = Omit<ProjectAdmin, 'id'>
 type SortField = 'name' | 'startDate'
 
-const PROJECT_DATA_STORAGE_KEY = 'platform-admin.project-management'
 const PROJECT_ADMINS_STORAGE_KEY = 'platform-admin.project-admins'
-
-interface ProjectManagementData {
-  projects: ManagedProject[]
-  admins: ProjectAdmin[]
-}
-
-const initialProjectData: ProjectManagementData = {
-  projects: initialProjects,
-  admins: initialProjectAdmins,
-}
 
 const emptyProjectForm: ProjectForm = {
   name: '',
   description: '',
+  logo: '',
+  theme: DEFAULT_PROJECT_THEME,
   startDate: '',
   endDate: '',
   status: 'Upcoming',
   adminId: '',
+  panelLinks: [],
+  userTypes: [],
 }
 
 const emptyAdminForm: ProjectAdminForm = {
@@ -80,620 +88,56 @@ const emptyAdminForm: ProjectAdminForm = {
   projectIds: [],
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 function formatDate(value: string) {
   if (!value) return '—'
   return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+    day: '2-digit', month: 'short', year: 'numeric',
   }).format(new Date(`${value}T12:00:00`))
 }
 
 function initials(name: string) {
-  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0] ?? '').join('').toUpperCase()
+  return name.trim().split(/\s+/).slice(0, 2).map((p) => p[0] ?? '').join('').toUpperCase()
+}
+
+function totalUsers(project: ManagedProject) {
+  return project.userTypes.reduce((s, ut) => s + (ut.count || 0), 0)
+}
+
+function statusClass(status: ProjectStatus): string {
+  return status.toLowerCase().replace(/\s+/g, '-')
 }
 
 function isProjectAdminActive(admin: ProjectAdmin) {
   return admin.status.toLowerCase() === 'active' || admin.isActive === true
 }
 
-function ProjectManagementPage() {
-  const [initialData] = useState(() => {
-    try {
-      const savedData = getFromStorage(PROJECT_DATA_STORAGE_KEY, initialProjectData)
-      return {
-        admins: getFromStorage(PROJECT_ADMINS_STORAGE_KEY, savedData.admins),
-        error: '',
-      }
-    } catch (error) {
-      return {
-        admins: initialProjectAdmins,
-        error: error instanceof Error ? error.message : 'Could not load saved project data.',
-      }
-    }
-  })
-  const navigate = useNavigate()
-  const [projects, setProjects] = useState<ManagedProject[]>([])
-  const [admins, setAdmins] = useState(initialData.admins)
-  const [isLoadingProjects, setIsLoadingProjects] = useState(true)
-  const [projectLoadError, setProjectLoadError] = useState('')
-  const [isSavingProject, setIsSavingProject] = useState(false)
-  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<'All' | ProjectStatus>('All')
-  const [sortField, setSortField] = useState<SortField>('name')
-  const [sortAscending, setSortAscending] = useState(true)
-  const [projectModalOpen, setProjectModalOpen] = useState(false)
-  const [adminModalOpen, setAdminModalOpen] = useState(false)
-  const [editingProjectId, setEditingProjectId] = useState<string | null>(null)
-  const [editingAdminId, setEditingAdminId] = useState<string | null>(null)
-  const [projectForm, setProjectForm] = useState<ProjectForm>(emptyProjectForm)
-  const [adminForm, setAdminForm] = useState<ProjectAdminForm>(emptyAdminForm)
-  const [projectError, setProjectError] = useState('')
-  const [adminError, setAdminError] = useState('')
-  const [notice, setNotice] = useState(initialData.error)
-  const [viewProject, setViewProject] = useState<ManagedProject | null>(null)
-  const [viewAdmin, setViewAdmin] = useState<ProjectAdmin | null>(null)
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
-  const refreshProjects = useCallback(async () => {
-    setIsLoadingProjects(true)
-    try {
-      const nextProjects = await listProjects()
-      setProjects(nextProjects)
-      setProjectLoadError('')
-      return nextProjects
-    } catch (error) {
-      if (error instanceof ProjectAuthenticationError) {
-        navigate('/login', { replace: true })
-        return null
-      }
-      setProjectLoadError(error instanceof Error ? error.message : 'Could not load projects.')
-      return null
-    } finally {
-      setIsLoadingProjects(false)
-    }
-  }, [navigate])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    listProjects(controller.signal)
-      .then((nextProjects) => {
-        if (controller.signal.aborted) return
-        setProjects(nextProjects)
-        setProjectLoadError('')
-      })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return
-        if (error instanceof ProjectAuthenticationError) {
-          navigate('/login', { replace: true })
-          return
-        }
-        setProjectLoadError(error instanceof Error ? error.message : 'Could not load projects.')
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoadingProjects(false)
-      })
-    return () => controller.abort()
-  }, [navigate])
-
-  useEffect(() => {
-    function syncSavedAdmins(event: StorageEvent) {
-      if (event.key !== PROJECT_ADMINS_STORAGE_KEY) return
-      try {
-        setAdmins(getFromStorage(PROJECT_ADMINS_STORAGE_KEY, initialProjectData.admins))
-      } catch (error) {
-        setNotice(error instanceof Error ? error.message : 'Could not load saved Project Admin data.')
-      }
-    }
-
-    window.addEventListener('storage', syncSavedAdmins)
-    return () => window.removeEventListener('storage', syncSavedAdmins)
-  }, [])
-
-  function persistAdmins(nextAdmins: ProjectAdmin[]) {
-    try {
-      saveToStorage(PROJECT_ADMINS_STORAGE_KEY, nextAdmins)
-      setAdmins(nextAdmins)
-      return true
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Could not save project data.')
-      return false
-    }
-  }
-
-  const visibleProjects = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return projects
-      .filter((project) => statusFilter === 'All' || project.status === statusFilter)
-      .filter((project) => !query || project.name.toLowerCase().includes(query))
-      .sort((left, right) => {
-        const comparison = left[sortField].localeCompare(right[sortField])
-        return sortAscending ? comparison : -comparison
-      })
-  }, [projects, search, sortAscending, sortField, statusFilter])
-
-  const counts = {
-    totalProjects: projects.length,
-    activeProjects: projects.filter((project) => project.status === 'Active').length,
-    completedProjects: projects.filter((project) => project.status === 'Completed').length,
-    holdProjects: projects.filter((project) => {
-      const status = project.status.trim().toLowerCase().replace(/[\s-]+/g, '_')
-      return status === 'hold' || status === 'on_hold'
-    }).length,
-    upcomingProjects: projects.filter((project) => project.status.trim().toLowerCase() === 'upcoming').length,
-    totalAdmins: admins.length,
-  }
-
-  function projectName(projectId: string) {
-    return projects.find((project) => project.id === projectId)?.name
-  }
-
-  function assignedAdmin(adminId: string) {
-    return admins.find((admin) => admin.id === adminId)
-  }
-
-  function projectAssignedAdmin(project: ManagedProject) {
-    return admins.find((admin) => admin.projectIds.includes(project.id)) ?? assignedAdmin(project.adminId)
-  }
-
-  function assignedProjectIds(admin: ProjectAdmin) {
-    return [...new Set([
-      ...admin.projectIds,
-      ...projects.filter((project) => project.adminId === admin.id).map((project) => project.id),
-    ])]
-  }
-
-  function openAddProject() {
-    setEditingProjectId(null)
-    setProjectForm(emptyProjectForm)
-    setProjectError('')
-    setProjectModalOpen(true)
-  }
-
-  function openEditProject(project: ManagedProject) {
-    const { id, ...values } = project
-    setEditingProjectId(id)
-    setProjectForm(values)
-    setProjectError('')
-    setProjectModalOpen(true)
-  }
-
-  async function saveProject(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const name = projectForm.name.trim()
-    if (!name) {
-      setProjectError('Project name is required.')
-      return
-    }
-    if (projectForm.startDate && projectForm.endDate && projectForm.endDate < projectForm.startDate) {
-      setProjectError('End date cannot be earlier than start date.')
-      return
-    }
-
-    setIsSavingProject(true)
-    setProjectError('')
-    const projectValues = { ...projectForm, name }
-    try {
-      if (editingProjectId) {
-        await updateProject(editingProjectId, projectValues)
-      } else {
-        await createProject(projectValues)
-      }
-
-      const refreshedProjects = await refreshProjects()
-      if (!refreshedProjects) {
-        setNotice('Project saved, but the latest project list could not be loaded. Use Retry to refresh.')
-        return
-      }
-
-      const savedProject = editingProjectId
-        ? refreshedProjects.find((project) => project.id === editingProjectId)
-        : [...refreshedProjects].reverse().find((project) =>
-          project.name === projectValues.name &&
-          project.description === projectValues.description &&
-          project.startDate === projectValues.startDate &&
-          project.endDate === projectValues.endDate &&
-          project.status === projectValues.status &&
-          project.adminId === projectValues.adminId,
-        )
-      let assignmentsSaved = true
-      if (savedProject) {
-        const nextAdmins = admins.map((admin) => ({
-          ...admin,
-          projectIds: admin.id === savedProject.adminId
-            ? [...new Set([...admin.projectIds, savedProject.id])]
-            : admin.projectIds.filter((assignedId) => assignedId !== savedProject.id),
-        }))
-        assignmentsSaved = persistAdmins(nextAdmins)
-      }
-
-      setProjectModalOpen(false)
-      if (!assignmentsSaved) {
-        setNotice('Project was saved, but the Project Admin assignment could not be saved in this browser.')
-      } else {
-        setNotice(editingProjectId ? 'Project updated successfully.' : 'Project created successfully.')
-      }
-    } catch (error) {
-      if (error instanceof ProjectAuthenticationError) {
-        navigate('/login', { replace: true })
-        return
-      }
-      setProjectError(error instanceof Error ? error.message : 'Could not save project.')
-    } finally {
-      setIsSavingProject(false)
-    }
-  }
-
-  async function deleteProject(project: ManagedProject) {
-    if (!window.confirm(`Delete “${project.name}”? This will remove its Project Admin assignment.`)) return
-    setDeletingProjectId(project.id)
-    setProjectLoadError('')
-    try {
-      await deleteProjectRequest(project.id)
-      setProjects((current) => current.filter((item) => item.id !== project.id))
-      const nextAdmins = admins.map((admin) => ({
-        ...admin,
-        projectIds: admin.projectIds.filter((projectId) => projectId !== project.id),
-      }))
-      const assignmentsCleared = persistAdmins(nextAdmins)
-      const refreshedProjects = await refreshProjects()
-      if (!refreshedProjects) {
-        setNotice(`“${project.name}” was deleted, but the project list could not be refreshed. Use Retry.`)
-        return
-      }
-      setNotice(assignmentsCleared
-        ? `“${project.name}” deleted successfully.`
-        : `“${project.name}” was deleted, but its local Project Admin assignment could not be updated.`)
-    } catch (error) {
-      if (error instanceof ProjectAuthenticationError) {
-        navigate('/login', { replace: true })
-        return
-      }
-      setProjectLoadError(error instanceof Error ? error.message : 'Could not delete project.')
-    } finally {
-      setDeletingProjectId(null)
-    }
-  }
-
-  function openAddAdmin() {
-    setEditingAdminId(null)
-    setAdminForm(emptyAdminForm)
-    setAdminError('')
-    setAdminModalOpen(true)
-  }
-
-  function openEditAdmin(admin: ProjectAdmin) {
-    const { id, ...values } = admin
-    setEditingAdminId(id)
-    setAdminForm(values)
-    setAdminError('')
-    setAdminModalOpen(true)
-  }
-
-  function saveAdmin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const name = adminForm.name.trim()
-    const email = adminForm.email.trim().toLowerCase()
-    if (!name || !email) {
-      setAdminError('Full name and email address are required.')
-      return
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setAdminError('Enter a valid email address.')
-      return
-    }
-    if (admins.some((admin) => admin.id !== editingAdminId && admin.email.toLowerCase() === email)) {
-      setAdminError('A Project Admin with this email already exists.')
-      return
-    }
-
-    const adminId = editingAdminId ?? `admin-${Date.now()}`
-    const nextAdmin: ProjectAdmin = { ...adminForm, id: adminId, name, email }
-    const withoutSelectedAssignments = admins
-      .filter((admin) => admin.id !== adminId)
-      .map((admin) => ({
-        ...admin,
-        projectIds: admin.projectIds.filter((projectId) => !adminForm.projectIds.includes(projectId)),
-      }))
-    const nextAdmins = [nextAdmin, ...withoutSelectedAssignments]
-    if (!persistAdmins(nextAdmins)) return
-    setAdminModalOpen(false)
-    setNotice(editingAdminId ? 'Project Admin updated.' : 'Project Admin added as demo data.')
-  }
-
-  function toggleAdminStatus(admin: ProjectAdmin) {
-    const nextStatus: ProjectAdminStatus = admin.status === 'Active' ? 'Inactive' : 'Active'
-    if (!window.confirm(`${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} ${admin.name}?`)) return
-    const nextAdmins = admins.map((item) => item.id === admin.id ? { ...item, status: nextStatus } : item)
-    if (!persistAdmins(nextAdmins)) return
-    setNotice(`${admin.name} is now ${nextStatus.toLowerCase()}.`)
-  }
-
-  function deleteAdmin(admin: ProjectAdmin) {
-    if (!window.confirm(`Delete Project Admin ${admin.name}? Their project assignments will be cleared.`)) return
-    const nextAdmins = admins.filter((item) => item.id !== admin.id)
-    if (!persistAdmins(nextAdmins)) return
-    setNotice(`${admin.name} deleted; project assignments cleared.`)
-  }
-
-  function toggleProjectSelection(projectId: string) {
-    setAdminForm((current) => ({
-      ...current,
-      projectIds: current.projectIds.includes(projectId)
-        ? current.projectIds.filter((id) => id !== projectId)
-        : [...current.projectIds, projectId],
-    }))
-  }
-
-  function changeSort(field: SortField) {
-    if (sortField === field) {
-      setSortAscending((current) => !current)
-      return
-    }
-    setSortField(field)
-    setSortAscending(true)
-  }
-
+interface LogoProps { name: string; logo: string; theme: string; size: 'sm' | 'lg' }
+function ProjectLogo({ name, logo, theme, size }: LogoProps) {
+  const [err, setErr] = useState(false)
+  const src = logo?.trim()
   return (
-    <div className="projects-page">
-      <header className="projects-navbar">
-        <button className="projects-menu-button" type="button" aria-label="Open navigation menu" onClick={() => setSidebarOpen(true)}>
-          <Menu size={21} />
-        </button>
-        <div className="projects-brand">
-          <span className="projects-brand-mark"><BriefcaseBusiness size={17} /></span>
-          <span>DBMS <strong>SUPER ADMIN</strong></span>
-        </div>
-        <div className="projects-navbar-section">PROJECT MANAGEMENT</div>
-        <div className="projects-profile"><span className="projects-profile-avatar">SA</span><span>Super Admin</span></div>
-        <AuthNavbarAction />
-      </header>
-
-      <div className="projects-workspace">
-        {sidebarOpen && <button className="projects-backdrop" type="button" aria-label="Close navigation menu" onClick={() => setSidebarOpen(false)} />}
-        <AdminSidebar drawer open={sidebarOpen} onNavigate={() => setSidebarOpen(false)} />
-
-        <main className="projects-main">
-          <section className="projects-header-card">
-            <div className="projects-heading-copy">
-              <span className="projects-heading-icon"><FolderKanban size={24} /></span>
-              <div>
-                <h1>Project Management</h1>
-                <p>Manage projects and their assigned Project Admins.</p>
-              </div>
-            </div>
-            <div className="projects-heading-actions">
-              <button className="projects-button projects-button--secondary" type="button" onClick={openAddAdmin}>
-                <UserRoundPlus size={15} /> Add Project Admin
-              </button>
-              <button className="projects-button projects-button--primary" type="button" onClick={openAddProject}>
-                <Plus size={16} /> Add Project
-              </button>
-            </div>
-          </section>
-
-          <div className="projects-demo-notice">
-            <ShieldCheck size={15} aria-hidden="true" />
-            <span>Projects are managed through the API. Project Admin records are demo data saved in this browser.</span>
-          </div>
-
-          {notice && <div className="projects-toast" role="status"><Check size={15} aria-hidden="true" />{notice}<button type="button" aria-label="Dismiss message" onClick={() => setNotice('')}><X size={14} /></button></div>}
-          {projectLoadError && <div className="projects-load-error" role="alert">{projectLoadError}<button className="projects-button projects-button--secondary" type="button" onClick={() => void refreshProjects()}>Retry</button></div>}
-
-          <section className="projects-summary-grid" aria-label="Project summary">
-            <SummaryCard title="Total Projects" value={counts.totalProjects} icon={<FolderKanban size={18} />} tone="orange" />
-            <SummaryCard title="Active Projects" value={counts.activeProjects} icon={<CircleCheck size={18} />} tone="green" />
-            <SummaryCard title="Completed Projects" value={counts.completedProjects} icon={<Clock3 size={18} />} tone="purple" />
-            <SummaryCard title="Total Project Admins" value={counts.totalAdmins} icon={<UsersRound size={18} />} tone="blue" />
-            <SummaryCard title="Hold Projects" value={counts.holdProjects} icon={<PauseCircle size={18} />} tone="orange" />
-            <SummaryCard title="Upcoming Projects" value={counts.upcomingProjects} icon={<CalendarClock size={18} />} tone="green" />
-          </section>
-
-          <section className="projects-card">
-            <div className="projects-section-heading">
-              <div><h2>Projects</h2><p>Review project details, timeline, status, and ownership.</p></div>
-              <button className="projects-button projects-button--primary projects-mobile-add" type="button" onClick={openAddProject}><Plus size={15} /> Add Project</button>
-            </div>
-            <div className="projects-toolbar">
-              <label className="projects-search">
-                <Search size={15} aria-hidden="true" />
-                <span className="projects-visually-hidden">Search projects by name</span>
-                <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search project name..." />
-              </label>
-              <label className="projects-filter">
-                <span className="projects-visually-hidden">Filter projects by status</span>
-                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as 'All' | ProjectStatus)}>
-                  <option value="All">All statuses</option>
-                  {projectStatuses.map((status) => <option key={status}>{status}</option>)}
-                </select>
-                <ChevronDown size={14} aria-hidden="true" />
-              </label>
-              <button className="projects-sort-button" type="button" onClick={() => changeSort(sortField === 'name' ? 'startDate' : 'name')} title={`Sort by ${sortField === 'name' ? 'start date' : 'project name'}`}>
-                <ArrowDownUp size={14} /> Sort: {sortField === 'name' ? 'Name' : 'Start date'} <span>{sortAscending ? '↑' : '↓'}</span>
-              </button>
-            </div>
-
-            <div className="projects-table-scroll">
-              <table className="projects-table">
-                <thead>
-                  <tr>
-                    <th><button type="button" onClick={() => changeSort('name')}>Project Name <ArrowDownUp size={12} /></button></th>
-                    <th>Description</th>
-                    <th>Assigned Project Admin</th>
-                    <th><button type="button" onClick={() => changeSort('startDate')}>Start Date <ArrowDownUp size={12} /></button></th>
-                    <th>End Date</th>
-                    <th>Status</th>
-                    <th><span className="projects-visually-hidden">Actions</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {isLoadingProjects && <tr><td className="projects-empty-state" colSpan={7}>Loading projects...</td></tr>}
-                  {visibleProjects.map((project) => {
-                    const admin = projectAssignedAdmin(project)
-                    return (
-                      <tr key={project.id}>
-                        <td><strong className="projects-name">{project.name}</strong></td>
-                        <td className="projects-description-cell">{project.description || '—'}</td>
-                        <td>{admin ? <span className="projects-admin-person"><span className="projects-avatar">{initials(admin.name)}</span>{admin.name}</span> : <span className="projects-unassigned">Unassigned</span>}</td>
-                        <td>{formatDate(project.startDate)}</td>
-                        <td>{formatDate(project.endDate)}</td>
-                        <td><span className={`projects-status projects-status--${project.status.toLowerCase().replace(' ', '-')}`}>{project.status}</span></td>
-                        <td>
-                          <div className="projects-row-actions">
-                            <button type="button" aria-label={`View ${project.name}`} title="View project" onClick={() => setViewProject(project)}><Eye size={15} /></button>
-                            <button type="button" aria-label={`Edit ${project.name}`} title="Edit project" onClick={() => openEditProject(project)}><Pencil size={14} /></button>
-                            <button type="button" aria-label={`Delete ${project.name}`} title="Delete project" disabled={deletingProjectId === project.id} onClick={() => void deleteProject(project)}><Trash2 size={14} /></button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {!isLoadingProjects && !projectLoadError && visibleProjects.length === 0 && <tr><td className="projects-empty-state" colSpan={7}>{projects.length === 0 ? 'No projects yet. Add a project to get started.' : 'No projects match your search or filters.'}</td></tr>}
-                </tbody>
-              </table>
-            </div>
-            <div className="projects-table-footer">Showing {visibleProjects.length} of {projects.length} projects</div>
-          </section>
-
-          <section className="projects-card">
-            <div className="projects-section-heading">
-              <div><h2>Project Admins</h2><p>Manage account details and project assignments.</p></div>
-              <button className="projects-button projects-button--secondary" type="button" onClick={openAddAdmin}><UserRoundPlus size={15} /> Add Project Admin</button>
-            </div>
-            <div className="projects-table-scroll">
-              <table className="projects-table projects-admins-table">
-                <thead><tr><th>Admin Name</th><th>Email</th><th>Phone Number</th><th>Projects</th><th>Account Status</th><th><span className="projects-visually-hidden">Actions</span></th></tr></thead>
-                <tbody>
-                  {admins.map((admin) => (
-                    <tr key={admin.id}>
-                      <td><span className="projects-admin-person"><span className="projects-avatar">{initials(admin.name)}</span><strong>{admin.name}</strong></span></td>
-                      <td>{admin.email}</td>
-                      <td>{admin.phone || '—'}</td>
-                      <td>{assignedProjectIds(admin).map((id) => projectName(id)).filter(Boolean).join(', ') || <span className="projects-unassigned">Unassigned</span>}</td>
-                      <td><span className={`projects-status projects-status--${admin.status.toLowerCase()}`}>{admin.status}</span></td>
-                      <td>
-                        <div className="projects-row-actions">
-                          <button type="button" aria-label={`View ${admin.name}`} title="View details" onClick={() => setViewAdmin(admin)}><Eye size={15} /></button>
-                          <button type="button" aria-label={`Edit ${admin.name}`} title="Edit details and assignments" onClick={() => openEditAdmin(admin)}><Pencil size={14} /></button>
-                          <button type="button" aria-label={`${admin.status === 'Active' ? 'Deactivate' : 'Activate'} ${admin.name}`} title={admin.status === 'Active' ? 'Deactivate account' : 'Activate account'} onClick={() => toggleAdminStatus(admin)}><UserRound size={14} /></button>
-                          <button type="button" aria-label={`Delete ${admin.name}`} title="Delete admin" onClick={() => deleteAdmin(admin)}><Trash2 size={14} /></button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {admins.length === 0 && <tr><td className="projects-empty-state" colSpan={6}>No Project Admins yet. Add an admin to assign projects.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-            <div className="projects-table-footer">Showing {admins.length} Project Admin{admins.length === 1 ? '' : 's'}</div>
-          </section>
-          <p className="projects-footer-note">Project Admin accounts are demonstration records only. Use the secure account invitation flow when backend support is available.</p>
-        </main>
-      </div>
-
-      {projectModalOpen && (
-        <div className="projects-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setProjectModalOpen(false) }}>
-          <section className="projects-modal" role="dialog" aria-modal="true" aria-labelledby="project-form-title">
-            <ModalHeading id="project-form-title" title={editingProjectId ? 'Edit Project' : 'Add Project'} onClose={() => setProjectModalOpen(false)} />
-            <form onSubmit={saveProject} noValidate>
-              <div className="projects-form-grid">
-                <label className="projects-field projects-field--wide"><span>Project Name <b>*</b></span><input autoFocus value={projectForm.name} onChange={(event) => setProjectForm((current) => ({ ...current, name: event.target.value }))} placeholder="e.g. Customer Portal Revamp" required /></label>
-                <label className="projects-field"><span>Project Status</span><select value={projectForm.status} onChange={(event) => setProjectForm((current) => ({ ...current, status: event.target.value as ProjectStatus }))}>{projectStatuses.map((status) => <option key={status}>{status}</option>)}</select></label>
-                <label className="projects-field projects-field--wide"><span>Description</span><textarea rows={3} value={projectForm.description} onChange={(event) => setProjectForm((current) => ({ ...current, description: event.target.value }))} placeholder="Briefly describe the project..." /></label>
-                <label className="projects-field"><span>Start Date</span><input type="date" value={projectForm.startDate} onChange={(event) => setProjectForm((current) => ({ ...current, startDate: event.target.value }))} /></label>
-                <label className="projects-field"><span>End Date</span><input type="date" min={projectForm.startDate || undefined} value={projectForm.endDate} onChange={(event) => setProjectForm((current) => ({ ...current, endDate: event.target.value }))} /></label>
-                <label className="projects-field projects-field--wide"><span>Project Admin</span><select value={projectForm.adminId} onChange={(event) => setProjectForm((current) => ({ ...current, adminId: event.target.value }))}><option value="">Select</option>{admins.filter(isProjectAdminActive).map((admin) => <option key={admin.id} value={admin.id}>{admin.name}</option>)}</select></label>
-              </div>
-              {projectError && <p className="projects-form-error" role="alert">{projectError}</p>}
-              <ModalActions
-                onCancel={() => setProjectModalOpen(false)}
-                submitLabel={isSavingProject ? 'Saving...' : editingProjectId ? 'Save Changes' : 'Save Project'}
-                submitDisabled={isSavingProject}
-              />
-            </form>
-          </section>
-        </div>
-      )}
-
-      {adminModalOpen && (
-        <div className="projects-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setAdminModalOpen(false) }}>
-          <section className="projects-modal" role="dialog" aria-modal="true" aria-labelledby="admin-form-title">
-            <ModalHeading id="admin-form-title" title={editingAdminId ? 'Edit Project Admin' : 'Add Project Admin'} onClose={() => setAdminModalOpen(false)} />
-            <p className="projects-form-demo-note">Demo only. This does not create login credentials or invite an account.</p>
-            <form onSubmit={saveAdmin} noValidate>
-              <div className="projects-form-grid">
-                <label className="projects-field projects-field--wide"><span>Full Name <b>*</b></span><input autoFocus value={adminForm.name} onChange={(event) => setAdminForm((current) => ({ ...current, name: event.target.value }))} placeholder="Enter full name" required /></label>
-                <label className="projects-field"><span>Email Address <b>*</b></span><input type="email" value={adminForm.email} onChange={(event) => setAdminForm((current) => ({ ...current, email: event.target.value }))} placeholder="name@example.com" required /></label>
-                <label className="projects-field"><span>Phone Number</span><input type="tel" value={adminForm.phone} onChange={(event) => setAdminForm((current) => ({ ...current, phone: event.target.value }))} placeholder="+1 555 0100" /></label>
-                <label className="projects-field"><span>Username</span><input value={adminForm.username} onChange={(event) => setAdminForm((current) => ({ ...current, username: event.target.value }))} placeholder="Optional" /></label>
-                <label className="projects-field"><span>Account Status</span><select value={adminForm.status} onChange={(event) => setAdminForm((current) => ({ ...current, status: event.target.value as ProjectAdminStatus }))}><option>Active</option><option>Inactive</option></select></label>
-                <fieldset className="projects-project-select projects-field--wide">
-                  <legend> Projects</legend>
-                  {projects.length === 0
-                    ? <p className="projects-unassigned">Add a project before assigning one.</p>
-                    : projects.map((project) => (
-                      <label key={project.id}>
-                        <input type="checkbox" checked={adminForm.projectIds.includes(project.id)} onChange={() => toggleProjectSelection(project.id)} />
-                        <span>{project.name}{project.adminId && project.adminId !== editingAdminId && <small>Reassigned from {assignedAdmin(project.adminId)?.name ?? 'another admin'}</small>}</span>
-                      </label>
-                    ))}
-                </fieldset>
-              </div>
-              {adminError && <p className="projects-form-error" role="alert">{adminError}</p>}
-              <ModalActions onCancel={() => setAdminModalOpen(false)} submitLabel={editingAdminId ? 'Save Changes' : 'Add Project Admin'} />
-            </form>
-          </section>
-        </div>
-      )}
-
-      {viewProject && (
-        <div className="projects-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setViewProject(null) }}>
-          <section className="projects-modal projects-details-modal" role="dialog" aria-modal="true" aria-labelledby="project-details-title">
-            <ModalHeading id="project-details-title" title={viewProject.name} onClose={() => setViewProject(null)} />
-            <p className="projects-details-description">{viewProject.description || 'No project description provided.'}</p>
-            <dl className="projects-details-grid">
-              <Detail label="Project Status" value={viewProject.status} />
-              <Detail label="Start Date" value={formatDate(viewProject.startDate)} />
-              <Detail label="End Date" value={formatDate(viewProject.endDate)} />
-              <Detail label="Assigned Admin" value={projectAssignedAdmin(viewProject)?.name ?? 'Unassigned'} />
-            </dl>
-            <ModalActions onCancel={() => setViewProject(null)} cancelLabel="Close" hideSubmit />
-          </section>
-        </div>
-      )}
-
-      {viewAdmin && (
-        <div className="projects-modal-overlay" onMouseDown={(event) => { if (event.target === event.currentTarget) setViewAdmin(null) }}>
-          <section className="projects-modal projects-details-modal" role="dialog" aria-modal="true" aria-labelledby="admin-details-title">
-            <ModalHeading id="admin-details-title" title={viewAdmin.name} onClose={() => setViewAdmin(null)} />
-            <p className="projects-form-demo-note">Project Admin demo record — no login credentials are stored.</p>
-            <dl className="projects-details-grid">
-              <Detail label="Email" value={viewAdmin.email} icon={<Mail size={14} />} />
-              <Detail label="Phone" value={viewAdmin.phone || 'Not provided'} icon={<Phone size={14} />} />
-              <Detail label="Username" value={viewAdmin.username || 'Not set'} />
-              <Detail label="Account Status" value={viewAdmin.status} />
-              <Detail label="Assigned Projects" value={assignedProjectIds(viewAdmin).map((id) => projectName(id)).filter(Boolean).join(', ') || 'Unassigned'} />
-            </dl>
-            <ModalActions onCancel={() => setViewAdmin(null)} cancelLabel="Close" hideSubmit />
-          </section>
-        </div>
-      )}
-    </div>
+    <span
+      className={`pm-project-logo pm-project-logo--${size}`}
+      style={{ background: theme || DEFAULT_PROJECT_THEME }}
+    >
+      {src && !err
+        ? <img src={src} alt={name} onError={() => setErr(true)} />
+        : initials(name)}
+    </span>
   )
 }
 
-interface SummaryCardProps {
-  title: string
-  value: number
-  icon: ReactNode
-  tone: 'orange' | 'green' | 'purple' | 'blue'
-}
-
+interface SummaryCardProps { title: string; value: number; icon: ReactNode; tone: 'orange' | 'green' | 'purple' | 'blue' }
 function SummaryCard({ title, value, icon, tone }: SummaryCardProps) {
   return (
     <article className="projects-summary-card">
-      <div className="projects-summary-top"><span>{title}</span><span className={`projects-summary-icon projects-summary-icon--${tone}`}>{icon}</span></div>
+      <div className="projects-summary-top">
+        <span>{title}</span>
+        <span className={`projects-summary-icon projects-summary-icon--${tone}`}>{icon}</span>
+      </div>
       <strong>{value.toLocaleString()}</strong>
       <small>Across the platform</small>
     </article>
@@ -703,7 +147,10 @@ function SummaryCard({ title, value, icon, tone }: SummaryCardProps) {
 function ModalHeading({ id, title, onClose }: { id: string; title: string; onClose: () => void }) {
   return (
     <div className="projects-modal-heading">
-      <div><span className="projects-modal-kicker">PROJECT MANAGEMENT</span><h2 id={id}>{title}</h2></div>
+      <div>
+        <span className="projects-modal-kicker">PROJECT MANAGEMENT</span>
+        <h2 id={id}>{title}</h2>
+      </div>
       <button type="button" aria-label="Close dialog" onClick={onClose}><X size={18} /></button>
     </div>
   )
@@ -725,13 +172,813 @@ function ModalActions({
   return (
     <div className="projects-modal-actions">
       <button className="projects-button projects-button--secondary" type="button" onClick={onCancel}>{cancelLabel}</button>
-      {!hideSubmit && <button className="projects-button projects-button--primary" type="submit" disabled={submitDisabled}><Check size={15} />{submitLabel}</button>}
+      {!hideSubmit && (
+        <button className="projects-button projects-button--primary" type="submit" disabled={submitDisabled}>
+          <Check size={15} />{submitLabel}
+        </button>
+      )}
     </div>
   )
 }
 
 function Detail({ label, value, icon }: { label: string; value: string; icon?: ReactNode }) {
   return <div><dt>{label}</dt><dd>{icon}{value}</dd></div>
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+function ProjectManagementPage() {
+  const navigate = useNavigate()
+
+  // ── data ──
+  const [projects, setProjects] = useState<ManagedProject[]>([])
+  const [admins, setAdmins] = useState<ProjectAdmin[]>(() => {
+    try { return getFromStorage(PROJECT_ADMINS_STORAGE_KEY, initialProjectAdmins) }
+    catch { return initialProjectAdmins }
+  })
+  const [isLoadingProjects, setIsLoadingProjects] = useState(true)
+  const [projectLoadError, setProjectLoadError] = useState('')
+  const [isSavingProject, setIsSavingProject] = useState(false)
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
+
+  // ── view ──
+  const [detailProject, setDetailProject] = useState<ManagedProject | null>(null)
+  const [projectModalOpen, setProjectModalOpen] = useState(false)
+  const [adminModalOpen, setAdminModalOpen] = useState(false)
+  const [viewAdmin, setViewAdmin] = useState<ProjectAdmin | null>(null)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // ── form ──
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null)
+  const [editingAdminId, setEditingAdminId] = useState<string | null>(null)
+  const [projectForm, setProjectForm] = useState<ProjectForm>(emptyProjectForm)
+  const [adminForm, setAdminForm] = useState<ProjectAdminForm>(emptyAdminForm)
+  const [projectError, setProjectError] = useState('')
+  const [adminError, setAdminError] = useState('')
+
+  // ── list controls ──
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'All' | ProjectStatus>('All')
+  const [sortField, setSortField] = useState<SortField>('name')
+  const [sortAscending, setSortAscending] = useState(true)
+
+  // ── notifications ──
+  const [notice, setNotice] = useState('')
+
+  // ── API ──────────────────────────────────────────────────────────────────
+  const refreshProjects = useCallback(async () => {
+    setIsLoadingProjects(true)
+    try {
+      const next = await listProjects()
+      setProjects(next)
+      setProjectLoadError('')
+      return next
+    } catch (error) {
+      if (error instanceof ProjectAuthenticationError) { navigate('/login', { replace: true }); return null }
+      setProjectLoadError(error instanceof Error ? error.message : 'Could not load projects.')
+      return null
+    } finally {
+      setIsLoadingProjects(false)
+    }
+  }, [navigate])
+
+  useEffect(() => {
+    const ctrl = new AbortController()
+    listProjects(ctrl.signal)
+      .then((next) => { if (!ctrl.signal.aborted) { setProjects(next); setProjectLoadError('') } })
+      .catch((error: unknown) => {
+        if (ctrl.signal.aborted) return
+        if (error instanceof ProjectAuthenticationError) { navigate('/login', { replace: true }); return }
+        setProjectLoadError(error instanceof Error ? error.message : 'Could not load projects.')
+      })
+      .finally(() => { if (!ctrl.signal.aborted) setIsLoadingProjects(false) })
+    return () => ctrl.abort()
+  }, [navigate])
+
+  useEffect(() => {
+    const sync = (e: StorageEvent) => {
+      if (e.key !== PROJECT_ADMINS_STORAGE_KEY) return
+      try { setAdmins(getFromStorage(PROJECT_ADMINS_STORAGE_KEY, initialProjectAdmins)) }
+      catch { /* ignore */ }
+    }
+    window.addEventListener('storage', sync)
+    return () => window.removeEventListener('storage', sync)
+  }, [])
+
+  function persistAdmins(next: ProjectAdmin[]) {
+    try { saveToStorage(PROJECT_ADMINS_STORAGE_KEY, next); setAdmins(next); return true }
+    catch (err) { setNotice(err instanceof Error ? err.message : 'Could not save.'); return false }
+  }
+
+  // ── Derived ───────────────────────────────────────────────────────────────
+  const visibleProjects = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return projects
+      .filter((p) => statusFilter === 'All' || p.status === statusFilter)
+      .filter((p) => !q || p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q))
+      .sort((a, b) => {
+        const cmp = a[sortField].localeCompare(b[sortField])
+        return sortAscending ? cmp : -cmp
+      })
+  }, [projects, search, sortAscending, sortField, statusFilter])
+
+  const counts = {
+    total:    projects.length,
+    active:   projects.filter((p) => p.status === 'Active').length,
+    completed:projects.filter((p) => p.status === 'Completed').length,
+    hold:     projects.filter((p) => p.status === 'On Hold').length,
+    upcoming: projects.filter((p) => p.status === 'Upcoming').length,
+    admins:   admins.length,
+  }
+
+  function projectName(id: string)       { return projects.find((p) => p.id === id)?.name }
+  function assignedAdmin(id: string)     { return admins.find((a) => a.id === id) }
+  function projectAdmin(p: ManagedProject) {
+    return admins.find((a) => a.projectIds.includes(p.id)) ?? assignedAdmin(p.adminId)
+  }
+  function adminProjectIds(a: ProjectAdmin) {
+    return [...new Set([...a.projectIds, ...projects.filter((p) => p.adminId === a.id).map((p) => p.id)])]
+  }
+
+  // ── Project handlers ──────────────────────────────────────────────────────
+  function openAddProject() {
+    setEditingProjectId(null)
+    setProjectForm(emptyProjectForm)
+    setProjectError('')
+    setProjectModalOpen(true)
+  }
+
+  function openEditProject(project: ManagedProject) {
+    const { id, ...values } = project
+    setEditingProjectId(id)
+    setProjectForm(values)
+    setProjectError('')
+    setProjectModalOpen(true)
+  }
+
+  async function saveProject(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const name = projectForm.name.trim()
+    if (!name) { setProjectError('Project name is required.'); return }
+    if (projectForm.startDate && projectForm.endDate && projectForm.endDate < projectForm.startDate) {
+      setProjectError('End date cannot be earlier than start date.'); return
+    }
+    for (const pl of projectForm.panelLinks) {
+      if (!pl.name.trim()) { setProjectError('Each panel must have a name.'); return }
+      if (!pl.url.trim())  { setProjectError(`Panel "${pl.name}" must have a URL.`); return }
+    }
+    for (const ut of projectForm.userTypes) {
+      if (!ut.role.trim()) { setProjectError('Each user type must have a role name.'); return }
+    }
+    setIsSavingProject(true)
+    setProjectError('')
+    try {
+      if (editingProjectId) {
+        await updateProject(editingProjectId, { ...projectForm, name })
+      } else {
+        await createProject({ ...projectForm, name })
+      }
+      await refreshProjects()
+      setProjectModalOpen(false)
+      setNotice(editingProjectId ? 'Project updated successfully.' : 'Project created successfully.')
+    } catch (err) {
+      if (err instanceof ProjectAuthenticationError) { navigate('/login', { replace: true }); return }
+      setProjectError(err instanceof Error ? err.message : 'Could not save project.')
+    } finally {
+      setIsSavingProject(false)
+    }
+  }
+
+  async function deleteProject(project: ManagedProject) {
+    if (!window.confirm(`Delete "${project.name}"? This cannot be undone.`)) return
+    setDeletingProjectId(project.id)
+    setProjectLoadError('')
+    try {
+      await deleteProjectRequest(project.id)
+      setProjects((cur) => cur.filter((p) => p.id !== project.id))
+      if (detailProject?.id === project.id) setDetailProject(null)
+      setNotice(`"${project.name}" deleted successfully.`)
+    } catch (err) {
+      if (err instanceof ProjectAuthenticationError) { navigate('/login', { replace: true }); return }
+      setProjectLoadError(err instanceof Error ? err.message : 'Could not delete project.')
+    } finally {
+      setDeletingProjectId(null)
+    }
+  }
+
+  // ── Admin handlers ────────────────────────────────────────────────────────
+  function openAddAdmin()              { setEditingAdminId(null); setAdminForm(emptyAdminForm); setAdminError(''); setAdminModalOpen(true) }
+  function openEditAdmin(a: ProjectAdmin) {
+    const { id, ...v } = a; setEditingAdminId(id); setAdminForm(v); setAdminError(''); setAdminModalOpen(true)
+  }
+
+  function saveAdmin(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const name = adminForm.name.trim()
+    const email = adminForm.email.trim().toLowerCase()
+    if (!name || !email)                                                     { setAdminError('Full name and email are required.'); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))                         { setAdminError('Enter a valid email address.'); return }
+    if (admins.some((a) => a.id !== editingAdminId && a.email.toLowerCase() === email)) { setAdminError('Email already exists.'); return }
+
+    const id = editingAdminId ?? `admin-${Date.now()}`
+    const next: ProjectAdmin = { ...adminForm, id, name, email }
+    const rest = admins
+      .filter((a) => a.id !== id)
+      .map((a) => ({ ...a, projectIds: a.projectIds.filter((pid) => !adminForm.projectIds.includes(pid)) }))
+    if (!persistAdmins([next, ...rest])) return
+    setAdminModalOpen(false)
+    setNotice(editingAdminId ? 'Project Admin updated.' : 'Project Admin added.')
+  }
+
+  function toggleAdminStatus(a: ProjectAdmin) {
+    const nextStatus: ProjectAdminStatus = a.status === 'Active' ? 'Inactive' : 'Active'
+    if (!window.confirm(`${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} ${a.name}?`)) return
+    if (persistAdmins(admins.map((item) => item.id === a.id ? { ...item, status: nextStatus } : item)))
+      setNotice(`${a.name} is now ${nextStatus.toLowerCase()}.`)
+  }
+
+  function deleteAdmin(a: ProjectAdmin) {
+    if (!window.confirm(`Delete Project Admin ${a.name}?`)) return
+    if (persistAdmins(admins.filter((item) => item.id !== a.id))) setNotice(`${a.name} deleted.`)
+  }
+
+  function toggleProjectSelection(id: string) {
+    setAdminForm((f) => ({
+      ...f,
+      projectIds: f.projectIds.includes(id) ? f.projectIds.filter((x) => x !== id) : [...f.projectIds, id],
+    }))
+  }
+
+  function changeSort(field: SortField) {
+    if (sortField === field) { setSortAscending((v) => !v); return }
+    setSortField(field); setSortAscending(true)
+  }
+
+  // ── Panel/UserType form helpers ───────────────────────────────────────────
+  const addPanelLink    = () => setProjectForm((f) => ({ ...f, panelLinks: [...f.panelLinks, { name: '', url: '' }] }))
+  const removePanelLink = (i: number) => setProjectForm((f) => ({ ...f, panelLinks: f.panelLinks.filter((_, idx) => idx !== i) }))
+  const updatePanelLink = (i: number, field: keyof PanelLink, val: string) =>
+    setProjectForm((f) => ({ ...f, panelLinks: f.panelLinks.map((pl, idx) => idx === i ? { ...pl, [field]: val } : pl) }))
+
+  const addUserType    = () => setProjectForm((f) => ({ ...f, userTypes: [...f.userTypes, { role: '', count: 0 }] }))
+  const removeUserType = (i: number) => setProjectForm((f) => ({ ...f, userTypes: f.userTypes.filter((_, idx) => idx !== i) }))
+  const updateUserType = (i: number, field: keyof UserType, val: string | number) =>
+    setProjectForm((f) => ({ ...f, userTypes: f.userTypes.map((ut, idx) => idx === i ? { ...ut, [field]: val } : ut) }))
+
+  // ─────────────────────────────────────────────────────────────────────────
+  return (
+    <div className="projects-page">
+      {/* ── Navbar ── */}
+      <header className="projects-navbar">
+        <button className="projects-menu-button" type="button" aria-label="Open navigation menu" onClick={() => setSidebarOpen(true)}>
+          <Menu size={21} />
+        </button>
+        <div className="projects-brand">
+          <span className="projects-brand-mark"><BriefcaseBusiness size={17} /></span>
+          <span>DBMS <strong>SUPER ADMIN</strong></span>
+        </div>
+        <div className="projects-navbar-section">PROJECT MANAGEMENT</div>
+        <div className="projects-profile"><span className="projects-profile-avatar">SA</span><span>Super Admin</span></div>
+        <AuthNavbarAction />
+      </header>
+
+      <div className="projects-workspace">
+        {sidebarOpen && <button className="projects-backdrop" type="button" aria-label="Close navigation menu" onClick={() => setSidebarOpen(false)} />}
+        <AdminSidebar drawer open={sidebarOpen} onNavigate={() => setSidebarOpen(false)} />
+
+        <main className="projects-main">
+          {/* ════════════════════════════════════════════════════════════════
+              DETAIL VIEW
+          ════════════════════════════════════════════════════════════════ */}
+          {detailProject ? (
+            <div className="pm-detail">
+              {/* Back */}
+              <div className="pm-detail__back">
+                <button className="pm-detail__back-btn" type="button" onClick={() => setDetailProject(null)}>
+                  <ArrowLeft size={15} /> Back to Projects
+                </button>
+                <div className="pm-detail__back-actions">
+                  <button className="projects-button projects-button--secondary" type="button" onClick={() => openEditProject(detailProject)}>
+                    <Pencil size={13} /> Edit
+                  </button>
+                  <button className="projects-button projects-button--danger" type="button"
+                    disabled={deletingProjectId === detailProject.id}
+                    onClick={() => void deleteProject(detailProject)}>
+                    <Trash2 size={13} /> {deletingProjectId === detailProject.id ? 'Deleting…' : 'Delete'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Header card */}
+              <div className="pm-detail__header-card">
+                <div className="pm-detail__header-accent" style={{ background: detailProject.theme || DEFAULT_PROJECT_THEME }} />
+                <div className="pm-detail__header-body">
+                  <ProjectLogo name={detailProject.name} logo={detailProject.logo} theme={detailProject.theme} size="lg" />
+                  <div className="pm-detail__header-info">
+                    <div className="pm-detail__header-top">
+                      <h2 className="pm-detail__title">{detailProject.name}</h2>
+                      <span className={`projects-status projects-status--${statusClass(detailProject.status)}`}>{detailProject.status}</span>
+                    </div>
+                    {detailProject.description && <p className="pm-detail__description">{detailProject.description}</p>}
+                    <div className="pm-detail__meta-row">
+                      {detailProject.startDate && (
+                        <span className="pm-detail__meta-item">
+                          <Calendar size={12} />
+                          <span>Start <strong>{formatDate(detailProject.startDate)}</strong></span>
+                        </span>
+                      )}
+                      {detailProject.endDate && (
+                        <span className="pm-detail__meta-item">
+                          <Calendar size={12} />
+                          <span>End <strong>{formatDate(detailProject.endDate)}</strong></span>
+                        </span>
+                      )}
+                      <span className="pm-detail__meta-item">
+                        <LayoutGrid size={12} />
+                        <span><strong>{detailProject.panelLinks.length}</strong> panel{detailProject.panelLinks.length !== 1 ? 's' : ''}</span>
+                      </span>
+                      {totalUsers(detailProject) > 0 && (
+                        <span className="pm-detail__meta-item">
+                          <Users size={12} />
+                          <span><strong>{totalUsers(detailProject).toLocaleString()}</strong> users</span>
+                        </span>
+                      )}
+                      {projectAdmin(detailProject) && (
+                        <span className="pm-detail__meta-item">
+                          <UserRound size={12} />
+                          <span>Admin: <strong>{projectAdmin(detailProject)!.name}</strong></span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detail sections */}
+              <div className="pm-detail__sections">
+                {/* Panels */}
+                <section className="projects-card">
+                  <div className="projects-section-heading">
+                    <div>
+                      <h2>Panels</h2>
+                      <p>Launch each panel via your super admin credentials.</p>
+                    </div>
+                  </div>
+                  {detailProject.panelLinks.length === 0 ? (
+                    <p className="pm-empty-hint pm-empty-hint--spaced">
+                      No panels configured. Edit the project to add panel links.
+                    </p>
+                  ) : (
+                    <div className="pm-panels-grid">
+                      {detailProject.panelLinks.map((pl, i) => (
+                        <div key={i} className="pm-panel-card">
+                          <span className="pm-panel-card__icon" style={{ background: detailProject.theme || DEFAULT_PROJECT_THEME }}>
+                            <LayoutGrid size={14} />
+                          </span>
+                          <span className="pm-panel-card__name">{pl.name}</span>
+                          <a href={pl.url} target="_blank" rel="noopener noreferrer" className="pm-panel-card__launch">
+                            <ExternalLink size={11} /> Launch
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                {/* User Types */}
+                <section className="projects-card">
+                  <div className="projects-section-heading">
+                    <div>
+                      <h2>User Types</h2>
+                      <p>Breakdown of users by role in this project.</p>
+                    </div>
+                  </div>
+                  {detailProject.userTypes.length === 0 ? (
+                    <p className="pm-empty-hint pm-empty-hint--spaced">
+                      No user types defined. Edit the project to add user type breakdowns.
+                    </p>
+                  ) : (
+                    <div className="pm-user-types-list">
+                      {detailProject.userTypes.map((ut, i) => (
+                        <div key={i} className="pm-user-type-row">
+                          <span className="pm-user-type-row__role"><UserRound size={12} /> {ut.role}</span>
+                          <span className="pm-user-type-row__count">{ut.count.toLocaleString()}</span>
+                        </div>
+                      ))}
+                      {detailProject.userTypes.length > 1 && (
+                        <div className="pm-user-type-total">
+                          <span>Total Users</span>
+                          <strong>{totalUsers(detailProject).toLocaleString()}</strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </section>
+              </div>
+            </div>
+          ) : (
+          /* ════════════════════════════════════════════════════════════════
+             LISTING VIEW
+          ════════════════════════════════════════════════════════════════ */
+          <>
+            {/* Page header */}
+            <section className="projects-header-card">
+              <div className="projects-heading-copy">
+                <span className="projects-heading-icon"><FolderKanban size={24} /></span>
+                <div>
+                  <h1>Project Management</h1>
+                  <p>Create and manage child projects, their panels, users, and Project Admins.</p>
+                </div>
+              </div>
+              <div className="projects-heading-actions">
+                <button className="projects-button projects-button--secondary" type="button" onClick={openAddAdmin}>
+                  <UserRoundPlus size={15} /> Add Project Admin
+                </button>
+                <button className="projects-button projects-button--primary" type="button" onClick={openAddProject}>
+                  <Plus size={16} /> Add Project
+                </button>
+              </div>
+            </section>
+
+            <div className="projects-demo-notice">
+              <ShieldCheck size={15} aria-hidden="true" />
+              <span>Projects are managed through the API. Project Admin records are demo data saved in this browser.</span>
+            </div>
+
+            {notice && (
+              <div className="projects-toast" role="status">
+                <Check size={15} aria-hidden="true" />{notice}
+                <button type="button" aria-label="Dismiss" onClick={() => setNotice('')}><X size={14} /></button>
+              </div>
+            )}
+            {projectLoadError && (
+              <div className="projects-load-error" role="alert">
+                {projectLoadError}
+                <button className="projects-button projects-button--secondary" type="button" onClick={() => void refreshProjects()}>Retry</button>
+              </div>
+            )}
+
+            {/* Stats */}
+            <section className="projects-summary-grid" aria-label="Project summary">
+              <SummaryCard title="Total Projects"      value={counts.total}    icon={<FolderKanban size={18} />} tone="orange" />
+              <SummaryCard title="Active Projects"     value={counts.active}   icon={<CircleCheck size={18} />}  tone="green"  />
+              <SummaryCard title="Completed Projects"  value={counts.completed}icon={<Clock3 size={18} />}       tone="purple" />
+              <SummaryCard title="Total Project Admins"value={counts.admins}   icon={<UsersRound size={18} />}   tone="blue"   />
+              <SummaryCard title="On Hold"             value={counts.hold}     icon={<PauseCircle size={18} />}  tone="orange" />
+              <SummaryCard title="Upcoming"            value={counts.upcoming} icon={<CalendarClock size={18} />}tone="green"  />
+            </section>
+
+            {/* Projects card-grid */}
+            <section className="projects-card">
+              <div className="projects-section-heading">
+                <div>
+                  <h2>Projects</h2>
+                  <p>Click a project to view its panels and user breakdown.</p>
+                </div>
+                <button className="projects-button projects-button--primary" type="button" onClick={openAddProject}>
+                  <Plus size={15} /> Add Project
+                </button>
+              </div>
+
+              <div className="projects-toolbar">
+                <label className="projects-search">
+                  <Search size={15} aria-hidden="true" />
+                  <span className="projects-visually-hidden">Search projects</span>
+                  <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search project name or description…" />
+                </label>
+                <label className="projects-filter">
+                  <span className="projects-visually-hidden">Filter by status</span>
+                  <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as 'All' | ProjectStatus)}>
+                    <option value="All">All statuses</option>
+                    {projectStatuses.map((s) => <option key={s}>{s}</option>)}
+                  </select>
+                  <ChevronDown size={14} aria-hidden="true" />
+                </label>
+                <button className="projects-sort-button" type="button"
+                  onClick={() => changeSort(sortField === 'name' ? 'startDate' : 'name')}
+                  title={`Sort by ${sortField === 'name' ? 'start date' : 'project name'}`}>
+                  <ArrowDownUp size={14} /> Sort: {sortField === 'name' ? 'Name' : 'Start date'}
+                  <span>{sortAscending ? '↑' : '↓'}</span>
+                </button>
+              </div>
+
+              {isLoadingProjects ? (
+                <div className="pm-loading-state">Loading projects…</div>
+              ) : visibleProjects.length === 0 ? (
+                <div className="pm-empty-state">
+                  {projects.length === 0
+                    ? 'No projects yet. Click "Add Project" to create the first one.'
+                    : 'No projects match your search or filters.'}
+                </div>
+              ) : (
+                <div className="pm-cards-grid">
+                  {visibleProjects.map((project) => (
+                    <article
+                      key={project.id}
+                      className="pm-project-card"
+                      style={{ '--card-theme': project.theme || DEFAULT_PROJECT_THEME } as React.CSSProperties}
+                    >
+                      <div className="pm-project-card__accent" />
+                      <div className="pm-project-card__body">
+                        <div className="pm-project-card__header">
+                          <ProjectLogo name={project.name} logo={project.logo} theme={project.theme} size="sm" />
+                          <span className={`projects-status projects-status--${statusClass(project.status)}`}>{project.status}</span>
+                        </div>
+                        <h3 className="pm-project-card__name">{project.name}</h3>
+                        <p className="pm-project-card__desc">{project.description || 'No description provided.'}</p>
+                        <div className="pm-project-card__meta">
+                          {project.startDate && <span><Calendar size={10} /> {formatDate(project.startDate)}</span>}
+                          <span><LayoutGrid size={10} /> {project.panelLinks.length} panel{project.panelLinks.length !== 1 ? 's' : ''}</span>
+                          {totalUsers(project) > 0 && <span><Users size={10} /> {totalUsers(project).toLocaleString()} users</span>}
+                        </div>
+                        <div className="pm-project-card__actions">
+                          <button className="pm-project-card__view-btn" type="button" onClick={() => setDetailProject(project)}>
+                            View Details
+                          </button>
+                          <button className="pm-project-card__icon-btn" type="button"
+                            aria-label={`Edit ${project.name}`} title="Edit project"
+                            onClick={() => openEditProject(project)}>
+                            <Pencil size={13} />
+                          </button>
+                          <button className="pm-project-card__icon-btn" type="button"
+                            aria-label={`Delete ${project.name}`} title="Delete project"
+                            disabled={deletingProjectId === project.id}
+                            onClick={() => void deleteProject(project)}>
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+              <div className="projects-table-footer">
+                Showing {visibleProjects.length} of {projects.length} project{projects.length !== 1 ? 's' : ''}
+              </div>
+            </section>
+
+            {/* Project Admins section */}
+            <section className="projects-card">
+              <div className="projects-section-heading">
+                <div><h2>Project Admins</h2><p>Manage account details and project assignments.</p></div>
+                <button className="projects-button projects-button--secondary" type="button" onClick={openAddAdmin}>
+                  <UserRoundPlus size={15} /> Add Project Admin
+                </button>
+              </div>
+              <div className="projects-table-scroll">
+                <table className="projects-table projects-admins-table">
+                  <thead>
+                    <tr>
+                      <th>Admin Name</th><th>Email</th><th>Phone</th>
+                      <th>Projects</th><th>Status</th>
+                      <th><span className="projects-visually-hidden">Actions</span></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {admins.map((admin) => (
+                      <tr key={admin.id}>
+                        <td>
+                          <span className="projects-admin-person">
+                            <span className="projects-avatar">{initials(admin.name)}</span>
+                            <strong>{admin.name}</strong>
+                          </span>
+                        </td>
+                        <td>{admin.email}</td>
+                        <td>{admin.phone || '—'}</td>
+                        <td>{adminProjectIds(admin).map((id) => projectName(id)).filter(Boolean).join(', ') || <span className="projects-unassigned">Unassigned</span>}</td>
+                        <td><span className={`projects-status projects-status--${admin.status.toLowerCase()}`}>{admin.status}</span></td>
+                        <td>
+                          <div className="projects-row-actions">
+                            <button type="button" aria-label={`View ${admin.name}`} title="View details" onClick={() => setViewAdmin(admin)}><Users size={14} /></button>
+                            <button type="button" aria-label={`Edit ${admin.name}`} title="Edit" onClick={() => openEditAdmin(admin)}><Pencil size={14} /></button>
+                            <button type="button" aria-label={`${admin.status === 'Active' ? 'Deactivate' : 'Activate'} ${admin.name}`} title={admin.status === 'Active' ? 'Deactivate' : 'Activate'} onClick={() => toggleAdminStatus(admin)}><UserRound size={14} /></button>
+                            <button type="button" aria-label={`Delete ${admin.name}`} title="Delete" onClick={() => deleteAdmin(admin)}><Trash2 size={14} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {admins.length === 0 && (
+                      <tr><td className="projects-empty-state" colSpan={6}>No Project Admins yet.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div className="projects-table-footer">Showing {admins.length} Project Admin{admins.length !== 1 ? 's' : ''}</div>
+            </section>
+            <p className="projects-footer-note">Project Admin accounts are demonstration records only.</p>
+          </>
+          )}
+        </main>
+      </div>
+
+      {/* ════ Project create / edit modal ════ */}
+      {projectModalOpen && (
+        <div className="projects-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setProjectModalOpen(false) }}>
+          <section className="projects-modal pm-form-modal" role="dialog" aria-modal="true" aria-labelledby="project-form-title">
+            <ModalHeading id="project-form-title" title={editingProjectId ? 'Edit Project' : 'Add Project'} onClose={() => setProjectModalOpen(false)} />
+            <form onSubmit={saveProject} noValidate>
+
+              {/* Basic Info */}
+              <div className="pm-form-section">
+                <p className="pm-form-section-title">Basic Information</p>
+                <div className="projects-form-grid">
+                  <label className="projects-field projects-field--wide">
+                    <span>Project Name <b>*</b></span>
+                    <input autoFocus value={projectForm.name}
+                      onChange={(e) => setProjectForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder="e.g. Customer Portal" required />
+                  </label>
+                  <label className="projects-field">
+                    <span>Status</span>
+                    <select value={projectForm.status}
+                      onChange={(e) => setProjectForm((f) => ({ ...f, status: e.target.value as ProjectStatus }))}>
+                      {projectStatuses.map((s) => <option key={s}>{s}</option>)}
+                    </select>
+                  </label>
+                  <label className="projects-field projects-field--wide">
+                    <span>Description</span>
+                    <textarea rows={3} value={projectForm.description}
+                      onChange={(e) => setProjectForm((f) => ({ ...f, description: e.target.value }))}
+                      placeholder="Briefly describe the project…" />
+                  </label>
+                </div>
+              </div>
+
+              {/* Branding */}
+              <div className="pm-form-section">
+                <p className="pm-form-section-title">Branding</p>
+                <div className="projects-form-grid">
+                  <label className="projects-field projects-field--wide">
+                    <span>Logo URL <small>(leave blank to use initials)</small></span>
+                    <input value={projectForm.logo}
+                      onChange={(e) => setProjectForm((f) => ({ ...f, logo: e.target.value }))}
+                      placeholder="https://example.com/logo.png" />
+                  </label>
+                  <div className="projects-field">
+                    <span>Theme Color</span>
+                    <div className="pm-color-row">
+                      <input type="color" className="pm-color-swatch"
+                        value={projectForm.theme || DEFAULT_PROJECT_THEME}
+                        onChange={(e) => setProjectForm((f) => ({ ...f, theme: e.target.value }))} />
+                      <input className="pm-color-text"
+                        value={projectForm.theme}
+                        onChange={(e) => setProjectForm((f) => ({ ...f, theme: e.target.value }))}
+                        placeholder="#f96321" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Timeline */}
+              <div className="pm-form-section">
+                <p className="pm-form-section-title">Timeline</p>
+                <div className="projects-form-grid">
+                  <label className="projects-field">
+                    <span>Start Date</span>
+                    <input type="date" value={projectForm.startDate}
+                      onChange={(e) => setProjectForm((f) => ({ ...f, startDate: e.target.value }))} />
+                  </label>
+                  <label className="projects-field">
+                    <span>End Date</span>
+                    <input type="date" min={projectForm.startDate || undefined} value={projectForm.endDate}
+                      onChange={(e) => setProjectForm((f) => ({ ...f, endDate: e.target.value }))} />
+                  </label>
+                </div>
+              </div>
+
+              {/* Panels */}
+              <div className="pm-form-section">
+                <div className="pm-form-section-heading">
+                  <p className="pm-form-section-title">Panels ({projectForm.panelLinks.length})</p>
+                  <button type="button" className="pm-add-row-btn" onClick={addPanelLink}><Plus size={12} /> Add Panel</button>
+                </div>
+                {projectForm.panelLinks.length === 0
+                  ? <p className="pm-empty-hint">Define each panel (sub-app) with a name and its URL for super admin access.</p>
+                  : (
+                    <div className="pm-dynamic-list">
+                      {projectForm.panelLinks.map((pl, i) => (
+                        <div key={i} className="pm-dynamic-row pm-dynamic-row--wide">
+                          <input value={pl.name} onChange={(e) => updatePanelLink(i, 'name', e.target.value)} placeholder="Panel name, e.g. Admin Panel" />
+                          <input value={pl.url}  onChange={(e) => updatePanelLink(i, 'url', e.target.value)}  placeholder="https://app.example.com" />
+                          <button type="button" className="pm-remove-btn" aria-label="Remove panel" onClick={() => removePanelLink(i)}><X size={13} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+              </div>
+
+              {/* User Types */}
+              <div className="pm-form-section">
+                <div className="pm-form-section-heading">
+                  <p className="pm-form-section-title">User Types ({projectForm.userTypes.length})</p>
+                  <button type="button" className="pm-add-row-btn" onClick={addUserType}><Plus size={12} /> Add Type</button>
+                </div>
+                {projectForm.userTypes.length === 0
+                  ? <p className="pm-empty-hint">Specify user roles and their expected counts for this project.</p>
+                  : (
+                    <div className="pm-dynamic-list">
+                      {projectForm.userTypes.map((ut, i) => (
+                        <div key={i} className="pm-dynamic-row">
+                          <input value={ut.role} onChange={(e) => updateUserType(i, 'role', e.target.value)} placeholder="Role, e.g. Admin" />
+                          <input type="number" min="0" value={ut.count} onChange={(e) => updateUserType(i, 'count', Number(e.target.value))} placeholder="Count" />
+                          <button type="button" className="pm-remove-btn" aria-label="Remove user type" onClick={() => removeUserType(i)}><X size={13} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+              </div>
+
+              {/* Assignment */}
+              <div className="pm-form-section">
+                <p className="pm-form-section-title">Assignment</p>
+                <label className="projects-field">
+                  <span>Project Admin</span>
+                  <select value={projectForm.adminId}
+                    onChange={(e) => setProjectForm((f) => ({ ...f, adminId: e.target.value }))}>
+                    <option value="">Unassigned</option>
+                    {admins.filter(isProjectAdminActive).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </label>
+              </div>
+
+              {projectError && <p className="projects-form-error" role="alert">{projectError}</p>}
+              <ModalActions
+                onCancel={() => setProjectModalOpen(false)}
+                submitLabel={isSavingProject ? 'Saving…' : editingProjectId ? 'Save Changes' : 'Create Project'}
+                submitDisabled={isSavingProject}
+              />
+            </form>
+          </section>
+        </div>
+      )}
+
+      {/* ════ Admin modal ════ */}
+      {adminModalOpen && (
+        <div className="projects-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setAdminModalOpen(false) }}>
+          <section className="projects-modal" role="dialog" aria-modal="true" aria-labelledby="admin-form-title">
+            <ModalHeading id="admin-form-title" title={editingAdminId ? 'Edit Project Admin' : 'Add Project Admin'} onClose={() => setAdminModalOpen(false)} />
+            <p className="projects-form-demo-note">Demo only — no login credentials are created.</p>
+            <form onSubmit={saveAdmin} noValidate>
+              <div className="projects-form-grid">
+                <label className="projects-field projects-field--wide">
+                  <span>Full Name <b>*</b></span>
+                  <input autoFocus value={adminForm.name} onChange={(e) => setAdminForm((f) => ({ ...f, name: e.target.value }))} placeholder="Enter full name" />
+                </label>
+                <label className="projects-field">
+                  <span>Email <b>*</b></span>
+                  <input type="email" value={adminForm.email} onChange={(e) => setAdminForm((f) => ({ ...f, email: e.target.value }))} placeholder="name@example.com" />
+                </label>
+                <label className="projects-field">
+                  <span>Phone</span>
+                  <input type="tel" value={adminForm.phone} onChange={(e) => setAdminForm((f) => ({ ...f, phone: e.target.value }))} placeholder="+91 98765 43210" />
+                </label>
+                <label className="projects-field">
+                  <span>Username</span>
+                  <input value={adminForm.username} onChange={(e) => setAdminForm((f) => ({ ...f, username: e.target.value }))} placeholder="Optional" />
+                </label>
+                <label className="projects-field">
+                  <span>Status</span>
+                  <select value={adminForm.status} onChange={(e) => setAdminForm((f) => ({ ...f, status: e.target.value as ProjectAdminStatus }))}>
+                    <option>Active</option><option>Inactive</option>
+                  </select>
+                </label>
+                <fieldset className="projects-project-select projects-field--wide">
+                  <legend>Projects</legend>
+                  {projects.length === 0
+                    ? <p className="projects-unassigned">No projects yet.</p>
+                    : projects.map((p) => (
+                      <label key={p.id}>
+                        <input type="checkbox" checked={adminForm.projectIds.includes(p.id)} onChange={() => toggleProjectSelection(p.id)} />
+                        <span>{p.name}</span>
+                      </label>
+                    ))}
+                </fieldset>
+              </div>
+              {adminError && <p className="projects-form-error" role="alert">{adminError}</p>}
+              <ModalActions onCancel={() => setAdminModalOpen(false)} submitLabel={editingAdminId ? 'Save Changes' : 'Add Project Admin'} />
+            </form>
+          </section>
+        </div>
+      )}
+
+      {/* ════ Admin detail modal ════ */}
+      {viewAdmin && (
+        <div className="projects-modal-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) setViewAdmin(null) }}>
+          <section className="projects-modal projects-details-modal" role="dialog" aria-modal="true" aria-labelledby="admin-details-title">
+            <ModalHeading id="admin-details-title" title={viewAdmin.name} onClose={() => setViewAdmin(null)} />
+            <p className="projects-form-demo-note">Demo record — no credentials stored.</p>
+            <dl className="projects-details-grid">
+              <Detail label="Email"             value={viewAdmin.email}         icon={<Mail size={14} />} />
+              <Detail label="Phone"             value={viewAdmin.phone || 'Not provided'} icon={<Phone size={14} />} />
+              <Detail label="Username"          value={viewAdmin.username || 'Not set'} />
+              <Detail label="Account Status"    value={viewAdmin.status} />
+              <Detail label="Assigned Projects" value={adminProjectIds(viewAdmin).map((id) => projectName(id)).filter(Boolean).join(', ') || 'Unassigned'} />
+            </dl>
+            <ModalActions onCancel={() => setViewAdmin(null)} cancelLabel="Close" hideSubmit />
+          </section>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default ProjectManagementPage
