@@ -19,6 +19,28 @@ export class ProjectAuthenticationError extends Error {
   }
 }
 
+function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return true;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+        .join(""),
+    );
+    const payload = JSON.parse(jsonPayload) as { exp?: number };
+    if (typeof payload.exp === "number") {
+      return payload.exp * 1000 <= Date.now() + 10000;
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 function asRecord(value: unknown): ApiRecord {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     throw new Error("The projects API returned an invalid response.");
@@ -180,7 +202,10 @@ function projectPayload(
 
 async function request(path: string, init?: RequestInit): Promise<unknown> {
   const accessToken = getAccessToken();
-  if (!accessToken) throw new ProjectAuthenticationError();
+  if (!accessToken || isTokenExpired(accessToken)) {
+    clearAccessToken();
+    throw new ProjectAuthenticationError();
+  }
 
   const response = await fetch(`${BASE}${path}`, {
     ...init,
@@ -196,12 +221,23 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
   const responseText = await response.text();
   console.log("[platform API]", init?.method ?? "GET", path, response.status);
 
-  if (response.status === 401) {
+  if (response.status === 401 || response.status === 403) {
     clearAccessToken();
     throw new ProjectAuthenticationError();
   }
 
   if (!response.ok) {
+    // If backend returned 500 or any error indicating an invalid or expired token
+    if (
+      responseText.includes("INVALID_TOKEN") ||
+      responseText.includes("SESSION_REVOKED") ||
+      responseText.includes("jwt expired") ||
+      responseText.includes("Missing access token")
+    ) {
+      clearAccessToken();
+      throw new ProjectAuthenticationError();
+    }
+
     let message = `Request failed (${response.status}).`;
     if (responseText) {
       try {

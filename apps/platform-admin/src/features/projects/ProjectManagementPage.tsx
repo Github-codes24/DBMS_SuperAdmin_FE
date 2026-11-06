@@ -19,7 +19,6 @@ import {
   ExternalLink,
   FolderKanban,
   LayoutGrid,
-  Link as LinkIcon,
   Mail,
   Menu,
   CalendarClock,
