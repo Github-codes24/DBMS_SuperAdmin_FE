@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import ResponsiveLayout from "../../components/layout/ResponsiveLayout";
 import { useToast, useConfirm } from "../../context";
+import { Modal, ImagePreview } from "../../components/overlays";
 import {
   DEFAULT_PROJECT_THEME,
   initialProjectAdmins,
@@ -223,28 +224,6 @@ function SummaryCard({ title, value, icon, tone }: SummaryCardProps) {
   );
 }
 
-function ModalHeading({
-  id,
-  title,
-  onClose,
-}: {
-  id: string;
-  title: string;
-  onClose: () => void;
-}) {
-  return (
-    <div className="projects-modal-heading">
-      <div>
-        <span className="projects-modal-kicker">PROJECT MANAGEMENT</span>
-        <h2 id={id}>{title}</h2>
-      </div>
-      <button type="button" aria-label="Close dialog" onClick={onClose}>
-        <X size={18} />
-      </button>
-    </div>
-  );
-}
-
 function ModalActions({
   onCancel,
   submitLabel = "Save",
@@ -330,6 +309,7 @@ function ProjectManagementPage() {
   const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [viewAdmin, setViewAdmin] = useState<ProjectAdmin | null>(null);
+  const [previewImage, setPreviewImage] = useState<{ src: string; alt?: string } | null>(null);
 
   // ── form ──
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -1345,25 +1325,15 @@ function ProjectManagementPage() {
         </main>
 
       {/* ════ Project create / edit modal ════ */}
-      {projectModalOpen && (
-        <div
-          className="projects-modal-overlay"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setProjectModalOpen(false);
-          }}
-        >
-          <section
-            className="projects-modal pm-form-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="project-form-title"
-          >
-            <ModalHeading
-              id="project-form-title"
-              title={editingProjectId ? "Edit Project" : "Add Project"}
-              onClose={() => setProjectModalOpen(false)}
-            />
-            <form onSubmit={saveProject} noValidate>
+      <Modal
+        isOpen={projectModalOpen}
+        onClose={() => setProjectModalOpen(false)}
+        kicker="PROJECT MANAGEMENT"
+        title={editingProjectId ? "Edit Project" : "Add Project"}
+        size="lg"
+        className="pm-form-modal"
+      >
+        <form onSubmit={saveProject} noValidate>
               {/* Basic Info */}
               <div className="pm-form-section">
                 <p className="pm-form-section-title">Basic Information</p>
@@ -1434,7 +1404,15 @@ function ProjectManagementPage() {
                                 style={{
                                   background:
                                     projectForm.theme || DEFAULT_PROJECT_THEME,
+                                  cursor: "pointer",
                                 }}
+                                title="Click to view full preview"
+                                onClick={() =>
+                                  setPreviewImage({
+                                    src: projectForm.logo,
+                                    alt: projectForm.name || "Project Logo",
+                                  })
+                                }
                               >
                                 <img
                                   src={projectForm.logo}
@@ -1740,35 +1718,20 @@ function ProjectManagementPage() {
                 submitDisabled={isSavingProject}
               />
             </form>
-          </section>
-        </div>
-      )}
+      </Modal>
 
       {/* ════ Admin modal ════ */}
-      {adminModalOpen && (
-        <div
-          className="projects-modal-overlay"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setAdminModalOpen(false);
-          }}
-        >
-          <section
-            className="projects-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="admin-form-title"
-          >
-            <ModalHeading
-              id="admin-form-title"
-              title={
-                editingAdminId ? "Edit Project Admin" : "Add Project Admin"
-              }
-              onClose={() => setAdminModalOpen(false)}
-            />
-            <p className="projects-form-demo-note">
-              Demo only — no login credentials are created.
-            </p>
-            <form onSubmit={saveAdmin} noValidate>
+      <Modal
+        isOpen={adminModalOpen}
+        onClose={() => setAdminModalOpen(false)}
+        kicker="PROJECT MANAGEMENT"
+        title={editingAdminId ? "Edit Project Admin" : "Add Project Admin"}
+        size="md"
+      >
+        <p className="projects-form-demo-note">
+          Demo only — no login credentials are created.
+        </p>
+        <form onSubmit={saveAdmin} noValidate>
               <div className="projects-form-grid">
                 <label className="projects-field projects-field--wide">
                   <span>
@@ -1862,29 +1825,19 @@ function ProjectManagementPage() {
                 }
               />
             </form>
-          </section>
-        </div>
-      )}
+      </Modal>
 
       {/* ════ Admin detail modal ════ */}
-      {viewAdmin && (
-        <div
-          className="projects-modal-overlay"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setViewAdmin(null);
-          }}
-        >
-          <section
-            className="projects-modal projects-details-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="admin-details-title"
-          >
-            <ModalHeading
-              id="admin-details-title"
-              title={viewAdmin.name}
-              onClose={() => setViewAdmin(null)}
-            />
+      <Modal
+        isOpen={Boolean(viewAdmin)}
+        onClose={() => setViewAdmin(null)}
+        kicker="PROJECT MANAGEMENT"
+        title={viewAdmin?.name ?? "Admin Details"}
+        size="md"
+        className="projects-details-modal"
+      >
+        {viewAdmin && (
+          <>
             <p className="projects-form-demo-note">
               Demo record — no credentials stored.
             </p>
@@ -1919,9 +1872,18 @@ function ProjectManagementPage() {
               cancelLabel="Close"
               hideSubmit
             />
-          </section>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
+
+      {/* ════ Fullscreen logo image preview lightbox ════ */}
+      <ImagePreview
+        isOpen={Boolean(previewImage)}
+        src={previewImage?.src || ""}
+        alt={previewImage?.alt}
+        title={previewImage?.alt}
+        onClose={() => setPreviewImage(null)}
+      />
       </div>
     </ResponsiveLayout>
   );
