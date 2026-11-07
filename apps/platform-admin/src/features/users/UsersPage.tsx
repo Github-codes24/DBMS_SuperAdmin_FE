@@ -1,12 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Users as UsersIcon } from 'lucide-react'
+import { Users as UsersIcon, Plus } from 'lucide-react'
 import ResponsiveLayout from '../../components/layout/ResponsiveLayout'
 import { useToast, useConfirm } from '../../context'
 import { AlertMessage } from '../../components/notifications'
 import { Modal } from '../../components/overlays'
 import { Avatar, DataDetailView, StatusBadge } from '../../components/data-display'
 import { TableSkeletonRows, EmptyState, NoSearchResults } from '../../components/feedback'
+import { PrimaryButton, SecondaryButton } from '../../components/ui/buttons'
 import './users.css'
 import {
   createUser,
@@ -356,9 +357,9 @@ function UserManagementPage() {
       description="Create and manage platform user accounts."
       icon={<UsersIcon size={24} />}
       headerActions={
-        <button className="button button--primary create-button" type="button" onClick={openCreate}>
-          <span aria-hidden="true">＋</span> Create User
-        </button>
+        <PrimaryButton icon={<Plus size={16} />} onClick={openCreate}>
+          Create User
+        </PrimaryButton>
       }
     >
       <div className="user-management-page">
@@ -370,13 +371,12 @@ function UserManagementPage() {
           onClose={() => setActionError('')}
           action={
             actionError === 'Your session has expired. Please sign in again.' ? (
-              <button
-                type="button"
-                className="button button--secondary"
+              <SecondaryButton
+                size="sm"
                 onClick={() => navigate('/login', { replace: true })}
               >
                 Sign in
-              </button>
+              </SecondaryButton>
             ) : undefined
           }
         />
@@ -389,13 +389,12 @@ function UserManagementPage() {
           onClose={() => setLoadError('')}
           action={
             loadError === 'Your session has expired. Please sign in again.' ? (
-              <button
-                type="button"
-                className="button button--secondary"
+              <SecondaryButton
+                size="sm"
                 onClick={() => navigate('/login', { replace: true })}
               >
                 Sign in
-              </button>
+              </SecondaryButton>
             ) : undefined
           }
         />
@@ -601,7 +600,17 @@ function UserManagementPage() {
                 : 'Required. Select one or more projects.'}
             </span>
           </label>
-          <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closeForm}>Cancel</button><button className="button button--primary" type="submit" disabled={isSaving || projectOptions.length === 0}>{isSaving ? 'Saving...' : editingId ? 'Save changes' : 'Create user'}</button></div>
+          <div className="modal-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+            <SecondaryButton onClick={closeForm}>Cancel</SecondaryButton>
+            <PrimaryButton
+              type="submit"
+              disabled={isSaving || projectOptions.length === 0}
+              isLoading={isSaving}
+              loadingText="Saving..."
+            >
+              {editingId ? 'Save changes' : 'Create user'}
+            </PrimaryButton>
+          </div>
         </form>
       </Modal>
 
@@ -611,7 +620,7 @@ function UserManagementPage() {
         kicker="USER PROFILE"
         title={viewingUser?.name ?? 'User Profile'}
         size="md"
-        footer={<button className="button button--secondary" type="button" onClick={() => setViewingUser(null)}>Close</button>}
+        footer={<SecondaryButton onClick={() => setViewingUser(null)}>Close</SecondaryButton>}
       >
         {viewingUser && (
           <DataDetailView
@@ -649,7 +658,17 @@ function UserManagementPage() {
             <p>Set a new password for {passwordResetUser.name}.</p>
             {passwordResetError && <div className="inline-alert inline-alert--error" role="alert">{passwordResetError}</div>}
             <label className="field"><span>New password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></label>
-            <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closePasswordReset}>Cancel</button><button className="button button--primary" type="submit" disabled={isResettingPassword}>{isResettingPassword ? 'Saving...' : 'Reset password'}</button></div>
+            <div className="modal-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <SecondaryButton onClick={closePasswordReset}>Cancel</SecondaryButton>
+              <PrimaryButton
+                type="submit"
+                disabled={isResettingPassword}
+                isLoading={isResettingPassword}
+                loadingText="Saving..."
+              >
+                Reset password
+              </PrimaryButton>
+            </div>
           </form>
         )}
       </Modal>

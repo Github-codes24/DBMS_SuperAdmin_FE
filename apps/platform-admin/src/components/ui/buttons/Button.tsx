@@ -18,6 +18,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loadingText?: string
   leftIcon?: ReactNode
   rightIcon?: ReactNode
+  icon?: ReactNode
   fullWidth?: boolean
 }
 
@@ -31,6 +32,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     loadingText,
     leftIcon,
     rightIcon,
+    icon,
     fullWidth = false,
     disabled,
     type = 'button',
@@ -39,6 +41,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   ref
 ) {
   const isDisabled = disabled || isLoading
+  const effectiveLeftIcon = leftIcon ?? icon
 
   const classNames = [
     'app-btn',
@@ -69,7 +72,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
         </>
       ) : (
         <>
-          {leftIcon && <span className="app-btn-icon-slot">{leftIcon}</span>}
+          {effectiveLeftIcon && <span className="app-btn-icon-slot">{effectiveLeftIcon}</span>}
           {children && <span>{children}</span>}
           {rightIcon && <span className="app-btn-icon-slot">{rightIcon}</span>}
         </>

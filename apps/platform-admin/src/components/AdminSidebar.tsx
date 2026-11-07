@@ -1,5 +1,6 @@
 import { BarChart3, BriefcaseBusiness, ShieldCheck, Users } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
+import { Avatar } from './data-display'
 import './adminSidebar.css'
 
 const navigation = [
@@ -45,7 +46,7 @@ function AdminSidebar({ drawer = false, open = false, onNavigate }: AdminSidebar
         })}
       </nav>
       <div className="admin-sidebar-profile">
-        <span className="admin-sidebar-avatar">SA</span>
+        <Avatar name="Super Admin" size="sm" />
         <span><strong>Super Admin</strong><small>Platform administrator</small></span>
       </div>
     </aside>

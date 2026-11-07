@@ -14,6 +14,10 @@ import {
   Users,
 } from 'lucide-react'
 import ResponsiveLayout from '../../components/layout/ResponsiveLayout'
+import { StatisticsCard } from '../../components/data-display'
+import { AlertMessage } from '../../components/notifications'
+import { EmptyState } from '../../components/feedback'
+import { PrimaryButton, SecondaryButton, IconButton } from '../../components/ui/buttons'
 import './reports.css'
 
 const reportTypes = [
@@ -114,22 +118,19 @@ function ReportsPage() {
         </select>
         <ChevronDown size={13} aria-hidden="true" />
       </label>
-      <button
-        className="reports-button reports-button--secondary reports-icon-button"
-        type="button"
-        aria-label="Refresh report"
+      <IconButton
+        icon={<RefreshCw size={15} />}
+        ariaLabel="Refresh report"
+        variant="secondary"
         onClick={() => setMessage('Report filters are up to date. No data is currently available.')}
-      >
-        <RefreshCw size={15} />
-      </button>
-      <button
-        className="reports-button reports-button--primary"
-        type="button"
+      />
+      <PrimaryButton
         disabled={dateRangeIsInvalid}
         onClick={exportReport}
+        icon={<Download size={15} />}
       >
-        <Download size={15} /> Export Report
-      </button>
+        Export Report
+      </PrimaryButton>
     </div>
   )
 
@@ -140,25 +141,33 @@ function ReportsPage() {
       icon={<BarChart3 size={24} />}
       headerActions={headerActions}
     >
-      {message && <p className="reports-message" role="status">{message}</p>}
+      {message && (
+        <div style={{ marginBottom: '1.25rem' }}>
+          <AlertMessage
+            variant="info"
+            message={message}
+            onClose={() => setMessage('')}
+          />
+        </div>
+      )}
 
-          <section className="reports-kpi-grid" aria-label="Summary statistics">
-            {[
-              { label: 'Total Users', icon: Users, tone: 'orange' },
-              { label: 'Total Customers', icon: UserRound, tone: 'blue' },
-              { label: 'Total Vendors', icon: Store, tone: 'green' },
-              { label: 'Active Telecallers', icon: PhoneCall, tone: 'purple' },
-            ].map(({ label, icon: Icon, tone }) => (
-              <article className="reports-kpi-card" key={label}>
-                <div className="reports-kpi-top">
-                  <span>{label}</span>
-                  <span className={`reports-kpi-icon reports-kpi-icon--${tone}`}><Icon size={17} /></span>
-                </div>
-                <div className="reports-kpi-value">--</div>
-                <p>No data available</p>
-              </article>
-            ))}
-          </section>
+      <section className="reports-kpi-grid" aria-label="Summary statistics">
+        {[
+          { label: 'Total Users', icon: Users, tone: 'orange' },
+          { label: 'Total Customers', icon: UserRound, tone: 'blue' },
+          { label: 'Total Vendors', icon: Store, tone: 'green' },
+          { label: 'Active Telecallers', icon: PhoneCall, tone: 'purple' },
+        ].map(({ label, icon: Icon, tone }) => (
+          <StatisticsCard
+            key={label}
+            title={label}
+            value="--"
+            icon={<Icon size={18} />}
+            tone={tone}
+            subtitle="No data available"
+          />
+        ))}
+      </section>
 
           <section className="reports-card reports-filter-card">
             <div className="reports-section-heading">
@@ -199,12 +208,12 @@ function ReportsPage() {
                 </select>
               </label>
               <div className="reports-filter-actions">
-                <button className="reports-button reports-button--primary" type="submit" disabled={dateRangeIsInvalid}>
-                  <FileBarChart size={15} /> Generate Report
-                </button>
-                <button className="reports-button reports-button--muted" type="button" onClick={resetFilters}>
-                  <RotateCcw size={14} /> Reset Filters
-                </button>
+                <PrimaryButton type="submit" disabled={dateRangeIsInvalid} icon={<FileBarChart size={15} />}>
+                  Generate Report
+                </PrimaryButton>
+                <SecondaryButton type="button" onClick={resetFilters} icon={<RotateCcw size={14} />}>
+                  Reset Filters
+                </SecondaryButton>
               </div>
             </form>
           </section>
@@ -244,19 +253,28 @@ function ReportsPage() {
                     : 'Generate a report to apply the selected filters. No records are currently available.'}
                 </p>
               </div>
-              <button
-                className="reports-button reports-button--secondary"
-                type="button"
+              <SecondaryButton
                 disabled={dateRangeIsInvalid}
                 onClick={exportReport}
+                icon={<Download size={14} />}
               >
-                <Download size={14} /> Export CSV
-              </button>
+                Export CSV
+              </SecondaryButton>
             </div>
             <div className="reports-table-scroll">
               <table className="reports-table">
                 <thead><tr><th>Record</th><th>Category</th><th>Email / Description</th><th>Status</th><th>Date</th></tr></thead>
-                <tbody><tr><td className="reports-empty-state" colSpan={5}>No report data available.</td></tr></tbody>
+                <tbody>
+                  <tr>
+                    <td colSpan={5} style={{ padding: '1.5rem', border: 'none' }}>
+                      <EmptyState
+                        title="No report data available"
+                        description="Generate a report to apply selected filters."
+                        size="sm"
+                      />
+                    </td>
+                  </tr>
+                </tbody>
               </table>
             </div>
           </section>

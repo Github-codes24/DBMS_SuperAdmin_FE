@@ -6,8 +6,10 @@ export type AlertType = 'success' | 'error' | 'warning' | 'info'
 
 export interface AlertMessageProps {
   type?: AlertType
+  variant?: AlertType
   title?: string
   description?: ReactNode
+  message?: ReactNode
   children?: ReactNode
   icon?: ReactNode
   action?: ReactNode
@@ -17,9 +19,11 @@ export interface AlertMessageProps {
 }
 
 export function AlertMessage({
-  type = 'info',
+  type,
+  variant,
   title,
   description,
+  message,
   children,
   icon,
   action,
@@ -31,6 +35,9 @@ export function AlertMessage({
 
   if (isDismissed) return null
 
+  const alertType = variant ?? type ?? 'info'
+  const isDismissible = dismissible || Boolean(onClose)
+
   const handleClose = () => {
     setIsDismissed(true)
     onClose?.()
@@ -38,7 +45,7 @@ export function AlertMessage({
 
   const renderIcon = () => {
     if (icon !== undefined) return icon
-    switch (type) {
+    switch (alertType) {
       case 'success':
         return <CheckCircle2 size={18} className="app-alert-icon" aria-hidden="true" />
       case 'error':
@@ -51,12 +58,12 @@ export function AlertMessage({
     }
   }
 
-  const bodyContent = description || children
+  const bodyContent = children || message || description
 
   return (
     <div
-      className={`app-alert app-alert--${type} ${className}`}
-      role={type === 'error' ? 'alert' : 'status'}
+      className={`app-alert app-alert--${alertType} ${className}`}
+      role={alertType === 'error' ? 'alert' : 'status'}
     >
       {renderIcon()}
       <div className="app-alert-content">
@@ -64,7 +71,7 @@ export function AlertMessage({
         {bodyContent && <div className="app-alert-desc">{bodyContent}</div>}
       </div>
       {action && <div className="app-alert-action">{action}</div>}
-      {dismissible && (
+      {isDismissible && (
         <button
           type="button"
           className="app-alert-close"

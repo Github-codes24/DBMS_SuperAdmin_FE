@@ -9,7 +9,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import {
   ArrowDownUp,
-  ArrowLeft,
   Calendar,
   Check,
   ChevronDown,
@@ -38,6 +37,8 @@ import { useToast, useConfirm } from "../../context";
 import { Modal, ImagePreview } from "../../components/overlays";
 import { StatisticsCard, StatusBadge, DataDetailView } from "../../components/data-display";
 import { CardSkeleton, EmptyState, NoSearchResults } from "../../components/feedback";
+import { PrimaryButton, SecondaryButton, DangerButton, BackButton } from "../../components/ui/buttons";
+import { AlertMessage } from "../../components/notifications";
 import {
   DEFAULT_PROJECT_THEME,
   initialProjectAdmins,
@@ -236,23 +237,21 @@ function ModalActions({
   submitDisabled?: boolean;
 }) {
   return (
-    <div className="projects-modal-actions">
-      <button
-        className="projects-button projects-button--secondary"
+    <div className="projects-modal-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+      <SecondaryButton
         type="button"
         onClick={onCancel}
       >
         {cancelLabel}
-      </button>
+      </SecondaryButton>
       {!hideSubmit && (
-        <button
-          className="projects-button projects-button--primary"
+        <PrimaryButton
           type="submit"
           disabled={submitDisabled}
+          icon={<Check size={15} />}
         >
-          <Check size={15} />
           {submitLabel}
-        </button>
+        </PrimaryButton>
       )}
     </div>
   );
@@ -718,32 +717,25 @@ function ProjectManagementPage() {
             <div className="pm-detail">
               {/* Back */}
               <div className="pm-detail__back">
-                <button
-                  className="pm-detail__back-btn"
-                  type="button"
-                  onClick={() => setDetailProject(null)}
-                >
-                  <ArrowLeft size={15} /> Back to Projects
-                </button>
+                <BackButton onClick={() => setDetailProject(null)} label="Back to Projects" />
                 <div className="pm-detail__back-actions">
-                  <button
-                    className="projects-button projects-button--secondary"
-                    type="button"
+                  <SecondaryButton
+                    size="sm"
+                    icon={<Pencil size={13} />}
                     onClick={() => openEditProject(detailProject)}
                   >
-                    <Pencil size={13} /> Edit
-                  </button>
-                  <button
-                    className="projects-button projects-button--danger"
-                    type="button"
+                    Edit
+                  </SecondaryButton>
+                  <DangerButton
+                    size="sm"
+                    icon={<Trash2 size={13} />}
                     disabled={deletingProjectId === detailProject.id}
+                    isLoading={deletingProjectId === detailProject.id}
+                    loadingText="Deleting…"
                     onClick={() => void deleteProject(detailProject)}
                   >
-                    <Trash2 size={13} />{" "}
-                    {deletingProjectId === detailProject.id
-                      ? "Deleting…"
-                      : "Delete"}
-                  </button>
+                    Delete
+                  </DangerButton>
                 </div>
               </div>
 
@@ -929,48 +921,39 @@ function ProjectManagementPage() {
                     </p>
                   </div>
                 </div>
-                <div className="projects-heading-actions">
-                  <button
-                    className="projects-button projects-button--secondary"
-                    type="button"
+                <div className="projects-heading-actions" style={{ display: 'flex', gap: '8px' }}>
+                  <SecondaryButton
+                    icon={<UserRoundPlus size={15} />}
                     onClick={openAddAdmin}
                   >
-                    <UserRoundPlus size={15} /> Add Project Admin
-                  </button>
-                  <button
-                    className="projects-button projects-button--primary"
-                    type="button"
+                    Add Project Admin
+                  </SecondaryButton>
+                  <PrimaryButton
+                    icon={<Plus size={16} />}
                     onClick={openAddProject}
                   >
-                    <Plus size={16} /> Add Project
-                  </button>
+                    Add Project
+                  </PrimaryButton>
                 </div>
               </section>
 
               {notice && (
-                <div className="projects-toast" role="status">
-                  <Check size={15} aria-hidden="true" />
-                  {notice}
-                  <button
-                    type="button"
-                    aria-label="Dismiss"
-                    onClick={() => setNotice("")}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
+                <AlertMessage
+                  variant="success"
+                  message={notice}
+                  onClose={() => setNotice("")}
+                />
               )}
               {projectLoadError && (
-                <div className="projects-load-error" role="alert">
-                  {projectLoadError}
-                  <button
-                    className="projects-button projects-button--secondary"
-                    type="button"
-                    onClick={() => void refreshProjects()}
-                  >
-                    Retry
-                  </button>
-                </div>
+                <AlertMessage
+                  variant="error"
+                  message={projectLoadError}
+                  action={
+                    <SecondaryButton size="sm" onClick={() => void refreshProjects()}>
+                      Retry
+                    </SecondaryButton>
+                  }
+                />
               )}
 
               {/* Stats */}
@@ -1025,13 +1008,12 @@ function ProjectManagementPage() {
                       Click a project to view its panels and user breakdown.
                     </p>
                   </div>
-                  <button
-                    className="projects-button projects-button--primary"
-                    type="button"
+                  <PrimaryButton
+                    icon={<Plus size={15} />}
                     onClick={openAddProject}
                   >
-                    <Plus size={15} /> Add Project
-                  </button>
+                    Add Project
+                  </PrimaryButton>
                 </div>
 
                 <div className="projects-toolbar">

@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Pencil, Plus, RotateCcw, Save, Search, ShieldCheck, Check, Trash2 } from 'lucide-react';
+import { ChevronDown, Pencil, Plus, RotateCcw, Save, ShieldCheck, Check, Trash2 } from 'lucide-react';
 import ResponsiveLayout from '../../components/layout/ResponsiveLayout';
 import { useToast, useConfirm } from '../../context';
+import { TableSkeletonRows, NoSearchResults } from '../../components/feedback';
+import { StatusBadge, TableSearch } from '../../components/data-display';
+import { AlertMessage } from '../../components/notifications';
+import { PrimaryButton, SecondaryButton, DangerButton } from '../../components/ui/buttons';
 import CreateRoleModal from './CreateRoleModal';
 import { createProjectRole, deleteProjectRole, getProjectRole, getRoleMatrix, listProjectRoles, listRoleActions, listRoleProjects, savePermissions, updateProjectRole, } from './rolesService';
 import './rolesPermissions.css';
@@ -275,13 +279,19 @@ function RolesPermissionsPage() {
     const isLoading = isLoadingProjects || isLoadingRoles || isLoadingMatrix;
 
     const headerActions = (
-      <div className="roles-header-actions">
-        <button className="roles-action-button roles-add-button" type="button" onClick={() => setIsCreateRoleOpen(true)}>
-          <Plus size={16}/>Add New Role
-        </button>
-        <button className="roles-action-button roles-save-button" type="button" disabled={!selectedRoleId || isLoading || isSaving} onClick={saveRolePermissions}>
-          <Save size={16}/>{isSaving ? 'Saving...' : 'Save Permissions'}
-        </button>
+      <div className="roles-header-actions" style={{ display: 'flex', gap: '8px' }}>
+        <SecondaryButton icon={<Plus size={16}/>} onClick={() => setIsCreateRoleOpen(true)}>
+          Add New Role
+        </SecondaryButton>
+        <PrimaryButton
+          icon={<Save size={16}/>}
+          disabled={!selectedRoleId || isLoading || isSaving}
+          isLoading={isSaving}
+          loadingText="Saving..."
+          onClick={saveRolePermissions}
+        >
+          Save Permissions
+        </PrimaryButton>
       </div>
     );
 
@@ -316,35 +326,32 @@ function RolesPermissionsPage() {
                       </select>
                       <ChevronDown size={14} aria-hidden="true"/>
                     </label>
-                    <span className="roles-count-badge">{activePermissions} of {totalPermissions} Privileges Active</span>
+                    <StatusBadge status={`${activePermissions} of ${totalPermissions} Privileges Active`} variant="primary" size="sm" dot={false} />
                   </div>
                   <p>{selectedRole ? `Configure module-specific access rights for ${selectedRole.name}.` : 'Select a project and role to configure access.'}</p>
                 </div>
               </div>
-              <div className="roles-toolbar-controls">
+              <div className="roles-toolbar-controls" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                 {selectedRole && (<>
-                    <button className="roles-control-button" type="button" disabled={isLoading || isDeleting} onClick={() => setIsEditRoleOpen(true)}>
-                      <Pencil size={14}/>Edit Role
-                    </button>
-                    <button className="roles-control-button" type="button" disabled={isLoading || isDeleting || selectedRole.isSystem} aria-label={`Delete ${selectedRole.name}`} onClick={deleteRole}>
-                      <Trash2 size={14}/>{isDeleting ? 'Deleting...' : 'Delete Role'}
-                    </button>
+                    <SecondaryButton size="sm" icon={<Pencil size={14}/>} disabled={isLoading || isDeleting} onClick={() => setIsEditRoleOpen(true)}>
+                      Edit Role
+                    </SecondaryButton>
+                    <DangerButton size="sm" icon={<Trash2 size={14}/>} disabled={isLoading || isDeleting || selectedRole.isSystem} aria-label={`Delete ${selectedRole.name}`} isLoading={isDeleting} loadingText="Deleting..." onClick={deleteRole}>
+                      Delete Role
+                    </DangerButton>
                   </>)}
-                <label className="roles-search">
-                  <Search size={15}/>
-                  <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter modules..." aria-label="Filter modules"/>
-                </label>
-                <button className="roles-control-button roles-reset-button" type="button" disabled={!selectedRoleId || isLoading} onClick={() => {
-            setPermissionState((current) => ({ ...current, [selectedRoleId]: createPermissions(permissionColumns) }));
-            setFilter('');
-            setSaveMessage('');
-        }}>
-                  <RotateCcw size={14}/>Reset
-                </button>
+                <TableSearch value={filter} onChange={setFilter} placeholder="Filter modules..." onClear={() => setFilter('')} />
+                <SecondaryButton size="sm" icon={<RotateCcw size={14}/>} disabled={!selectedRoleId || isLoading} onClick={() => {
+                  setPermissionState((current) => ({ ...current, [selectedRoleId]: createPermissions(permissionColumns) }));
+                  setFilter('');
+                  setSaveMessage('');
+                }}>
+                  Reset
+                </SecondaryButton>
               </div>
             </div>
 
-            {apiError && <p className="roles-api-error" role="alert">{apiError}</p>}
+            {apiError && <AlertMessage variant="error" message={apiError} onClose={() => setApiError('')} />}
 
             <div className="roles-table-scroll">
               <table className={`roles-table${showFullAccess ? '' : ' roles-table--without-full-access'}`}>
@@ -359,7 +366,16 @@ function RolesPermissionsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleModules.map(({ name, description }) => (<tr key={name}>
+                  {isLoadingMatrix ? (
+                    <TableSkeletonRows rows={modules.length} columns={tableHeaders.length + 1} />
+                  ) : visibleModules.length === 0 ? (
+                    <tr>
+                      <td colSpan={tableHeaders.length + 1} style={{ padding: 0, border: 'none' }}>
+                        <NoSearchResults query={filter} onClearSearch={() => setFilter('')} />
+                      </td>
+                    </tr>
+                  ) : (
+                    visibleModules.map(({ name, description }) => (<tr key={name}>
                       <td className="roles-module-cell">
                         <div className="roles-module-name">{name}</div>
                         <div className="roles-module-description">{description}</div>
@@ -378,8 +394,8 @@ function RolesPermissionsPage() {
                             </button>
                           </td>);
             })}
-                    </tr>))}
-                  {visibleModules.length === 0 && (<tr><td className="roles-empty-cell" colSpan={tableHeaders.length + 1}>No modules match “{filter}”.</td></tr>)}
+                    </tr>))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -387,9 +403,9 @@ function RolesPermissionsPage() {
               <span><i /> {isLoading ? 'Loading roles and permissions...' : saveMessage || 'Changes are local until saved.'}</span>
               <div className="roles-footer-actions">
                 <span>{saveMessage || `${visibleModules.length} modules`}</span>
-                <button className="roles-action-button roles-save-button" type="button" disabled={!selectedRoleId || isLoading || isSaving} onClick={saveRolePermissions}>
-                  <Save size={15}/>{isSaving ? 'Saving...' : 'Save Changes'}
-                </button>
+                <PrimaryButton size="sm" icon={<Save size={15}/>} disabled={!selectedRoleId || isLoading || isSaving} isLoading={isSaving} loadingText="Saving..." onClick={saveRolePermissions}>
+                  Save Changes
+                </PrimaryButton>
               </div>
             </div>
           </section>
