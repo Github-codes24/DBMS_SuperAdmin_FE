@@ -7,20 +7,26 @@ import {
   Mail,
   ShieldCheck,
   ArrowRight,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiBaseUrl } from "../../api";
 import { setAccessToken } from "./authService";
 import { LoadingButton } from "../../components/ui/buttons";
 import { AlertMessage } from "../../components/notifications";
+import { useTheme } from "../../context";
 import homeImg from "../../assets/home.png";
 import logo from "../../assets/logo.png";
+import "./login.css";
 
 const EMAIL_REGEX =
   /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
 
 function Login() {
   const navigate = useNavigate();
+  const { effectiveMode, setMode, applyTheme, colorId, customColor } = useTheme();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -29,6 +35,12 @@ function Login() {
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleToggleTheme = () => {
+    const nextMode = effectiveMode === "dark" ? "light" : "dark";
+    setMode(nextMode);
+    applyTheme({ mode: nextMode, colorId, customColor });
+  };
 
   const validateEmailFormat = (val: string) => {
     const trimmed = (val || "").trim();
@@ -163,11 +175,21 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-[#fff7ed] via-white to-[#fff1e6] flex items-center justify-center p-4 sm:p-6 md:p-10 relative overflow-x-hidden overflow-y-auto font-sans">
-      {/* Background LTS Orange Curved Shape */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+    <div className="login-page-root">
+      {/* Theme Mode Quick Switch */}
+      <button
+        className="login-theme-toggle"
+        type="button"
+        aria-label={`Switch to ${effectiveMode === "dark" ? "light" : "dark"} mode`}
+        title={`Switch to ${effectiveMode === "dark" ? "light" : "dark"} mode`}
+        onClick={handleToggleTheme}
+      >
+        {effectiveMode === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+      </button>
+
+      {/* Decorative Wave Shape */}
+      <div className="login-bg-shape">
         <svg
-          className="absolute left-0 top-0 h-full w-full text-[#ffedd5]/60"
           viewBox="0 0 1440 900"
           fill="none"
           preserveAspectRatio="none"
@@ -180,22 +202,23 @@ function Login() {
       </div>
 
       {/* Main Container */}
-      <div className="relative z-10 w-full max-w-7xl flex flex-col lg:flex-row items-center justify-center lg:justify-between gap-8 lg:gap-20 my-auto">
+      <div className="login-content-wrapper">
         {/* Login Card */}
-        <div className="w-full max-w-[430px] bg-white/90 backdrop-blur-md rounded-3xl shadow-2xl border border-orange-100 p-7 sm:p-12 flex flex-col items-center">
-          {/* Official LTS Logo Header */}
+        <div className="login-card">
+          {/* Logo Header */}
           <div className="flex items-center justify-center mb-8 cursor-pointer group hover:scale-105 transition-transform">
             <img
               src={logo}
-              alt="DBMS"
+              alt="DBMS Super Admin"
               className="h-12 sm:h-20 w-auto object-contain"
             />
           </div>
+
           <div className="w-full text-center">
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mb-1 tracking-tight">
+            <h2 className="login-title">
               Super Admin Login
             </h2>
-            <p className="text-slate-500 text-xs sm:text-sm font-medium mb-6">
+            <p className="login-subtitle">
               Sign in to DBMS Super Admin Management Suite
             </p>
 
@@ -216,13 +239,13 @@ function Login() {
             >
               {/* Email Address */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="login-field-label">
                   Email Address
                 </label>
-                <div className="relative">
+                <div className="login-input-group">
                   <Mail
                     size={16}
-                    className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${emailError ? "text-rose-400" : "text-slate-400"}`}
+                    className={`login-input-icon ${emailError ? "!text-rose-400" : ""}`}
                   />
                   <input
                     type="email"
@@ -230,11 +253,7 @@ function Login() {
                     value={email}
                     onChange={handleEmailChange}
                     onBlur={handleEmailBlur}
-                    className={`w-full pl-10 pr-4 py-4 text-xs sm:text-sm bg-slate-50 border rounded-xl text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all font-medium ${
-                      emailError
-                        ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
-                        : "border-slate-200 focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20"
-                    }`}
+                    className={`login-input ${emailError ? "login-input--error" : ""}`}
                   />
                 </div>
                 {emailError && (
@@ -247,29 +266,26 @@ function Login() {
 
               {/* Password */}
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="login-field-label">
                   Password
                 </label>
-                <div className="relative">
+                <div className="login-input-group">
                   <Lock
                     size={16}
-                    className={`absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors ${passwordError ? "text-rose-400" : "text-slate-400"}`}
+                    className={`login-input-icon ${passwordError ? "!text-rose-400" : ""}`}
                   />
                   <input
                     type={showPassword ? "text" : "password"}
                     placeholder="Enter password"
                     value={password}
                     onChange={handlePasswordChange}
-                    className={`w-full pl-10 pr-11 py-4 text-xs sm:text-sm bg-slate-50 border rounded-xl text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none transition-all font-medium ${
-                      passwordError
-                        ? "border-rose-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"
-                        : "border-slate-200 focus:border-[#f26522] focus:ring-2 focus:ring-[#f26522]/20"
-                    }`}
+                    className={`login-input ${passwordError ? "login-input--error" : ""}`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                    className="login-password-toggle"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -283,20 +299,20 @@ function Login() {
               </div>
 
               {/* Remember Me & Forgot Password */}
-              <div className="flex items-center justify-between pt-1 pb-1">
-                <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+              <div className="flex items-center justify-between pt-1 pb-1 w-full">
+                <label className="login-checkbox-label">
                   <input
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
-                    className="w-4 h-4 text-[#f26522] border-slate-300 rounded focus:ring-[#f26522] cursor-pointer"
+                    className="login-checkbox"
                   />
                   <span>Remember me</span>
                 </label>
 
                 <button
                   type="button"
-                  className="text-xs font-bold text-[#f26522] hover:text-[#e05411] hover:underline cursor-pointer"
+                  className="login-forgot-link"
                   onClick={() =>
                     setNoticeMessage("Forgot password is not connected yet.")
                   }
@@ -310,7 +326,7 @@ function Login() {
                 type="submit"
                 loading={isLoading}
                 loadingText="Signing in..."
-                className="w-full !py-3.5 !rounded-xl !text-sm !font-bold !bg-gradient-to-r !from-[#f26522] !to-[#e05411] hover:!from-[#e05411] hover:!to-[#c84302] shadow-lg shadow-orange-500/25 cursor-pointer"
+                className="login-submit-button"
                 icon={<ArrowRight size={16} />}
               >
                 Sign In to DBMS Suite
@@ -330,13 +346,13 @@ function Login() {
           </div>
 
           {/* Floating Badge */}
-          <div className="mt-4 bg-white/90 backdrop-blur-md px-5 py-3 rounded-2xl shadow-xl border border-orange-100 flex items-center gap-3.5">
-            <ShieldCheck size={24} className="text-[#f26522] shrink-0" />
+          <div className="login-brand-badge">
+            <ShieldCheck size={24} className="login-brand-badge-icon" />
             <div className="text-left">
-              <div className="text-sm font-bold text-slate-800">
+              <div className="login-brand-badge-title">
                 DBMS Verified Enterprise Portal
               </div>
-              <div className="text-xs text-slate-500 font-medium mt-0.5">
+              <div className="login-brand-badge-desc">
                 100% Encrypted & Authenticated Suite
               </div>
             </div>
