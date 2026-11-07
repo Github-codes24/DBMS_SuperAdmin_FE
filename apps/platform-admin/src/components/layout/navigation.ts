@@ -50,3 +50,4 @@ export const DEFAULT_NAVIGATION_ITEMS: NavigationItem[] = [
     roles: ['superadmin', 'admin'],
   },
 ]
+
