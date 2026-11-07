@@ -4,6 +4,7 @@ import {
   ShieldCheck,
   Users,
   LayoutDashboard,
+  Settings,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -48,6 +49,13 @@ export const DEFAULT_NAVIGATION_ITEMS: NavigationItem[] = [
     href: '/reports-analytics',
     aliases: ['/reports'],
     roles: ['superadmin', 'admin'],
+  },
+  {
+    label: 'Settings',
+    icon: Settings,
+    href: '/settings',
+    aliases: ['/settings/appearance'],
+    roles: ['superadmin', 'admin', 'user'],
   },
 ]
 

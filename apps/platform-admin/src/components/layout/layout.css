@@ -141,6 +141,26 @@
   gap: var(--space-3);
 }
 
+.app-navbar-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color-default, #e2e8f0);
+  background: var(--color-bg-surface, #ffffff);
+  color: var(--color-text-secondary, #475569);
+  cursor: pointer;
+  transition: var(--transition-all);
+}
+
+.app-navbar-theme-toggle:hover {
+  background: var(--color-bg-surface-hover, #f8fafc);
+  color: var(--color-primary, #f96321);
+  border-color: var(--color-primary, #f96321);
+}
+
 .app-navbar-profile {
   display: flex;
   align-items: center;

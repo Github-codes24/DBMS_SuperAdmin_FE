@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Menu, ShieldCheck } from 'lucide-react'
+import { Menu, ShieldCheck, Sun, Moon } from 'lucide-react'
 import AuthNavbarAction from '../AuthNavbarAction'
 import { getCurrentUser } from '../../features/auth/authService'
 import { NotificationCenter, type NotificationCenterProps } from '../notifications/NotificationCenter'
 import { useToast } from '../../context/useToast'
+import { useTheme } from '../../context'
 
 interface TopNavbarProps {
   onMenuClick?: () => void
@@ -19,12 +20,21 @@ const SECTION_MAP: Record<string, string> = {
   '/projects': 'Project Management',
   '/roles-permissions': 'Roles & Permissions',
   '/reports-analytics': 'Reports & Analytics',
+  '/settings': 'Settings',
+  '/settings/appearance': 'Theme & Appearance',
 }
 
 export function TopNavbar({ onMenuClick, sectionTitle, actions }: TopNavbarProps) {
   const location = useLocation()
   const user = getCurrentUser()
   const derivedTitle = sectionTitle || SECTION_MAP[location.pathname] || 'Workspace'
+  const { effectiveMode, setMode, applyTheme, colorId, customColor } = useTheme()
+
+  const handleToggleTheme = () => {
+    const nextMode = effectiveMode === 'dark' ? 'light' : 'dark'
+    setMode(nextMode)
+    applyTheme({ mode: nextMode, colorId, customColor })
+  }
 
   let notifProps: NotificationCenterProps = {
     notifications: [],
@@ -86,6 +96,16 @@ export function TopNavbar({ onMenuClick, sectionTitle, actions }: TopNavbarProps
 
       <div className="app-navbar-right">
         {actions}
+
+        <button
+          className="app-navbar-theme-toggle"
+          type="button"
+          aria-label={`Switch to ${effectiveMode === 'dark' ? 'light' : 'dark'} mode`}
+          title={`Switch to ${effectiveMode === 'dark' ? 'light' : 'dark'} mode`}
+          onClick={handleToggleTheme}
+        >
+          {effectiveMode === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
+        </button>
 
         <NotificationCenter
           notifications={notifProps.notifications}
