@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Menu, Pencil, Plus, RotateCcw, Save, Search, ShieldCheck, Check, Trash2, } from 'lucide-react';
-import AdminSidebar from '../../components/AdminSidebar';
-import AuthNavbarAction from '../../components/AuthNavbarAction';
+import { ChevronDown, Pencil, Plus, RotateCcw, Save, Search, ShieldCheck, Check, Trash2 } from 'lucide-react';
+import ResponsiveLayout from '../../components/layout/ResponsiveLayout';
 import CreateRoleModal from './CreateRoleModal';
 import { createProjectRole, deleteProjectRole, getProjectRole, getRoleMatrix, listProjectRoles, listRoleActions, listRoleProjects, savePermissions, updateProjectRole, } from './rolesService';
 import './rolesPermissions.css';
@@ -27,7 +26,6 @@ function RolesPermissionsPage() {
     const [permissionState, setPermissionState] = useState({});
     const [expectedVersion, setExpectedVersion] = useState();
     const [filter, setFilter] = useState('');
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isCreateRoleOpen, setIsCreateRoleOpen] = useState(false);
     const [isEditRoleOpen, setIsEditRoleOpen] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
@@ -262,52 +260,25 @@ function RolesPermissionsPage() {
         }
     }
     const isLoading = isLoadingProjects || isLoadingRoles || isLoadingMatrix;
-    return (<div className="roles-page">
-      <header className="roles-navbar">
-        <button className="roles-menu-button" type="button" aria-label="Open navigation menu" onClick={() => setSidebarOpen(true)}>
-          <Menu size={21}/>
-        </button>
-        <div className="roles-brand">
-          <span className="roles-brand-mark"><ShieldCheck size={19}/></span>
-          <span>DBMS <strong>SUPER ADMIN</strong></span>
-        </div>
-        <div className="roles-navbar-section">ROLES &amp; PERMISSIONS</div>
-        <button className="roles-profile" type="button">
-          <span className="roles-profile-avatar">SA</span>
-          <span>Super Admin</span>
-          <ChevronDown size={15}/>
-        </button>
-        <AuthNavbarAction />
-      </header>
 
-      <div className="roles-workspace">
-        {sidebarOpen && <button className="roles-backdrop" type="button" aria-label="Close navigation menu" onClick={() => setSidebarOpen(false)}/>}
-        <AdminSidebar drawer open={sidebarOpen} onNavigate={() => setSidebarOpen(false)}/>
+    const headerActions = (
+      <div className="roles-header-actions">
+        <button className="roles-action-button roles-add-button" type="button" onClick={() => setIsCreateRoleOpen(true)}>
+          <Plus size={16}/>Add New Role
+        </button>
+        <button className="roles-action-button roles-save-button" type="button" disabled={!selectedRoleId || isLoading || isSaving} onClick={saveRolePermissions}>
+          <Save size={16}/>{isSaving ? 'Saving...' : 'Save Permissions'}
+        </button>
+      </div>
+    );
 
-        <main className="roles-main">
-          <section className="roles-header-card">
-            <div className="roles-header-copy">
-              <div className="roles-title-row">
-                <span className="roles-title-icon"><ShieldCheck size={25} strokeWidth={2}/></span>
-                <div className="roles-title-text">
-                  <div className="roles-heading-line">
-                    <h1>Roles &amp; Permissions Management</h1>
-                    <span className="roles-access-badge">Super Admin Access Only</span>
-                  </div>
-                  <p>Only Super Admin has master access to assign and manage module permissions (View, Edit, Import, Delete) for Admin and Telecaller roles.</p>
-                </div>
-              </div>
-            </div>
-            <div className="roles-header-actions">
-              <div className="roles-logged-in"><i /> <span>Logged in: <strong>Super Admin</strong></span></div>
-              <button className="roles-action-button roles-add-button" type="button" onClick={() => setIsCreateRoleOpen(true)}>
-                <Plus size={16}/>Add New Role
-              </button>
-              <button className="roles-action-button roles-save-button" type="button" disabled={!selectedRoleId || isLoading || isSaving} onClick={saveRolePermissions}>
-                <Save size={16}/>{isSaving ? 'Saving...' : 'Save Permissions'}
-              </button>
-            </div>
-          </section>
+    return (
+      <ResponsiveLayout
+        title="Roles & Permissions Management"
+        description="Only Super Admin has master access to assign and manage module permissions (View, Edit, Import, Delete) for Admin and Telecaller roles."
+        icon={<ShieldCheck size={25} strokeWidth={2}/>}
+        headerActions={headerActions}
+      >
 
           <section className="roles-permissions-card" aria-label="Roles permissions">
             <div className="roles-toolbar">
@@ -409,10 +380,9 @@ function RolesPermissionsPage() {
               </div>
             </div>
           </section>
-        </main>
-      </div>
-      {isCreateRoleOpen && (<CreateRoleModal mode="create" roleOptions={roleOptions.map(({ id, name }) => ({ id, name }))} onClose={() => setIsCreateRoleOpen(false)} onSubmit={createRole}/>)}
-      {isEditRoleOpen && selectedRole && (<CreateRoleModal mode="edit" roleOptions={roleOptions.map(({ id, name }) => ({ id, name }))} roleId={selectedRole.id} initialTitle={selectedRole.name} initialDescription={selectedRole.description} onClose={() => setIsEditRoleOpen(false)} onSubmit={updateRole}/>)}
-    </div>);
+        {isCreateRoleOpen && (<CreateRoleModal mode="create" roleOptions={roleOptions.map(({ id, name }) => ({ id, name }))} onClose={() => setIsCreateRoleOpen(false)} onSubmit={createRole}/>)}
+        {isEditRoleOpen && selectedRole && (<CreateRoleModal mode="edit" roleOptions={roleOptions.map(({ id, name }) => ({ id, name }))} roleId={selectedRole.id} initialTitle={selectedRole.name} initialDescription={selectedRole.description} onClose={() => setIsEditRoleOpen(false)} onSubmit={updateRole}/>)}
+      </ResponsiveLayout>
+    );
 }
 export default RolesPermissionsPage;

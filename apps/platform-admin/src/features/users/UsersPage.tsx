@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import AdminSidebar from '../../components/AdminSidebar'
-import AuthNavbarAction from '../../components/AuthNavbarAction'
+import { Users as UsersIcon } from 'lucide-react'
+import ResponsiveLayout from '../../components/layout/ResponsiveLayout'
 import './users.css'
 import {
   createUser,
@@ -338,29 +338,17 @@ function UserManagementPage() {
   }
 
   return (
-    <div className="user-admin-shell">
-      <header className="user-admin-navbar">
-        <span className="user-admin-navbar-title">DBMS <strong>SUPER ADMIN</strong></span>
-        <span className="user-admin-navbar-section">USER MANAGEMENT</span>
-        <span className="user-admin-navbar-user"><span aria-hidden="true" /> Super Admin</span>
-        <AuthNavbarAction />
-      </header>
-      <div className="user-admin-body">
-        <AdminSidebar />
-
-        <div className="user-admin-main">
-        <main className="page-content user-management-page">
-      <section className="page-heading user-page-heading">
-        <div>
-          <div className="user-heading-kicker"><span className="kicker-line" /> ACCESS CONTROL</div>
-          <h1>User Management</h1>
-          <p className="page-description">Create and manage platform user accounts.</p>
-        </div>
+    <ResponsiveLayout
+      title="User Management"
+      description="Create and manage platform user accounts."
+      icon={<UsersIcon size={24} />}
+      headerActions={
         <button className="button button--primary create-button" type="button" onClick={openCreate}>
           <span aria-hidden="true">＋</span> Create User
         </button>
-      </section>
-
+      }
+    >
+      <div className="user-management-page">
       {toast && <div className="toast user-toast" role="status">{toast}</div>}
       {actionError && (
         <div className="inline-alert inline-alert--error" role="alert">
@@ -599,10 +587,8 @@ function UserManagementPage() {
           </section>
         </div>
       )}
-        </main>
-        </div>
       </div>
-    </div>
+    </ResponsiveLayout>
   )
 }
 

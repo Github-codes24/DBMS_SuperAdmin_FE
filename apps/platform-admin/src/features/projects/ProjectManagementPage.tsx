@@ -10,7 +10,6 @@ import { useNavigate } from "react-router-dom";
 import {
   ArrowDownUp,
   ArrowLeft,
-  BriefcaseBusiness,
   Calendar,
   Check,
   ChevronDown,
@@ -20,14 +19,12 @@ import {
   FolderKanban,
   LayoutGrid,
   Mail,
-  Menu,
   CalendarClock,
   PauseCircle,
   Pencil,
   Phone,
   Plus,
   Search,
-  ShieldCheck,
   Trash2,
   Upload,
   UserRound,
@@ -36,8 +33,7 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import AdminSidebar from "../../components/AdminSidebar";
-import AuthNavbarAction from "../../components/AuthNavbarAction";
+import ResponsiveLayout from "../../components/layout/ResponsiveLayout";
 import {
   DEFAULT_PROJECT_THEME,
   initialProjectAdmins,
@@ -331,7 +327,6 @@ function ProjectManagementPage() {
   const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [viewAdmin, setViewAdmin] = useState<ProjectAdmin | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // ── form ──
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -733,48 +728,8 @@ function ProjectManagementPage() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="projects-page">
-      {/* ── Navbar ── */}
-      <header className="projects-navbar">
-        <button
-          className="projects-menu-button"
-          type="button"
-          aria-label="Open navigation menu"
-          onClick={() => setSidebarOpen(true)}
-        >
-          <Menu size={21} />
-        </button>
-        <div className="projects-brand">
-          <span className="projects-brand-mark">
-            <BriefcaseBusiness size={17} />
-          </span>
-          <span>
-            DBMS <strong>SUPER ADMIN</strong>
-          </span>
-        </div>
-        <div className="projects-navbar-section">PROJECT MANAGEMENT</div>
-        <div className="projects-profile">
-          <span className="projects-profile-avatar">SA</span>
-          <span>Super Admin</span>
-        </div>
-        <AuthNavbarAction />
-      </header>
-
-      <div className="projects-workspace">
-        {sidebarOpen && (
-          <button
-            className="projects-backdrop"
-            type="button"
-            aria-label="Close navigation menu"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-        <AdminSidebar
-          drawer
-          open={sidebarOpen}
-          onNavigate={() => setSidebarOpen(false)}
-        />
-
+    <ResponsiveLayout>
+      <div className="projects-page-inner">
         <main className="projects-main">
           {/* ════════════════════════════════════════════════════════════════
               DETAIL VIEW
@@ -1366,7 +1321,6 @@ function ProjectManagementPage() {
             </>
           )}
         </main>
-      </div>
 
       {/* ════ Project create / edit modal ════ */}
       {projectModalOpen && (
@@ -1946,7 +1900,8 @@ function ProjectManagementPage() {
           </section>
         </div>
       )}
-    </div>
+      </div>
+    </ResponsiveLayout>
   );
 }
 
