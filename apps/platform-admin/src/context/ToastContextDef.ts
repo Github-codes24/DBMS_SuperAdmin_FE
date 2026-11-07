@@ -59,3 +59,4 @@ export interface ToastProviderProps {
   children: ReactNode
   position?: ToastPosition
 }
+
