@@ -1,6 +1,14 @@
 .projects-page,
-.projects-page * {
+.projects-page-inner,
+.projects-page *,
+.projects-page-inner * {
   box-sizing: border-box;
+}
+
+.projects-page-inner {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .projects-page {
@@ -11,15 +19,8 @@
   --project-muted: #94a3b8;
   --project-border: #e5eaf1;
   --project-canvas: #f3f6fa;
-  height: 100vh;
-  height: 100dvh;
-  min-height: 0;
-  flex: 0 0 100dvh;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-color: #cbd5e1 #f3f6fa;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
+  width: 100%;
+  min-height: auto;
   background: var(--project-canvas);
   color: var(--project-ink);
   font:

@@ -1,0 +1,584 @@
+/**
+ * DBMS SuperAdmin Global Layout Styles
+ * Governs TopNavbar, Sidebar, PageHeader, Breadcrumbs, PageContainer, TabNavigation, Footer
+ */
+
+/* =========================================================================
+   1. Root Layout Shell
+   ========================================================================= */
+.app-layout {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  background-color: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  overflow-x: clip;
+}
+
+.app-layout-workspace {
+  display: flex;
+  flex: 1;
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  align-items: flex-start;
+}
+
+.app-layout-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+  padding: var(--space-4) var(--space-6) var(--space-8);
+}
+
+@media (max-width: 768px) {
+  .app-layout-main {
+    padding: var(--space-3) var(--space-4) var(--space-6);
+  }
+}
+
+/* =========================================================================
+   2. Top Navigation Bar (TopNavbar)
+   ========================================================================= */
+.app-navbar {
+  height: var(--navbar-height);
+  min-height: var(--navbar-height);
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 var(--space-5);
+  background: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-slate-200);
+  box-shadow: var(--shadow-xs);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.app-navbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.app-navbar-toggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-slate-200);
+  background: var(--color-bg-surface);
+  color: var(--color-slate-600);
+  cursor: pointer;
+  transition: var(--transition-all);
+}
+
+.app-navbar-toggle:hover {
+  background: var(--color-slate-100);
+  color: var(--color-slate-900);
+}
+
+@media (max-width: 1024px) {
+  .app-navbar-toggle {
+    display: inline-flex;
+  }
+}
+
+.app-navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: var(--color-slate-900);
+  font-weight: var(--weight-bold);
+  font-size: var(--text-base);
+  letter-spacing: -0.01em;
+}
+
+.app-navbar-brand-mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(249, 99, 33, 0.25);
+}
+
+.app-navbar-section-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: var(--color-primary-50);
+  border: 1px solid var(--color-primary-100);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+}
+
+@media (max-width: 640px) {
+  .app-navbar-section-tag {
+    display: none;
+  }
+}
+
+.app-navbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.app-navbar-theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color-default, #e2e8f0);
+  background: var(--color-bg-surface, #ffffff);
+  color: var(--color-text-secondary, #475569);
+  cursor: pointer;
+  transition: var(--transition-all);
+}
+
+.app-navbar-theme-toggle:hover {
+  background: var(--color-bg-surface-hover, #f8fafc);
+  color: var(--color-primary, #f96321);
+  border-color: var(--color-primary, #f96321);
+}
+
+.app-navbar-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 4px 10px 4px 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-slate-100);
+  border: 1px solid var(--color-slate-200);
+  color: var(--color-slate-700);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.app-navbar-avatar {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+  color: #fff;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+}
+
+@media (max-width: 640px) {
+  .app-navbar-profile span.app-navbar-profile-name {
+    display: none;
+  }
+}
+
+/* =========================================================================
+   3. Sidebar Navigation (Sidebar)
+   ========================================================================= */
+.app-sidebar {
+  width: var(--sidebar-width);
+  flex: 0 0 var(--sidebar-width);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: calc(var(--navbar-height) + var(--space-3));
+  height: calc(100vh - var(--navbar-height) - var(--space-6));
+  max-height: calc(100dvh - var(--navbar-height) - var(--space-6));
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: var(--space-3) 0 var(--space-3) var(--space-3);
+  padding: var(--space-4) var(--space-3) var(--space-3);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--border-color-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-normal) var(--ease-default);
+  z-index: 30;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color-strong) transparent;
+}
+
+.app-sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2) var(--space-4);
+  color: var(--color-slate-900);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-extrabold);
+  text-decoration: none;
+  border-bottom: 1px solid var(--color-slate-100);
+  margin-bottom: var(--space-3);
+}
+
+.app-sidebar-brand strong {
+  color: var(--color-slate-500);
+  font-weight: var(--weight-medium);
+  margin-left: 2px;
+}
+
+.app-sidebar-label {
+  margin: 0;
+  padding: var(--space-1) var(--space-2) var(--space-2);
+  color: var(--color-slate-400);
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.app-sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1;
+}
+
+.app-sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  color: var(--color-slate-600);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  transition: var(--transition-all);
+}
+
+.app-sidebar-link:hover {
+  background: var(--color-slate-100);
+  color: var(--color-slate-900);
+}
+
+.app-sidebar-link--active {
+  background: var(--color-primary-50);
+  color: var(--color-primary);
+  font-weight: var(--weight-semibold);
+}
+
+.app-sidebar-link--active:hover {
+  background: var(--color-primary-100);
+  color: var(--color-primary-hover);
+}
+
+.app-sidebar-link-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: var(--color-slate-200);
+  color: var(--color-slate-700);
+}
+
+.app-sidebar-link--active .app-sidebar-link-badge {
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.app-sidebar-footer {
+  margin-top: auto;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-slate-100);
+}
+
+.app-sidebar-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--color-slate-50);
+  border: 1px solid var(--color-slate-200);
+}
+
+.app-sidebar-profile-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.app-sidebar-profile-name {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
+  color: var(--color-slate-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-sidebar-profile-role {
+  font-size: 10px;
+  color: var(--color-slate-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Sidebar Responsive Drawer */
+@media (max-width: 1024px) {
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    margin: 0;
+    height: 100vh;
+    border-radius: 0 var(--radius-xl) var(--radius-xl) 0;
+    box-shadow: var(--shadow-2xl);
+    z-index: 50;
+    transform: translateX(-105%);
+  }
+
+  .app-sidebar--open {
+    transform: translateX(0);
+  }
+
+  .app-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--color-bg-overlay);
+    backdrop-filter: blur(2px);
+    z-index: 45;
+    border: none;
+    cursor: pointer;
+    animation: fadeIn var(--duration-fast) ease-out;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* =========================================================================
+   4. Breadcrumbs (Breadcrumbs)
+   ========================================================================= */
+.app-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-xs);
+  color: var(--color-slate-500);
+}
+
+.app-breadcrumb-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  color: var(--color-slate-500);
+  transition: var(--transition-colors);
+}
+
+.app-breadcrumb-item:hover {
+  color: var(--color-primary);
+}
+
+.app-breadcrumb-item--current {
+  color: var(--color-slate-900);
+  font-weight: var(--weight-semibold);
+  pointer-events: none;
+}
+
+.app-breadcrumb-separator {
+  color: var(--color-slate-400);
+  display: inline-flex;
+  align-items: center;
+}
+
+/* =========================================================================
+   5. Page Header (PageHeader)
+   ========================================================================= */
+.app-page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-slate-200);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  margin-bottom: var(--space-5);
+}
+
+.app-page-header-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.app-page-header-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  background: var(--color-primary-50);
+  border: 1px solid var(--color-primary-100);
+  color: var(--color-primary);
+}
+
+.app-page-header-text h1 {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-extrabold);
+  color: var(--color-slate-900);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.app-page-header-text p {
+  font-size: var(--text-sm);
+  color: var(--color-slate-500);
+  margin-top: 2px;
+}
+
+.app-page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .app-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: var(--space-4);
+  }
+
+  .app-page-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* =========================================================================
+   6. Tab Navigation (TabNavigation)
+   ========================================================================= */
+.app-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--color-slate-200);
+  margin-bottom: var(--space-5);
+  overflow-x: auto;
+}
+
+.app-tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-slate-500);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--transition-all);
+}
+
+.app-tab-button:hover {
+  color: var(--color-slate-900);
+}
+
+.app-tab-button--active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.app-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  border-radius: var(--radius-full);
+  background: var(--color-slate-100);
+  color: var(--color-slate-600);
+}
+
+.app-tab-button--active .app-tab-badge {
+  background: var(--color-primary-100);
+  color: var(--color-primary);
+}
+
+/* =========================================================================
+   7. Page Container (PageContainer)
+   ========================================================================= */
+.app-page-container {
+  width: 100%;
+  margin: 0 auto;
+}
+
+.app-page-container--boxed {
+  max-width: 1400px;
+}
+
+.app-page-container--fluid {
+  max-width: 100%;
+}
+
+/* =========================================================================
+   8. Global Footer (Footer)
+   ========================================================================= */
+.app-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-5) 0 var(--space-2);
+  margin-top: auto;
+  border-top: 1px solid var(--color-slate-200);
+  font-size: var(--text-xs);
+  color: var(--color-slate-400);
+}
+
+.app-footer-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.app-footer-link {
+  color: var(--color-slate-500);
+  text-decoration: none;
+  transition: var(--transition-colors);
+}
+
+.app-footer-link:hover {
+  color: var(--color-primary);
+}
+

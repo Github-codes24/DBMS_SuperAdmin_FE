@@ -2696,13 +2696,10 @@ body {
   box-sizing: border-box;
   display: flex;
   width: 100%;
-  height: 100vh;
-  height: 100dvh;
-  min-height: 0;
+  min-height: auto;
   flex-direction: column;
-  gap: 10px;
-  overflow: hidden;
-  padding: 0 clamp(16px, 3vw, 42px) 10px;
+  gap: 16px;
+  padding: 0;
 }
 
 .user-orange-topbar {
@@ -2788,17 +2785,11 @@ body {
   color: #ffffff;
 }
 
-body {
-  overflow: hidden;
-}
-
 .user-admin-shell {
   display: flex;
   width: 100%;
-  height: 100vh;
-  height: 100dvh;
+  min-height: 100vh;
   flex-direction: column;
-  overflow: hidden;
   background: #f8fafc;
 }
 
@@ -2806,7 +2797,6 @@ body {
   display: flex;
   min-height: 0;
   flex: 1 1 auto;
-  overflow: hidden;
 }
 
 .user-admin-sidebar {

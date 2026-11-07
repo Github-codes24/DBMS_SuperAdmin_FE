@@ -1,0 +1,241 @@
+/**
+ * DBMS SuperAdmin Centralized Theme & Appearance Styles
+ * Supports dynamic primary shades, light/dark mode, and live UI preview
+ */
+
+:root {
+  --primary-color: var(--color-primary, #f96321);
+  --primary-hover: var(--color-primary-hover, #ea580c);
+  --primary-light: var(--color-primary-50, #fff7ed);
+  --sidebar-bg: #ffffff;
+  --navbar-bg: #ffffff;
+  --page-bg: #f8fafc;
+  --card-bg: #ffffff;
+  --text-primary: #0f172a;
+  --border-color: #e2e8f0;
+}
+
+/* =========================================================================
+   Dark Theme Token Overrides
+   ========================================================================= */
+:root.dark,
+[data-theme="dark"] {
+  --color-bg-canvas: #0b0f19;
+  --color-bg-surface: #111827;
+  --color-bg-surface-subtle: #1f2937;
+  --color-bg-surface-hover: #1f2937;
+  --color-bg-overlay: rgba(0, 0, 0, 0.7);
+
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #d1d5db;
+  --color-text-muted: #9ca3af;
+  --color-text-subtle: #6b7280;
+  --color-text-inverse: #0f172a;
+
+  --border-color-default: #374151;
+  --border-color-subtle: #1f2937;
+  --border-color-strong: #4b5563;
+
+  --sidebar-bg: #101726;
+  --navbar-bg: #111827;
+  --page-bg: #0b0f19;
+  --card-bg: #111827;
+  --text-primary: #f9fafb;
+  --border-color: #374151;
+
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.5);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.6);
+}
+
+/* =========================================================================
+   Global Dark Theme Element Overrides
+   ========================================================================= */
+html.dark body,
+[data-theme="dark"] body {
+  background-color: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+}
+
+html.dark .app-layout,
+[data-theme="dark"] .app-layout {
+  background-color: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+}
+
+html.dark .admin-sidebar,
+[data-theme="dark"] .admin-sidebar,
+html.dark .app-sidebar,
+[data-theme="dark"] .app-sidebar {
+  background: var(--sidebar-bg);
+  border-color: var(--border-color-default);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+html.dark .admin-sidebar-brand,
+[data-theme="dark"] .admin-sidebar-brand {
+  color: var(--color-text-primary);
+}
+
+html.dark .app-navbar,
+[data-theme="dark"] .app-navbar {
+  background: var(--navbar-bg);
+  border-color: var(--border-color-default);
+}
+
+html.dark .app-page-header,
+[data-theme="dark"] .app-page-header,
+html.dark .projects-card,
+[data-theme="dark"] .projects-card,
+html.dark .users-card,
+[data-theme="dark"] .users-card,
+html.dark .roles-permissions-card,
+[data-theme="dark"] .roles-permissions-card,
+html.dark .dashboard-card,
+[data-theme="dark"] .dashboard-card,
+html.dark .reports-card,
+[data-theme="dark"] .reports-card,
+html.dark .app-card,
+[data-theme="dark"] .app-card,
+html.dark .pm-detail__header-card,
+[data-theme="dark"] .pm-detail__header-card,
+html.dark .pm-panel-card,
+[data-theme="dark"] .pm-panel-card {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color-default) !important;
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .app-stat-card,
+[data-theme="dark"] .app-stat-card,
+html.dark .projects-summary-card,
+[data-theme="dark"] .projects-summary-card {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color-default) !important;
+}
+
+html.dark .app-stat-card-title,
+[data-theme="dark"] .app-stat-card-title {
+  color: var(--color-text-muted) !important;
+}
+
+html.dark .app-stat-card-value,
+[data-theme="dark"] .app-stat-card-value {
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .app-table-container,
+[data-theme="dark"] .app-table-container,
+html.dark .app-table,
+[data-theme="dark"] .app-table,
+html.dark .projects-table,
+[data-theme="dark"] .projects-table,
+html.dark .roles-table,
+[data-theme="dark"] .roles-table,
+html.dark .users-table,
+[data-theme="dark"] .users-table {
+  background: var(--card-bg) !important;
+  color: var(--color-text-primary) !important;
+  border-color: var(--border-color-default) !important;
+}
+
+html.dark th,
+[data-theme="dark"] th {
+  background-color: var(--color-bg-surface-subtle) !important;
+  color: var(--color-text-secondary) !important;
+  border-color: var(--border-color-default) !important;
+}
+
+html.dark td,
+[data-theme="dark"] td {
+  border-color: var(--border-color-default) !important;
+  color: var(--color-text-primary) !important;
+}
+
+html.dark tr:hover td,
+[data-theme="dark"] tr:hover td {
+  background-color: var(--color-bg-surface-hover) !important;
+}
+
+html.dark .app-modal,
+[data-theme="dark"] .app-modal,
+html.dark .app-drawer,
+[data-theme="dark"] .app-drawer {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color-default) !important;
+  color: var(--color-text-primary) !important;
+}
+
+html.dark input:not([type="checkbox"]):not([type="radio"]),
+html.dark select,
+html.dark textarea,
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: var(--color-bg-surface-subtle) !important;
+  border-color: var(--border-color-default) !important;
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .app-btn--secondary,
+[data-theme="dark"] .app-btn--secondary {
+  background-color: var(--color-bg-surface-subtle) !important;
+  border-color: var(--border-color-default) !important;
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .app-btn--secondary:hover:not(:disabled),
+[data-theme="dark"] .app-btn--secondary:hover:not(:disabled) {
+  background-color: var(--color-bg-surface-hover) !important;
+  border-color: var(--border-color-strong) !important;
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .app-pagination,
+[data-theme="dark"] .app-pagination {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color-default) !important;
+}
+
+html.dark .app-pagination__btn,
+[data-theme="dark"] .app-pagination__btn {
+  background: var(--color-bg-surface-subtle) !important;
+  border-color: var(--border-color-default) !important;
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .app-dropdown-menu,
+[data-theme="dark"] .app-dropdown-menu,
+html.dark .app-popover-content,
+[data-theme="dark"] .app-popover-content {
+  background: var(--card-bg) !important;
+  border-color: var(--border-color-default) !important;
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .app-page-header-text h1,
+[data-theme="dark"] .app-page-header-text h1,
+html.dark h1,
+html.dark h2,
+html.dark h3,
+html.dark h4 {
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .app-page-header-text p,
+[data-theme="dark"] .app-page-header-text p {
+  color: var(--color-text-muted) !important;
+}
+
+html.dark .admin-sidebar-profile strong,
+[data-theme="dark"] .admin-sidebar-profile strong {
+  color: var(--color-text-primary) !important;
+}
+
+html.dark .admin-sidebar-profile small,
+[data-theme="dark"] .admin-sidebar-profile small {
+  color: var(--color-text-muted) !important;
+}
+

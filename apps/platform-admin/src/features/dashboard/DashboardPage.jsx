@@ -5,17 +5,18 @@ import {
   CalendarDays,
   ChevronDown,
   Download,
-  FileBarChart,
-  Menu,
-  RefreshCw,
-  RotateCcw,
-  Store,
-  Users,
-  UserRound,
   PhoneCall,
+  RefreshCw,
+  Store,
+  UserRound,
+  Users,
 } from "lucide-react";
-import AdminSidebar from "../../components/AdminSidebar";
-import AuthNavbarAction from "../../components/AuthNavbarAction";
+import ResponsiveLayout from "../../components/layout/ResponsiveLayout";
+import { StatisticsCard } from "../../components/data-display";
+import { AlertMessage } from "../../components/notifications";
+import { EmptyState } from "../../components/feedback";
+import { PrimaryButton, SecondaryButton, IconButton } from "../../components/ui/buttons";
+import "../reports/reports.css";
 
 const reportTypes = [
   "Customer Report",
@@ -33,14 +34,6 @@ const dateRanges = [
   "Last 3 Months",
   "Custom Date Range",
 ];
-
-const statusesByReport = {
-  "Customer Report": ["Active", "Inactive"],
-  "Vendor Report": ["Active", "Inactive", "Pending", "Approved", "Rejected"],
-  "User Report": ["Active", "Inactive"],
-  "Telecaller Report": ["Active", "Inactive"],
-  "Activity Report": ["Pending", "Approved", "Rejected"],
-};
 
 function getDateDaysAgo(daysAgo) {
   const date = new Date();
@@ -62,42 +55,16 @@ function csvCell(value) {
 
 function DashboardPage() {
   const defaultDates = getDefaultDates();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [reportType, setReportType] = useState(reportTypes[0]);
+  const [reportType] = useState(reportTypes[0]);
   const [dateRange, setDateRange] = useState("Last 30 Days");
-  const [status, setStatus] = useState("All");
-  const [fromDate, setFromDate] = useState(defaultDates.from);
-  const [toDate, setToDate] = useState(defaultDates.to);
+  const [fromDate] = useState(defaultDates.from);
+  const [toDate] = useState(defaultDates.to);
   const [message, setMessage] = useState("");
-  const [generatedReport, setGeneratedReport] = useState(null);
+  const [generatedReport] = useState(null);
 
   const dateRangeIsInvalid =
     dateRange === "Custom Date Range" &&
     (!fromDate || !toDate || fromDate > toDate);
-  const dateError =
-    !fromDate || !toDate
-      ? "Select both dates to generate a report."
-      : "From Date must be on or before To Date.";
-
-  function resetFilters() {
-    const dates = getDefaultDates();
-    setReportType(reportTypes[0]);
-    setDateRange("Last 30 Days");
-    setStatus("All");
-    setFromDate(dates.from);
-    setToDate(dates.to);
-    setMessage("");
-    setGeneratedReport(null);
-  }
-
-  function generateReport(event) {
-    event.preventDefault();
-    if (dateRangeIsInvalid) return;
-    setGeneratedReport({ reportType, dateRange, status, fromDate, toDate });
-    setMessage(
-      `Report generated: ${reportType}, ${status} status, ${dateRange}. No data is currently available.`,
-    );
-  }
 
   function exportReport() {
     if (dateRangeIsInvalid) return;
@@ -121,129 +88,75 @@ function DashboardPage() {
     );
   }
 
-  return (
-    <div className="reports-page">
-      <header className="reports-navbar">
-        <button
-          className="reports-menu-button"
-          type="button"
-          aria-label="Open navigation menu"
-          onClick={() => setSidebarOpen(true)}
+  const headerActions = (
+    <div className="reports-header-actions">
+      <label className="reports-date-control">
+        <CalendarDays size={15} aria-hidden="true" />
+        <span className="reports-visually-hidden">Dashboard date range</span>
+        <select
+          value={dateRange}
+          onChange={(event) => setDateRange(event.target.value)}
         >
-          <Menu size={21} />
-        </button>
-        <div className="reports-brand">
-          <span className="reports-brand-mark">
-            <BarChart3 size={18} />
-          </span>
-          <span>
-            DBMS <strong>SUPER ADMIN</strong>
-          </span>
-        </div>
-        <div className="reports-navbar-section">DASHBOARD</div>
-        <div className="reports-profile">
-          <span className="reports-profile-avatar">SA</span>
-          <span>Super Admin</span>
-          <ChevronDown size={15} />
-        </div>
-        <AuthNavbarAction />
-      </header>
+          {dateRanges.map((range) => (
+            <option key={range}>{range}</option>
+          ))}
+        </select>
+        <ChevronDown size={13} aria-hidden="true" />
+      </label>
+      <IconButton
+        icon={<RefreshCw size={15} />}
+        ariaLabel="Refresh report"
+        variant="secondary"
+        onClick={() =>
+          setMessage(
+            "Report filters are up to date. No data is currently available.",
+          )
+        }
+      />
+      <PrimaryButton
+        disabled={dateRangeIsInvalid}
+        onClick={exportReport}
+        icon={<Download size={15} />}
+      >
+        Export Report
+      </PrimaryButton>
+    </div>
+  );
 
-      <div className="reports-workspace">
-        {sidebarOpen && (
-          <button
-            className="reports-backdrop"
-            type="button"
-            aria-label="Close navigation menu"
-            onClick={() => setSidebarOpen(false)}
+  return (
+    <ResponsiveLayout
+      title="Dashboard"
+      description="Monitor business performance, analyze system activities, and generate detailed reports."
+      icon={<BarChart3 size={24} />}
+      headerActions={headerActions}
+    >
+      {message && (
+        <div style={{ marginBottom: "1.25rem" }}>
+          <AlertMessage
+            variant="info"
+            message={message}
+            onClose={() => setMessage("")}
           />
-        )}
-        <AdminSidebar
-          drawer
-          open={sidebarOpen}
-          onNavigate={() => setSidebarOpen(false)}
-        />
+        </div>
+      )}
 
-        <main className="reports-main">
-          <section className="reports-header-card">
-            <div className="reports-title-row">
-              <span className="reports-title-icon">
-                <BarChart3 size={24} />
-              </span>
-              <div>
-                <h1>Dashboard</h1>
-                <p>
-                  Monitor business performance, analyze system activities, and
-                  generate detailed reports.
-                </p>
-              </div>
-            </div>
-            <div className="reports-header-actions">
-              <label className="reports-date-control">
-                <CalendarDays size={15} aria-hidden="true" />
-                <span className="reports-visually-hidden">
-                  Dashboard date range
-                </span>
-                <select
-                  value={dateRange}
-                  onChange={(event) => setDateRange(event.target.value)}
-                >
-                  {dateRanges.map((range) => (
-                    <option key={range}>{range}</option>
-                  ))}
-                </select>
-                <ChevronDown size={13} aria-hidden="true" />
-              </label>
-              <button
-                className="reports-button reports-button--secondary reports-icon-button"
-                type="button"
-                aria-label="Refresh report"
-                onClick={() =>
-                  setMessage(
-                    "Report filters are up to date. No data is currently available.",
-                  )
-                }
-              >
-                <RefreshCw size={15} />
-              </button>
-              <button
-                className="reports-button reports-button--primary"
-                type="button"
-                disabled={dateRangeIsInvalid}
-                onClick={exportReport}
-              >
-                <Download size={15} /> Export Report
-              </button>
-            </div>
-          </section>
-
-          {message && (
-            <p className="reports-message" role="status">
-              {message}
-            </p>
-          )}
-
-          <section className="reports-kpi-grid" aria-label="Summary statistics">
-            {[
-              { label: "Total Users", icon: Users, tone: "orange" },
-              { label: "Total Customers", icon: UserRound, tone: "blue" },
-              { label: "Total Vendors", icon: Store, tone: "green" },
-              { label: "Active Telecallers", icon: PhoneCall, tone: "purple" },
-            ].map(({ label, icon: Icon, tone }) => (
-              <article className="reports-kpi-card" key={label}>
-                <div className="reports-kpi-top">
-                  <span>{label}</span>
-                  <span
-                    className={`reports-kpi-icon reports-kpi-icon--${tone}`}
-                  >
-                    <Icon size={17} />
-                  </span>
-                </div>
-                <div className="reports-kpi-value">--</div>
-                <p>No data available</p>
-              </article>
-            ))}
-          </section>
+      <section className="reports-kpi-grid" aria-label="Summary statistics">
+        {[
+          { label: "Total Users", icon: Users, tone: "orange" },
+          { label: "Total Customers", icon: UserRound, tone: "blue" },
+          { label: "Total Vendors", icon: Store, tone: "green" },
+          { label: "Active Telecallers", icon: PhoneCall, tone: "purple" },
+        ].map(({ label, icon: Icon, tone }) => (
+          <StatisticsCard
+            key={label}
+            title={label}
+            value="--"
+            icon={<Icon size={18} />}
+            tone={tone}
+            subtitle="No data available"
+          />
+        ))}
+      </section>
 
           {/* <section className="reports-card reports-filter-card">
             <div className="reports-section-heading">
@@ -393,14 +306,13 @@ function DashboardPage() {
                     : "Generate a report to apply the selected filters. No records are currently available."}
                 </p>
               </div>
-              <button
-                className="reports-button reports-button--secondary"
-                type="button"
+              <SecondaryButton
                 disabled={dateRangeIsInvalid}
                 onClick={exportReport}
+                icon={<Download size={14} />}
               >
-                <Download size={14} /> Export CSV
-              </button>
+                Export CSV
+              </SecondaryButton>
             </div>
             <div className="reports-table-scroll">
               <table className="reports-table">
@@ -415,8 +327,12 @@ function DashboardPage() {
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="reports-empty-state" colSpan={5}>
-                      No report data available.
+                    <td colSpan={5} style={{ padding: "1.5rem", border: "none" }}>
+                      <EmptyState
+                        title="No report data available"
+                        description="Connect a data source or adjust filters to view details."
+                        size="sm"
+                      />
                     </td>
                   </tr>
                 </tbody>
@@ -427,9 +343,7 @@ function DashboardPage() {
             No report data is displayed. Connect a data source when it is
             available.
           </p>
-        </main>
-      </div>
-    </div>
+    </ResponsiveLayout>
   );
 }
 

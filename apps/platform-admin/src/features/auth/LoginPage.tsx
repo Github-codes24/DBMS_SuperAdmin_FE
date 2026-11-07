@@ -11,6 +11,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import { apiBaseUrl } from "../../api";
 import { setAccessToken } from "./authService";
+import { LoadingButton } from "../../components/ui/buttons";
+import { AlertMessage } from "../../components/notifications";
 import homeImg from "../../assets/home.png";
 import logo from "../../assets/logo.png";
 
@@ -161,7 +163,7 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-[#fff7ed] via-white to-[#fff1e6] flex items-center justify-center p-4 sm:p-6 md:p-10 relative overflow-hidden font-sans">
+    <div className="min-h-screen w-full bg-gradient-to-br from-[#fff7ed] via-white to-[#fff1e6] flex items-center justify-center p-4 sm:p-6 md:p-10 relative overflow-x-hidden overflow-y-auto font-sans">
       {/* Background LTS Orange Curved Shape */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <svg
@@ -198,9 +200,12 @@ function Login() {
             </p>
 
             {noticeMessage && (
-              <div className="mb-5 flex items-center gap-2 p-3 text-xs font-semibold text-amber-800 bg-amber-50 border border-amber-200 rounded-xl text-left shadow-2xs">
-                <AlertCircle size={18} className="text-[#f26522] shrink-0" />
-                <span>{noticeMessage}</span>
+              <div className="mb-5 text-left">
+                <AlertMessage
+                  variant="warning"
+                  message={noticeMessage}
+                  onClose={() => setNoticeMessage("")}
+                />
               </div>
             )}
 
@@ -301,18 +306,15 @@ function Login() {
               </div>
 
               {/* Login Button */}
-              <button
+              <LoadingButton
                 type="submit"
-                disabled={isLoading}
-                className="w-full bg-gradient-to-r from-[#f26522] to-[#e05411] hover:from-[#e05411] hover:to-[#c84302] text-white font-bold py-3.5 px-4 rounded-xl shadow-lg shadow-orange-500/25 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 text-sm"
+                loading={isLoading}
+                loadingText="Signing in..."
+                className="w-full !py-3.5 !rounded-xl !text-sm !font-bold !bg-gradient-to-r !from-[#f26522] !to-[#e05411] hover:!from-[#e05411] hover:!to-[#c84302] shadow-lg shadow-orange-500/25 cursor-pointer"
+                icon={<ArrowRight size={16} />}
               >
-                <>
-                  <span>
-                    {isLoading ? "Signing in..." : "Sign In to DBMS Suite"}
-                  </span>
-                  {!isLoading && <ArrowRight size={16} />}
-                </>
-              </button>
+                Sign In to DBMS Suite
+              </LoadingButton>
             </form>
           </div>
         </div>

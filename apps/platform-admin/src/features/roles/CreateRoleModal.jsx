@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react';
-import { ChevronDown, ShieldCheck, X } from 'lucide-react';
+import { useState } from 'react';
+import { ShieldCheck } from 'lucide-react';
+import { Modal } from '../../components/overlays';
+import { TextInput, Textarea, SelectDropdown } from '../../components/ui/forms';
+import { PrimaryButton, SecondaryButton } from '../../components/ui/buttons';
+import { AlertMessage } from '../../components/notifications';
 import './createRoleModal.css';
+
 function CreateRoleModal({ mode, roleOptions, roleId, initialTitle = '', initialDescription = '', onClose, onSubmit, }) {
     const [title, setTitle] = useState(initialTitle);
     const [description, setDescription] = useState(initialDescription);
@@ -8,16 +13,9 @@ function CreateRoleModal({ mode, roleOptions, roleId, initialTitle = '', initial
     const [titleError, setTitleError] = useState('');
     const [requestError, setRequestError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    useEffect(() => {
-        function handleKeyDown(event) {
-            if (event.key === 'Escape')
-                onClose();
-        }
-        document.addEventListener('keydown', handleKeyDown);
-        return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [onClose]);
+
     async function handleSubmit(event) {
-        event.preventDefault();
+        if (event) event.preventDefault();
         if (!title.trim()) {
             setTitleError('Role title is required.');
             return;
@@ -39,60 +37,79 @@ function CreateRoleModal({ mode, roleOptions, roleId, initialTitle = '', initial
             setIsSubmitting(false);
         }
     }
-    return (<div className="create-role-overlay" onMouseDown={(event) => {
-            if (event.target === event.currentTarget && !isSubmitting)
-                onClose();
-        }}>
-      <section className="create-role-modal" role="dialog" aria-modal="true" aria-labelledby="create-role-title">
-        <header className="create-role-header">
-          <div className="create-role-heading">
-            <ShieldCheck size={20} strokeWidth={2} aria-hidden="true"/>
-            <h2 id="create-role-title">{mode === 'create' ? 'Create New Role' : 'Edit Role'}</h2>
+
+    const cloneOptions = [
+      { value: '', label: 'None (Start with no permissions)' },
+      ...roleOptions.map((role) => ({ value: role.id, label: role.name })),
+    ];
+
+    return (
+      <Modal
+        isOpen={true}
+        onClose={onClose}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <ShieldCheck size={20} strokeWidth={2} aria-hidden="true" />
+            <span>{mode === 'create' ? 'Create New Role' : 'Edit Role'}</span>
           </div>
-          <button className="create-role-close" type="button" onClick={onClose} aria-label="Close dialog" disabled={isSubmitting}>
-            <X size={18}/>
-          </button>
-        </header>
-
-        <form onSubmit={handleSubmit} noValidate>
-          <div className="create-role-fields">
-            <label className="create-role-field">
-              <span>Role Title <strong>*</strong></span>
-              <input autoFocus value={title} onChange={(event) => {
-            setTitle(event.target.value);
-            if (event.target.value.trim())
-                setTitleError('');
-        }} placeholder="e.g. Regional Supervisor" aria-invalid={Boolean(titleError)} aria-describedby={titleError ? 'create-role-title-error' : undefined}/>
-              {titleError && <span className="create-role-error" id="create-role-title-error">{titleError}</span>}
-            </label>
-
-            <label className="create-role-field">
-              <span>Description</span>
-              <textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Briefly describe the responsibilities of this role..."/>
-            </label>
-
-            {mode === 'create' && (<label className="create-role-field">
-                <span>Clone Initial Permissions From</span>
-                <span className="create-role-select-wrap">
-                  <select value={cloneFrom} onChange={(event) => setCloneFrom(event.target.value)}>
-                    <option value="">None (Start with no permissions)</option>
-                    {roleOptions.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-                  </select>
-                  <ChevronDown size={16} aria-hidden="true"/>
-                </span>
-              </label>)}
+        }
+        size="md"
+        closeOnEscape={!isSubmitting}
+        closeOnBackdropClick={!isSubmitting}
+        footer={
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', width: '100%' }}>
+            <SecondaryButton onClick={onClose} disabled={isSubmitting}>
+              Cancel
+            </SecondaryButton>
+            <PrimaryButton
+              type="submit"
+              disabled={isSubmitting}
+              isLoading={isSubmitting}
+              loadingText="Saving..."
+              onClick={handleSubmit}
+            >
+              {mode === 'create' ? 'Create Role' : 'Save Role'}
+            </PrimaryButton>
           </div>
+        }
+      >
+        <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <TextInput
+            label="Role Title"
+            required
+            autoFocus
+            value={title}
+            onChange={(event) => {
+              setTitle(event.target.value);
+              if (event.target.value.trim()) setTitleError('');
+            }}
+            placeholder="e.g. Regional Supervisor"
+            error={titleError}
+          />
 
-          {requestError && <p className="create-role-error" role="alert">{requestError}</p>}
+          <Textarea
+            label="Description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Briefly describe the responsibilities of this role..."
+            rows={3}
+          />
 
-          <footer className="create-role-footer">
-            <button className="create-role-cancel" type="button" onClick={onClose} disabled={isSubmitting}>Cancel</button>
-            <button className="create-role-submit" type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Saving...' : mode === 'create' ? 'Create Role' : 'Save Role'}
-            </button>
-          </footer>
+          {mode === 'create' && (
+            <SelectDropdown
+              label="Clone Initial Permissions From"
+              options={cloneOptions}
+              value={cloneFrom}
+              onChange={(event) => setCloneFrom(event.target.value)}
+            />
+          )}
+
+          {requestError && (
+            <AlertMessage variant="error" message={requestError} />
+          )}
         </form>
-      </section>
-    </div>);
+      </Modal>
+    );
 }
+
 export default CreateRoleModal;
