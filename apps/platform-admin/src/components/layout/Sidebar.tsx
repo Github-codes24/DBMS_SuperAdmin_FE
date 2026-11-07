@@ -1,56 +1,12 @@
 import { useLocation, Link } from 'react-router-dom'
-import {
-  BarChart3,
-  BriefcaseBusiness,
-  ShieldCheck,
-  Users,
-  LayoutDashboard,
-  type LucideIcon,
-} from 'lucide-react'
+import { ShieldCheck } from 'lucide-react'
 import { getCurrentUser } from '../../features/auth/authService'
+import {
+  type NavigationItem,
+  DEFAULT_NAVIGATION_ITEMS,
+} from './navigation'
 
-export interface NavigationItem {
-  label: string
-  href: string
-  icon: LucideIcon
-  badge?: string | number
-  roles?: string[]
-  aliases?: string[]
-}
-
-export const DEFAULT_NAVIGATION_ITEMS: NavigationItem[] = [
-  {
-    label: 'Dashboard',
-    icon: LayoutDashboard,
-    href: '/dashboard',
-    roles: ['superadmin', 'admin', 'user'],
-  },
-  {
-    label: 'User Management',
-    icon: Users,
-    href: '/users',
-    roles: ['superadmin', 'admin'],
-  },
-  {
-    label: 'Project Management',
-    icon: BriefcaseBusiness,
-    href: '/project-management',
-    aliases: ['/projects'],
-    roles: ['superadmin'],
-  },
-  {
-    label: 'Roles & Permissions',
-    icon: ShieldCheck,
-    href: '/roles-permissions',
-    roles: ['superadmin'],
-  },
-  {
-    label: 'Reports & Analytics',
-    icon: BarChart3,
-    href: '/reports-analytics',
-    roles: ['superadmin', 'admin'],
-  },
-]
+export type { NavigationItem }
 
 interface SidebarProps {
   items?: NavigationItem[]

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Activity,
   BarChart3,
   CalendarDays,
   ChevronDown,
@@ -30,14 +31,6 @@ const dateRanges = [
   "Custom Date Range",
 ];
 
-const statusesByReport = {
-  "Customer Report": ["Active", "Inactive"],
-  "Vendor Report": ["Active", "Inactive", "Pending", "Approved", "Rejected"],
-  "User Report": ["Active", "Inactive"],
-  "Telecaller Report": ["Active", "Inactive"],
-  "Activity Report": ["Pending", "Approved", "Rejected"],
-};
-
 function getDateDaysAgo(daysAgo) {
   const date = new Date();
   date.setHours(12, 0, 0, 0);
@@ -58,41 +51,16 @@ function csvCell(value) {
 
 function DashboardPage() {
   const defaultDates = getDefaultDates();
-  const [reportType, setReportType] = useState(reportTypes[0]);
+  const [reportType] = useState(reportTypes[0]);
   const [dateRange, setDateRange] = useState("Last 30 Days");
-  const [status, setStatus] = useState("All");
-  const [fromDate, setFromDate] = useState(defaultDates.from);
-  const [toDate, setToDate] = useState(defaultDates.to);
+  const [fromDate] = useState(defaultDates.from);
+  const [toDate] = useState(defaultDates.to);
   const [message, setMessage] = useState("");
-  const [generatedReport, setGeneratedReport] = useState(null);
+  const [generatedReport] = useState(null);
 
   const dateRangeIsInvalid =
     dateRange === "Custom Date Range" &&
     (!fromDate || !toDate || fromDate > toDate);
-  const dateError =
-    !fromDate || !toDate
-      ? "Select both dates to generate a report."
-      : "From Date must be on or before To Date.";
-
-  function resetFilters() {
-    const dates = getDefaultDates();
-    setReportType(reportTypes[0]);
-    setDateRange("Last 30 Days");
-    setStatus("All");
-    setFromDate(dates.from);
-    setToDate(dates.to);
-    setMessage("");
-    setGeneratedReport(null);
-  }
-
-  function generateReport(event) {
-    event.preventDefault();
-    if (dateRangeIsInvalid) return;
-    setGeneratedReport({ reportType, dateRange, status, fromDate, toDate });
-    setMessage(
-      `Report generated: ${reportType}, ${status} status, ${dateRange}. No data is currently available.`,
-    );
-  }
 
   function exportReport() {
     if (dateRangeIsInvalid) return;

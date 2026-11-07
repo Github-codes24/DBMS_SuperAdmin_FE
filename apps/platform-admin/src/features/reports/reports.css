@@ -3,6 +3,7 @@
   box-sizing: border-box;
 }
 
+:root,
 .reports-page {
   --reports-orange: #f96321;
   --reports-ink: #101d35;
@@ -10,6 +11,9 @@
   --reports-muted: #94a3b8;
   --reports-border: #e5eaf1;
   --reports-canvas: #f3f6fa;
+}
+
+.reports-page {
   height: 100vh;
   height: 100dvh;
   overflow-x: hidden;
