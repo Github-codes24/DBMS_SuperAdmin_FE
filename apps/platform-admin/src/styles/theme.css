@@ -8,7 +8,8 @@
   --primary-hover: var(--color-primary-hover, #ea580c);
   --primary-light: var(--color-primary-50, #fff7ed);
   --sidebar-bg: #ffffff;
-  --navbar-bg: #ffffff;
+  --navbar-bg: #f8fafc;
+  --navbar-border: #e2e8f0;
   --page-bg: #f8fafc;
   --card-bg: #ffffff;
   --text-primary: #0f172a;
@@ -37,7 +38,8 @@
   --border-color-strong: #4b5563;
 
   --sidebar-bg: #101726;
-  --navbar-bg: #111827;
+  --navbar-bg: #131b2e;
+  --navbar-border: #28354f;
   --page-bg: #0b0f19;
   --card-bg: #111827;
   --text-primary: #f9fafb;
@@ -82,7 +84,7 @@ html.dark .admin-sidebar-brand,
 html.dark .app-navbar,
 [data-theme="dark"] .app-navbar {
   background: var(--navbar-bg);
-  border-color: var(--border-color-default);
+  border-color: var(--navbar-border, var(--border-color-default));
 }
 
 html.dark .app-page-header,

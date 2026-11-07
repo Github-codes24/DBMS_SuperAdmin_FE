@@ -92,16 +92,18 @@ function applyDomTheme(settings: ThemeSettings, effectiveMode: 'light' | 'dark')
   root.style.setProperty('--primary-hover', shades.primaryHover)
   root.style.setProperty('--primary-light', shades.primary50)
 
+  // Top Navbar dynamic theme styling (2-3 shades lighter than primary)
+  root.style.setProperty('--navbar-bg', shades.navbarBg)
+  root.style.setProperty('--navbar-border', shades.navbarBorder)
+
   if (isDark) {
     root.style.setProperty('--sidebar-bg', '#101726')
-    root.style.setProperty('--navbar-bg', '#131b2e')
     root.style.setProperty('--page-bg', '#0b0f19')
     root.style.setProperty('--card-bg', '#131b2e')
     root.style.setProperty('--text-primary', '#f8fafc')
     root.style.setProperty('--border-color', '#28354f')
   } else {
     root.style.setProperty('--sidebar-bg', '#ffffff')
-    root.style.setProperty('--navbar-bg', '#ffffff')
     root.style.setProperty('--page-bg', '#f8fafc')
     root.style.setProperty('--card-bg', '#ffffff')
     root.style.setProperty('--text-primary', '#0f172a')
