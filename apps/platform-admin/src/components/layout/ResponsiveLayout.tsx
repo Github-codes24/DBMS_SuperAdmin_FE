@@ -25,7 +25,7 @@ export function ResponsiveLayout({
   description,
   icon,
   headerActions,
-  breadcrumbs = true,
+  breadcrumbs = false,
   containerVariant = 'fluid',
   navigationItems,
   showFooter = true,

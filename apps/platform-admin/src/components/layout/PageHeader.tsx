@@ -14,7 +14,7 @@ export function PageHeader({
   title,
   description,
   icon,
-  breadcrumbs = true,
+  breadcrumbs = false,
   actions,
   children,
 }: PageHeaderProps) {
