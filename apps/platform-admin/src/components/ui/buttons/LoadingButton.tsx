@@ -17,3 +17,4 @@ export const LoadingButton = forwardRef<HTMLButtonElement, LoadingButtonProps>(
 )
 
 export default LoadingButton
+

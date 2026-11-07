@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Pencil, Plus, RotateCcw, Save, Search, ShieldCheck, Check, Trash2 } from 'lucide-react';
 import ResponsiveLayout from '../../components/layout/ResponsiveLayout';
+import { useToast, useConfirm } from '../../context';
 import CreateRoleModal from './CreateRoleModal';
 import { createProjectRole, deleteProjectRole, getProjectRole, getRoleMatrix, listProjectRoles, listRoleActions, listRoleProjects, savePermissions, updateProjectRole, } from './rolesService';
 import './rolesPermissions.css';
@@ -16,6 +17,8 @@ const createPermissions = (permissions, enabled = false) => Object.fromEntries(m
     Object.fromEntries(permissions.map((permission) => [permission, enabled])),
 ]));
 function RolesPermissionsPage() {
+    const { toast } = useToast();
+    const { confirm } = useConfirm();
     // Previous local preview role data is retained for reference; API data now populates this page.
     // const previewRoles = initialRoleOptions
     const [projects, setProjects] = useState([]);
@@ -202,7 +205,13 @@ function RolesPermissionsPage() {
     async function deleteRole() {
         if (!selectedProjectId || !selectedRole)
             return;
-        if (!window.confirm(`Delete the "${selectedRole.name}" role? This cannot be undone.`))
+        const confirmed = await confirm({
+            title: `Delete Role: ${selectedRole.name}`,
+            message: `Are you sure you want to delete the "${selectedRole.name}" role? This cannot be undone.`,
+            confirmText: 'Delete Role',
+            confirmVariant: 'danger',
+        });
+        if (!confirmed)
             return;
         setIsDeleting(true);
         setApiError('');
@@ -219,9 +228,11 @@ function RolesPermissionsPage() {
             setExpectedVersion(undefined);
             setIsLoadingMatrix(Boolean(remainingRoles[0]?.id));
             setSaveMessage('Role deleted.');
+            toast.success(`Role "${selectedRole.name}" deleted successfully.`);
         }
         catch (error) {
             setApiError(error instanceof Error ? error.message : 'Could not delete the role.');
+            toast.error(error instanceof Error ? error.message : 'Could not delete the role.');
         }
         finally {
             setIsDeleting(false);
@@ -251,9 +262,11 @@ function RolesPermissionsPage() {
             setPermissionState((current) => ({ ...current, [selectedRoleId]: state }));
             setExpectedVersion(savedMatrix.version);
             setSaveMessage('Permissions saved.');
+            toast.success('Permissions saved successfully.');
         }
         catch (error) {
             setApiError(error instanceof Error ? error.message : 'Could not save permissions.');
+            toast.error(error instanceof Error ? error.message : 'Could not save permissions.');
         }
         finally {
             setIsSaving(false);

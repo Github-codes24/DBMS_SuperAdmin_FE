@@ -3,6 +3,8 @@ import { Link, useLocation } from 'react-router-dom'
 import { Menu, ShieldCheck } from 'lucide-react'
 import AuthNavbarAction from '../AuthNavbarAction'
 import { getCurrentUser } from '../../features/auth/authService'
+import { NotificationCenter, type NotificationCenterProps } from '../notifications/NotificationCenter'
+import { useToast } from '../../context/useToast'
 
 interface TopNavbarProps {
   onMenuClick?: () => void
@@ -23,6 +25,26 @@ export function TopNavbar({ onMenuClick, sectionTitle, actions }: TopNavbarProps
   const location = useLocation()
   const user = getCurrentUser()
   const derivedTitle = sectionTitle || SECTION_MAP[location.pathname] || 'Workspace'
+
+  let notifProps: NotificationCenterProps = {
+    notifications: [],
+    onMarkAsRead: () => {},
+    onMarkAllAsRead: () => {},
+    onClearAll: () => {},
+  }
+  try {
+    const toastContext = useToast()
+    if (toastContext) {
+      notifProps = {
+        notifications: toastContext.notifications,
+        onMarkAsRead: toastContext.markAsRead,
+        onMarkAllAsRead: toastContext.markAllAsRead,
+        onClearAll: toastContext.clearNotifications,
+      }
+    }
+  } catch {
+    // rendered outside ToastProvider
+  }
 
   // User initials
   const initials = user?.name
@@ -64,6 +86,13 @@ export function TopNavbar({ onMenuClick, sectionTitle, actions }: TopNavbarProps
 
       <div className="app-navbar-right">
         {actions}
+
+        <NotificationCenter
+          notifications={notifProps.notifications}
+          onMarkAsRead={notifProps.onMarkAsRead}
+          onMarkAllAsRead={notifProps.onMarkAllAsRead}
+          onClearAll={notifProps.onClearAll}
+        />
 
         <div className="app-navbar-profile" title={user?.email || 'superadmin'}>
           <span className="app-navbar-avatar">{initials}</span>

@@ -34,6 +34,7 @@ import {
   X,
 } from "lucide-react";
 import ResponsiveLayout from "../../components/layout/ResponsiveLayout";
+import { useToast, useConfirm } from "../../context";
 import {
   DEFAULT_PROJECT_THEME,
   initialProjectAdmins,
@@ -303,6 +304,8 @@ function Detail({
 // ─── Main Component ───────────────────────────────────────────────────────────
 function ProjectManagementPage() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
 
   // ── data ──
   const [projects, setProjects] = useState<ManagedProject[]>([]);
@@ -565,8 +568,13 @@ function ProjectManagementPage() {
   }
 
   async function deleteProject(project: ManagedProject) {
-    if (!window.confirm(`Delete "${project.name}"? This cannot be undone.`))
-      return;
+    const confirmed = await confirm({
+      title: `Delete Project: ${project.name}`,
+      message: `Are you sure you want to delete "${project.name}"? This cannot be undone.`,
+      confirmText: "Delete Project",
+      confirmVariant: "danger",
+    });
+    if (!confirmed) return;
     setDeletingProjectId(project.id);
     setProjectLoadError("");
     try {
@@ -574,6 +582,7 @@ function ProjectManagementPage() {
       setProjects((cur) => cur.filter((p) => p.id !== project.id));
       if (detailProject?.id === project.id) setDetailProject(null);
       setNotice(`"${project.name}" deleted successfully.`);
+      toast.success(`"${project.name}" deleted successfully.`);
     } catch (err) {
       if (err instanceof ProjectAuthenticationError) {
         navigate("/login", { replace: true });
@@ -635,34 +644,47 @@ function ProjectManagementPage() {
       }));
     if (!persistAdmins([next, ...rest])) return;
     setAdminModalOpen(false);
-    setNotice(
-      editingAdminId ? "Project Admin updated." : "Project Admin added.",
-    );
+    const msg = editingAdminId ? "Project Admin updated." : "Project Admin added.";
+    setNotice(msg);
+    toast.success(msg);
   }
 
-  function toggleAdminStatus(a: ProjectAdmin) {
+  async function toggleAdminStatus(a: ProjectAdmin) {
     const nextStatus: ProjectAdminStatus =
       a.status === "Active" ? "Inactive" : "Active";
-    if (
-      !window.confirm(
-        `${nextStatus === "Inactive" ? "Deactivate" : "Activate"} ${a.name}?`,
-      )
-    )
-      return;
+    const confirmed = await confirm({
+      title: `${nextStatus === "Inactive" ? "Deactivate" : "Activate"} Project Admin`,
+      message: `Are you sure you want to ${nextStatus === "Inactive" ? "deactivate" : "activate"} ${a.name}?`,
+      confirmText: nextStatus === "Inactive" ? "Deactivate" : "Activate",
+      confirmVariant: nextStatus === "Inactive" ? "warning" : "primary",
+    });
+    if (!confirmed) return;
     if (
       persistAdmins(
         admins.map((item) =>
           item.id === a.id ? { ...item, status: nextStatus } : item,
         ),
       )
-    )
-      setNotice(`${a.name} is now ${nextStatus.toLowerCase()}.`);
+    ) {
+      const msg = `${a.name} is now ${nextStatus.toLowerCase()}.`;
+      setNotice(msg);
+      toast.success(msg);
+    }
   }
 
-  function deleteAdmin(a: ProjectAdmin) {
-    if (!window.confirm(`Delete Project Admin ${a.name}?`)) return;
-    if (persistAdmins(admins.filter((item) => item.id !== a.id)))
-      setNotice(`${a.name} deleted.`);
+  async function deleteAdmin(a: ProjectAdmin) {
+    const confirmed = await confirm({
+      title: "Delete Project Admin",
+      message: `Are you sure you want to delete Project Admin ${a.name}?`,
+      confirmText: "Delete Admin",
+      confirmVariant: "danger",
+    });
+    if (!confirmed) return;
+    if (persistAdmins(admins.filter((item) => item.id !== a.id))) {
+      const msg = `${a.name} deleted.`;
+      setNotice(msg);
+      toast.success(msg);
+    }
   }
 
   void [openEditAdmin, toggleAdminStatus, deleteAdmin];

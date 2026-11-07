@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Users as UsersIcon } from 'lucide-react'
 import ResponsiveLayout from '../../components/layout/ResponsiveLayout'
+import { useToast, useConfirm } from '../../context'
+import { AlertMessage } from '../../components/notifications'
 import './users.css'
 import {
   createUser,
@@ -104,7 +106,8 @@ function UserManagementPage() {
   const [passwordResetError, setPasswordResetError] = useState('')
   const [isResettingPassword, setIsResettingPassword] = useState(false)
   const [formError, setFormError] = useState('')
-  const [toast, setToast] = useState('')
+  const { toast } = useToast()
+  const { confirm } = useConfirm()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -141,7 +144,6 @@ function UserManagementPage() {
     setLoadError('')
     setter(value)
     setPage(1)
-    setToast('')
     setActionError('')
   }
 
@@ -210,7 +212,7 @@ function UserManagementPage() {
         setUsers((current) => current.map((user) =>
           user.id === updatedRecord.id ? updatedRecord : user,
         ))
-        setToast('User updated successfully.')
+        toast.success('User updated successfully.')
       } else {
         const createdUser = await createUser({ ...input, password: form.password })
         const createdRecord = fromApiUser(createdUser, projectOptions)
@@ -219,7 +221,7 @@ function UserManagementPage() {
           ...current.filter((user) => user.id !== createdRecord.id),
         ].slice(0, PAGE_SIZE))
         setTotalUsers((current) => current + 1)
-        setToast('User created successfully.')
+        toast.success('User created successfully.')
         setSearch('')
         setRoleFilter('All')
         setStatusFilter('All')
@@ -248,7 +250,7 @@ function UserManagementPage() {
       setUsers((current) => current.map((currentUser) =>
         currentUser.id === updatedRecord.id ? updatedRecord : currentUser,
       ))
-      setToast(`User ${nextStatus.toLowerCase()} successfully.`)
+      toast.success(`User ${nextStatus.toLowerCase()} successfully.`)
     } catch (error) {
       if (error instanceof AuthenticationError) {
         setActionError(getErrorMessage(error))
@@ -260,7 +262,13 @@ function UserManagementPage() {
 
   async function toggleStatus(user: UserRecord) {
     const nextStatus: UserStatus = user.status === 'Active' ? 'Inactive' : 'Active'
-    if (!window.confirm(`${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} ${user.name}?`)) return
+    const confirmed = await confirm({
+      title: `${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} User`,
+      message: `Are you sure you want to ${nextStatus === 'Inactive' ? 'deactivate' : 'activate'} ${user.name}?`,
+      confirmText: nextStatus === 'Inactive' ? 'Deactivate' : 'Activate',
+      confirmVariant: nextStatus === 'Inactive' ? 'warning' : 'primary',
+    })
+    if (!confirmed) return
     await changeUserStatus(user, nextStatus)
   }
 
@@ -293,7 +301,7 @@ function UserManagementPage() {
     setPasswordResetError('')
     try {
       await resetUserPassword(passwordResetUser.id, newPassword)
-      setToast(`Password reset for ${passwordResetUser.name}.`)
+      toast.success(`Password reset for ${passwordResetUser.name}.`)
       setPasswordResetUser(null)
       setNewPassword('')
     } catch (error) {
@@ -314,11 +322,17 @@ function UserManagementPage() {
   }
 
   async function removeUser(user: UserRecord) {
-    if (!window.confirm(`Delete ${user.name}? This action cannot be undone.`)) return
+    const confirmed = await confirm({
+      title: 'Delete User',
+      message: `Are you sure you want to delete ${user.name}? This action cannot be undone.`,
+      confirmText: 'Delete User',
+      confirmVariant: 'danger',
+    })
+    if (!confirmed) return
     setActionError('')
     try {
       await deleteUser(user.id)
-      setToast('User deleted successfully.')
+      toast.success('User deleted successfully.')
       if (page > 1 && totalUsers - 1 <= (page - 1) * PAGE_SIZE) {
         setIsLoading(true)
         setLoadError('')
@@ -349,22 +363,43 @@ function UserManagementPage() {
       }
     >
       <div className="user-management-page">
-      {toast && <div className="toast user-toast" role="status">{toast}</div>}
       {actionError && (
-        <div className="inline-alert inline-alert--error" role="alert">
-          {actionError}
-          {actionError === 'Your session has expired. Please sign in again.' && (
-            <button type="button" onClick={() => navigate('/login', { replace: true })}>Sign in</button>
-          )}
-        </div>
+        <AlertMessage
+          type="error"
+          description={actionError}
+          dismissible
+          onClose={() => setActionError('')}
+          action={
+            actionError === 'Your session has expired. Please sign in again.' ? (
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={() => navigate('/login', { replace: true })}
+              >
+                Sign in
+              </button>
+            ) : undefined
+          }
+        />
       )}
       {loadError && (
-        <div className="inline-alert inline-alert--error" role="alert">
-          {loadError}
-          {loadError === 'Your session has expired. Please sign in again.' && (
-            <button type="button" onClick={() => navigate('/login', { replace: true })}>Sign in</button>
-          )}
-        </div>
+        <AlertMessage
+          type="error"
+          description={loadError}
+          dismissible
+          onClose={() => setLoadError('')}
+          action={
+            loadError === 'Your session has expired. Please sign in again.' ? (
+              <button
+                type="button"
+                className="button button--secondary"
+                onClick={() => navigate('/login', { replace: true })}
+              >
+                Sign in
+              </button>
+            ) : undefined
+          }
+        />
       )}
 
       <section className="users-card user-filter-card" aria-label="User search and filters">

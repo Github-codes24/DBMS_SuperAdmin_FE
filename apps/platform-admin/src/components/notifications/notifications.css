@@ -1,0 +1,526 @@
+/**
+ * Toast and Notification System CSS
+ * Built with DBMS Centralized Design Tokens
+ */
+
+/* =========================================================================
+   1. Toast Container & Toast Message
+   ========================================================================= */
+
+.app-toast-container {
+  position: fixed;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  max-width: 420px;
+  width: calc(100vw - 32px);
+}
+
+.app-toast-container--top-right {
+  top: 20px;
+  right: 20px;
+}
+
+.app-toast-container--top-left {
+  top: 20px;
+  left: 20px;
+}
+
+.app-toast-container--top-center {
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.app-toast-container--bottom-right {
+  bottom: 20px;
+  right: 20px;
+}
+
+.app-toast-container--bottom-left {
+  bottom: 20px;
+  left: 20px;
+}
+
+.app-toast-container--bottom-center {
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Toast Card */
+.app-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md, 10px);
+  background-color: var(--color-bg-surface, #ffffff);
+  border: 1px solid var(--border-color-default, #e2e8f0);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
+  font-family: var(--font-sans, Inter, sans-serif);
+  position: relative;
+  overflow: hidden;
+  animation: app-toast-slide-in 220ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: all 180ms ease;
+}
+
+@keyframes app-toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.app-toast--exiting {
+  opacity: 0;
+  transform: scale(0.92);
+  pointer-events: none;
+}
+
+/* Toast Type Accents */
+.app-toast--success {
+  border-left: 4px solid var(--color-success, #16a34a);
+}
+
+.app-toast--error {
+  border-left: 4px solid var(--color-danger, #dc2626);
+}
+
+.app-toast--warning {
+  border-left: 4px solid var(--color-warning, #d97706);
+}
+
+.app-toast--info {
+  border-left: 4px solid var(--color-info, #0284c7);
+}
+
+.app-toast-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.app-toast--success .app-toast-icon {
+  color: var(--color-success, #16a34a);
+}
+
+.app-toast--error .app-toast-icon {
+  color: var(--color-danger, #dc2626);
+}
+
+.app-toast--warning .app-toast-icon {
+  color: var(--color-warning, #d97706);
+}
+
+.app-toast--info .app-toast-icon {
+  color: var(--color-info, #0284c7);
+}
+
+.app-toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-toast-title {
+  font-size: var(--text-sm, 13px);
+  font-weight: var(--weight-semibold, 600);
+  color: var(--color-text-primary, #0f172a);
+  margin: 0 0 2px 0;
+  line-height: 1.35;
+}
+
+.app-toast-message {
+  font-size: var(--text-xs, 12px);
+  color: var(--color-text-secondary, #475569);
+  margin: 0;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.app-toast-close {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-slate-400, #94a3b8);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-xs, 4px);
+  transition: color 150ms ease;
+  margin-left: 4px;
+}
+
+.app-toast-close:hover {
+  color: var(--color-text-primary, #0f172a);
+}
+
+/* =========================================================================
+   2. Alert Message (Inline Banner)
+   ========================================================================= */
+
+.app-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid transparent;
+  font-family: var(--font-sans, Inter, sans-serif);
+  margin-bottom: var(--space-4, 16px);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.app-alert--success {
+  background-color: var(--color-success-50, #f0fdf4);
+  border-color: var(--color-success-200, #bbf7d0);
+  color: #14532d;
+}
+
+.app-alert--error {
+  background-color: var(--color-danger-50, #fef2f2);
+  border-color: var(--color-danger-200, #fecaca);
+  color: #7f1d1d;
+}
+
+.app-alert--warning {
+  background-color: var(--color-warning-50, #fffbeb);
+  border-color: var(--color-warning-200, #fde68a);
+  color: #78350f;
+}
+
+.app-alert--info {
+  background-color: var(--color-info-50, #f0f9ff);
+  border-color: var(--color-info-200, #bae6fd);
+  color: #0c4a6e;
+}
+
+.app-alert-icon {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.app-alert--success .app-alert-icon {
+  color: var(--color-success, #16a34a);
+}
+
+.app-alert--error .app-alert-icon {
+  color: var(--color-danger, #dc2626);
+}
+
+.app-alert--warning .app-alert-icon {
+  color: var(--color-warning, #d97706);
+}
+
+.app-alert--info .app-alert-icon {
+  color: var(--color-info, #0284c7);
+}
+
+.app-alert-content {
+  flex: 1;
+}
+
+.app-alert-title {
+  font-size: var(--text-sm, 13px);
+  font-weight: var(--weight-semibold, 600);
+  margin: 0 0 2px 0;
+  line-height: 1.35;
+}
+
+.app-alert-desc {
+  font-size: var(--text-xs, 12px);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.app-alert-action {
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.app-alert-close {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.7;
+  color: inherit;
+  display: flex;
+  margin-left: 8px;
+  transition: opacity 150ms ease;
+}
+
+.app-alert-close:hover {
+  opacity: 1;
+}
+
+/* =========================================================================
+   3. Confirmation Dialog
+   ========================================================================= */
+
+.app-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 99998;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: app-fade-in 150ms ease;
+}
+
+@keyframes app-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.app-dialog-card {
+  background-color: var(--color-bg-surface, #ffffff);
+  border: 1px solid var(--border-color-default, #e2e8f0);
+  border-radius: var(--radius-xl, 16px);
+  box-shadow: var(--shadow-2xl, 0 25px 50px -12px rgba(15, 23, 42, 0.25));
+  max-width: 440px;
+  width: 100%;
+  padding: 24px;
+  box-sizing: border-box;
+  animation: app-dialog-pop 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  font-family: var(--font-sans, Inter, sans-serif);
+}
+
+@keyframes app-dialog-pop {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.app-dialog-icon-badge {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-full, 9999px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.app-dialog-icon-badge--danger {
+  background-color: var(--color-danger-50, #fef2f2);
+  color: var(--color-danger, #dc2626);
+}
+
+.app-dialog-icon-badge--warning {
+  background-color: var(--color-warning-50, #fffbeb);
+  color: var(--color-warning, #d97706);
+}
+
+.app-dialog-icon-badge--primary {
+  background-color: var(--color-primary-50, #fff7ed);
+  color: var(--color-primary, #f96321);
+}
+
+.app-dialog-title {
+  font-size: var(--text-lg, 16px);
+  font-weight: var(--weight-bold, 700);
+  color: var(--color-text-primary, #0f172a);
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+}
+
+.app-dialog-message {
+  font-size: var(--text-sm, 13px);
+  color: var(--color-text-secondary, #475569);
+  line-height: 1.5;
+  margin: 0 0 24px 0;
+}
+
+.app-dialog-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* =========================================================================
+   4. Notification Center & Notification Popup
+   ========================================================================= */
+
+.app-notif-center {
+  position: relative;
+  display: inline-block;
+}
+
+.app-notif-bell-btn {
+  position: relative;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-slate-500, #64748b);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md, 8px);
+  transition: all 150ms ease;
+}
+
+.app-notif-bell-btn:hover {
+  background-color: var(--color-slate-100, #f1f5f9);
+  color: var(--color-text-primary, #0f172a);
+}
+
+.app-notif-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background-color: var(--color-primary, #f96321);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border: 2px solid var(--color-bg-surface, #ffffff);
+}
+
+.app-notif-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 100;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background-color: var(--color-bg-surface, #ffffff);
+  border: 1px solid var(--border-color-default, #e2e8f0);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-xl, 0 20px 25px -5px rgba(15, 23, 42, 0.1));
+  overflow: hidden;
+  font-family: var(--font-sans, Inter, sans-serif);
+  animation: app-fade-in 140ms ease;
+}
+
+.app-notif-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-slate-100, #f1f5f9);
+}
+
+.app-notif-header-title {
+  font-size: var(--text-sm, 13px);
+  font-weight: var(--weight-bold, 700);
+  color: var(--color-text-primary, #0f172a);
+  margin: 0;
+}
+
+.app-notif-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-notif-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: var(--color-primary, #f96321);
+  cursor: pointer;
+  font-weight: var(--weight-medium, 500);
+}
+
+.app-notif-link-btn:hover {
+  text-decoration: underline;
+}
+
+.app-notif-list {
+  max-height: 360px;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.app-notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-slate-50, #f8fafc);
+  cursor: pointer;
+  transition: background-color 120ms ease;
+  position: relative;
+}
+
+.app-notif-item:hover {
+  background-color: var(--color-slate-50, #f8fafc);
+}
+
+.app-notif-item--unread {
+  background-color: var(--color-primary-50, #fff7ed);
+}
+
+.app-notif-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.app-notif-item-title {
+  font-size: 12px;
+  font-weight: var(--weight-semibold, 600);
+  color: var(--color-text-primary, #0f172a);
+  margin: 0 0 2px 0;
+}
+
+.app-notif-item-desc {
+  font-size: 11px;
+  color: var(--color-text-secondary, #475569);
+  margin: 0 0 4px 0;
+  line-height: 1.4;
+}
+
+.app-notif-item-time {
+  font-size: 10px;
+  color: var(--color-text-muted, #64748b);
+}
+
+.app-notif-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-primary, #f96321);
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.app-notif-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--color-text-muted, #64748b);
+  font-size: var(--text-xs, 12px);
+}

@@ -12,3 +12,4 @@ export const DangerButton = forwardRef<HTMLButtonElement, DangerButtonProps>(
 )
 
 export default DangerButton
+
