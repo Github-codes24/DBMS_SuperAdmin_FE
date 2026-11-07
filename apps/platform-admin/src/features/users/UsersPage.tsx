@@ -5,6 +5,7 @@ import ResponsiveLayout from '../../components/layout/ResponsiveLayout'
 import { useToast, useConfirm } from '../../context'
 import { AlertMessage } from '../../components/notifications'
 import { Modal } from '../../components/overlays'
+import { Avatar, DataDetailView, StatusBadge } from '../../components/data-display'
 import './users.css'
 import {
   createUser,
@@ -79,10 +80,6 @@ function fromApiUser(user: User, projectOptions: SelectOption[]): UserRecord {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
-}
-
-function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
 }
 
 function UserManagementPage() {
@@ -459,7 +456,7 @@ function UserManagementPage() {
                 <tr key={user.id}>
                   <td><span className="user-id-chip">{user.userId}</span></td>
                   <td><div className="user-cell">
-                    <span className="user-avatar" aria-hidden="true">{initials(user.name)}</span>
+                    <Avatar name={user.name} size="sm" />
                     <span className="user-identity"><strong>{user.name}</strong><span>Platform account</span></span>
                   </div></td>
                   <td><span className="user-email"><span className="email-glyph" aria-hidden="true">✉</span>{user.email}</span></td>
@@ -507,122 +504,122 @@ function UserManagementPage() {
 
       <footer className="user-page-footer">DBMS SUPER ADMIN <span>•</span> USER DIRECTORY</footer>
 
-      {isFormOpen && (
-        <div className="modal-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) closeForm()
-        }}>
-          <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="user-form-title">
-            <div className="modal-header">
-              <div><p className="eyebrow">ACCESS CONTROL</p><h2 id="user-form-title">{editingId ? 'Edit user details' : 'Create user account'}</h2></div>
-              <button type="button" className="modal-close" onClick={closeForm} aria-label="Close">×</button>
-            </div>
-            <form className="user-form modal-body" onSubmit={saveUser} noValidate>
-              <p className="form-demo-hint">Changes are saved to the platform user directory.</p>
-              {formError && <div className="inline-alert inline-alert--error" role="alert">{formError}</div>}
-              <label className="field"><span>Full name <span className="required-mark">*</span></span><input autoComplete="name" maxLength={100} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></label>
-              <label className="field"><span>Email address <span className="required-mark">*</span></span><input type="email" autoComplete="email" maxLength={254} value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></label>
-              {!editingId && <label className="field"><span>Password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required /></label>}
-              <label className="field"><span>Role <span className="required-mark">*</span></span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>{ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
-              <label className="field assigned-projects-field">
-                <span>Assigned projects <span className="required-mark">*</span></span>
-                <select
-                  required
-                  aria-required="true"
-                  aria-invalid={formError === 'At least one assigned project is required.'}
-                  disabled={projectOptions.length === 0}
-                  value=""
-                  onChange={(event) => {
-                    const selectedProject = event.target.value
-                    if (!selectedProject) return
-                    setForm((current) => ({
-                      ...current,
-                      projects: current.projects.includes(selectedProject)
-                        ? current.projects
-                        : [...current.projects, selectedProject],
-                    }))
-                    if (formError === 'At least one assigned project is required.') setFormError('')
-                  }}
-                >
-                  <option value="">{projectOptions.length ? 'Select a project' : 'Projects unavailable'}</option>
-                  {projectOptions.map((project) => (
-                    <option key={project.id} value={project.id} disabled={form.projects.includes(project.id)}>
-                      {project.name}{form.projects.includes(project.id) ? ' (assigned)' : ''}
-                    </option>
-                  ))}
-                </select>
-                {form.projects.length > 0 && (
-                  <div className="selected-projects" aria-label="Selected projects">
-                    {form.projects.map((project) => (
-                      <span className="selected-project-chip" key={project}>
-                        {projectOptions.find((option) => option.id === project)?.name ?? project}
-                        <button
-                          type="button"
-                          aria-label={`Remove ${project}`}
-                          onClick={() => setForm((current) => ({
-                            ...current,
-                            projects: current.projects.filter((assigned) => assigned !== project),
-                          }))}
-                        >×</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <span className={`field-hint ${formError === 'At least one assigned project is required.' ? 'field-error' : ''}`}>
-                  {formError === 'At least one assigned project is required.'
-                    ? formError
-                    : 'Required. Select one or more projects.'}
-                </span>
-              </label>
-              <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closeForm}>Cancel</button><button className="button button--primary" type="submit" disabled={isSaving || projectOptions.length === 0}>{isSaving ? 'Saving...' : editingId ? 'Save changes' : 'Create user'}</button></div>
-            </form>
-          </section>
-        </div>
-      )}
+      <Modal
+        isOpen={isFormOpen}
+        onClose={closeForm}
+        kicker="ACCESS CONTROL"
+        title={editingId ? 'Edit user details' : 'Create user account'}
+        size="md"
+      >
+        <form className="user-form" onSubmit={saveUser} noValidate>
+          <p className="form-demo-hint">Changes are saved to the platform user directory.</p>
+          {formError && <div className="inline-alert inline-alert--error" role="alert">{formError}</div>}
+          <label className="field"><span>Full name <span className="required-mark">*</span></span><input autoComplete="name" maxLength={100} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></label>
+          <label className="field"><span>Email address <span className="required-mark">*</span></span><input type="email" autoComplete="email" maxLength={254} value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></label>
+          {!editingId && <label className="field"><span>Password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required /></label>}
+          <label className="field"><span>Role <span className="required-mark">*</span></span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>{ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
+          <label className="field assigned-projects-field">
+            <span>Assigned projects <span className="required-mark">*</span></span>
+            <select
+              required
+              aria-required="true"
+              aria-invalid={formError === 'At least one assigned project is required.'}
+              disabled={projectOptions.length === 0}
+              value=""
+              onChange={(event) => {
+                const selectedProject = event.target.value
+                if (!selectedProject) return
+                setForm((current) => ({
+                  ...current,
+                  projects: current.projects.includes(selectedProject)
+                    ? current.projects
+                    : [...current.projects, selectedProject],
+                }))
+                if (formError === 'At least one assigned project is required.') setFormError('')
+              }}
+            >
+              <option value="">{projectOptions.length ? 'Select a project' : 'Projects unavailable'}</option>
+              {projectOptions.map((project) => (
+                <option key={project.id} value={project.id} disabled={form.projects.includes(project.id)}>
+                  {project.name}{form.projects.includes(project.id) ? ' (assigned)' : ''}
+                </option>
+              ))}
+            </select>
+            {form.projects.length > 0 && (
+              <div className="selected-projects" aria-label="Selected projects">
+                {form.projects.map((project) => (
+                  <span className="selected-project-chip" key={project}>
+                    {projectOptions.find((option) => option.id === project)?.name ?? project}
+                    <button
+                      type="button"
+                      aria-label={`Remove ${project}`}
+                      onClick={() => setForm((current) => ({
+                        ...current,
+                        projects: current.projects.filter((assigned) => assigned !== project),
+                      }))}
+                    >×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <span className={`field-hint ${formError === 'At least one assigned project is required.' ? 'field-error' : ''}`}>
+              {formError === 'At least one assigned project is required.'
+                ? formError
+                : 'Required. Select one or more projects.'}
+            </span>
+          </label>
+          <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closeForm}>Cancel</button><button className="button button--primary" type="submit" disabled={isSaving || projectOptions.length === 0}>{isSaving ? 'Saving...' : editingId ? 'Save changes' : 'Create user'}</button></div>
+        </form>
+      </Modal>
 
-      {viewingUser && (
-        <div className="modal-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setViewingUser(null)
-        }}>
-          <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="user-detail-title">
-            <div className="modal-header">
-              <div><p className="eyebrow">USER PROFILE</p><h2 id="user-detail-title">{viewingUser.name}</h2></div>
-              <button type="button" className="modal-close" onClick={() => setViewingUser(null)} aria-label="Close">×</button>
-            </div>
-            <div className="modal-body">
-              <dl className="details-grid">
-                <div><dt>User ID</dt><dd>{viewingUser.userId}</dd></div>
-                <div><dt>Full name</dt><dd>{viewingUser.name}</dd></div>
-                <div><dt>Email address</dt><dd>{viewingUser.email}</dd></div>
-                <div><dt>Phone number</dt><dd>{viewingUser.phone || 'Not provided'}</dd></div>
-                <div><dt>Role</dt><dd>{viewingUser.role}</dd></div>
-                <div><dt>Account status</dt><dd>{viewingUser.status}</dd></div>
-                <div><dt>Assigned projects</dt><dd>{viewingUser.projects.length ? viewingUser.projects.join(', ') : 'None'}</dd></div>
-                <div><dt>Created date</dt><dd>{formatDate(viewingUser.createdAt)}</dd></div>
-              </dl>
-              <div className="modal-actions"><button className="button button--secondary" type="button" onClick={() => setViewingUser(null)}>Close</button></div>
-            </div>
-          </section>
-        </div>
-      )}
+      <Modal
+        isOpen={Boolean(viewingUser)}
+        onClose={() => setViewingUser(null)}
+        kicker="USER PROFILE"
+        title={viewingUser?.name ?? 'User Profile'}
+        size="md"
+        footer={<button className="button button--secondary" type="button" onClick={() => setViewingUser(null)}>Close</button>}
+      >
+        {viewingUser && (
+          <DataDetailView
+            columns={2}
+            items={[
+              { label: 'User ID', value: viewingUser.userId, copyable: true },
+              { label: 'Full name', value: viewingUser.name },
+              { label: 'Email address', value: viewingUser.email, copyable: true },
+              { label: 'Phone number', value: viewingUser.phone || 'Not provided' },
+              { label: 'Role', value: viewingUser.role },
+              {
+                label: 'Account status',
+                value: <StatusBadge status={viewingUser.status} size="sm" />,
+              },
+              {
+                label: 'Assigned projects',
+                value: viewingUser.projects.length ? viewingUser.projects.join(', ') : 'None',
+                fullWidth: true,
+              },
+              { label: 'Created date', value: formatDate(viewingUser.createdAt) },
+            ]}
+          />
+        )}
+      </Modal>
 
-      {passwordResetUser && (
-        <div className="modal-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) closePasswordReset()
-        }}>
-          <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="password-reset-title">
-            <div className="modal-header">
-              <div><p className="eyebrow">ACCOUNT SECURITY</p><h2 id="password-reset-title">Reset password</h2></div>
-              <button type="button" className="modal-close" onClick={closePasswordReset} aria-label="Close">×</button>
-            </div>
-            <form className="user-form modal-body" onSubmit={submitPasswordReset}>
-              <p>Set a new password for {passwordResetUser.name}.</p>
-              {passwordResetError && <div className="inline-alert inline-alert--error" role="alert">{passwordResetError}</div>}
-              <label className="field"><span>New password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></label>
-              <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closePasswordReset}>Cancel</button><button className="button button--primary" type="submit" disabled={isResettingPassword}>{isResettingPassword ? 'Saving...' : 'Reset password'}</button></div>
-            </form>
-          </section>
-        </div>
-      )}
+      <Modal
+        isOpen={Boolean(passwordResetUser)}
+        onClose={closePasswordReset}
+        kicker="ACCOUNT SECURITY"
+        title="Reset password"
+        size="sm"
+      >
+        {passwordResetUser && (
+          <form className="user-form" onSubmit={submitPasswordReset}>
+            <p>Set a new password for {passwordResetUser.name}.</p>
+            {passwordResetError && <div className="inline-alert inline-alert--error" role="alert">{passwordResetError}</div>}
+            <label className="field"><span>New password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></label>
+            <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closePasswordReset}>Cancel</button><button className="button button--primary" type="submit" disabled={isResettingPassword}>{isResettingPassword ? 'Saving...' : 'Reset password'}</button></div>
+          </form>
+        )}
+      </Modal>
       </div>
     </ResponsiveLayout>
   )

@@ -36,6 +36,7 @@ import {
 import ResponsiveLayout from "../../components/layout/ResponsiveLayout";
 import { useToast, useConfirm } from "../../context";
 import { Modal, ImagePreview } from "../../components/overlays";
+import { StatisticsCard, StatusBadge, DataDetailView } from "../../components/data-display";
 import {
   DEFAULT_PROJECT_THEME,
   initialProjectAdmins,
@@ -209,18 +210,14 @@ interface SummaryCardProps {
 }
 function SummaryCard({ title, value, icon, tone }: SummaryCardProps) {
   return (
-    <article className="projects-summary-card">
-      <div className="projects-summary-top">
-        <span>{title}</span>
-        <span
-          className={`projects-summary-icon projects-summary-icon--${tone}`}
-        >
-          {icon}
-        </span>
-      </div>
-      <strong>{value.toLocaleString()}</strong>
-      <small>Across the platform</small>
-    </article>
+    <StatisticsCard
+      title={title}
+      value={value}
+      icon={icon}
+      tone={tone}
+      subtitle="Across the platform"
+      className="projects-summary-card"
+    />
   );
 }
 
@@ -256,26 +253,6 @@ function ModalActions({
           {submitLabel}
         </button>
       )}
-    </div>
-  );
-}
-
-function Detail({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon?: ReactNode;
-}) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>
-        {icon}
-        {value}
-      </dd>
     </div>
   );
 }
@@ -1841,32 +1818,39 @@ function ProjectManagementPage() {
             <p className="projects-form-demo-note">
               Demo record — no credentials stored.
             </p>
-            <dl className="projects-details-grid">
-              <Detail
-                label="Email"
-                value={viewAdmin.email}
-                icon={<Mail size={14} />}
-              />
-              <Detail
-                label="Phone"
-                value={viewAdmin.phone || "Not provided"}
-                icon={<Phone size={14} />}
-              />
-              <Detail
-                label="Username"
-                value={viewAdmin.username || "Not set"}
-              />
-              <Detail label="Account Status" value={viewAdmin.status} />
-              <Detail
-                label="Assigned Projects"
-                value={
-                  adminProjectIds(viewAdmin)
-                    .map((id) => projectName(id))
-                    .filter(Boolean)
-                    .join(", ") || "Unassigned"
-                }
-              />
-            </dl>
+            <DataDetailView
+              columns={2}
+              items={[
+                {
+                  label: "Email",
+                  value: viewAdmin.email,
+                  icon: <Mail size={14} />,
+                  copyable: true,
+                },
+                {
+                  label: "Phone",
+                  value: viewAdmin.phone || "Not provided",
+                  icon: <Phone size={14} />,
+                },
+                {
+                  label: "Username",
+                  value: viewAdmin.username || "Not set",
+                },
+                {
+                  label: "Account Status",
+                  value: <StatusBadge status={viewAdmin.status} size="sm" />,
+                },
+                {
+                  label: "Assigned Projects",
+                  value:
+                    adminProjectIds(viewAdmin)
+                      .map((id) => projectName(id))
+                      .filter(Boolean)
+                      .join(", ") || "Unassigned",
+                  fullWidth: true,
+                },
+              ]}
+            />
             <ModalActions
               onCancel={() => setViewAdmin(null)}
               cancelLabel="Close"
