@@ -6,6 +6,7 @@ import { useToast, useConfirm } from '../../context'
 import { AlertMessage } from '../../components/notifications'
 import { Modal } from '../../components/overlays'
 import { Avatar, DataDetailView, StatusBadge } from '../../components/data-display'
+import { TableSkeletonRows, EmptyState, NoSearchResults } from '../../components/feedback'
 import './users.css'
 import {
   createUser,
@@ -452,43 +453,75 @@ function UserManagementPage() {
               <th scope="col"><span className="visually-hidden">Actions</span></th>
             </tr></thead>
             <tbody>
-              {pageUsers.map((user) => (
-                <tr key={user.id}>
-                  <td><span className="user-id-chip">{user.userId}</span></td>
-                  <td><div className="user-cell">
-                    <Avatar name={user.name} size="sm" />
-                    <span className="user-identity"><strong>{user.name}</strong><span>Platform account</span></span>
-                  </div></td>
-                  <td><span className="user-email"><span className="email-glyph" aria-hidden="true">✉</span>{user.email}</span></td>
-                  <td><span className="role-badge"><span className="role-glyph" aria-hidden="true">◈</span>{user.role}</span></td>
-                  <td className="secondary-cell">{user.phone || '—'}</td>
-                  <td className="project-cell">{user.projects.length ? user.projects.join(', ') : '—'}</td>
-                  <td>
-                    <select
-                      className={`user-row-status status-badge--${user.status.toLowerCase()}`}
-                      aria-label={`Change ${user.name} status`}
-                      value={user.status}
-                      onChange={(event) => void changeUserStatus(
-                        user,
-                        event.target.value === 'Active' ? 'Active' : 'Inactive',
-                      )}
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
+              {isLoading ? (
+                <TableSkeletonRows rows={PAGE_SIZE} columns={7} hasActions />
+              ) : pageUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={9}>
+                    {search || roleFilter !== 'All' || statusFilter !== 'All' ? (
+                      <NoSearchResults
+                        query={search}
+                        onClearSearch={() => {
+                          setSearch('')
+                          setRoleFilter('All')
+                          setStatusFilter('All')
+                        }}
+                      />
+                    ) : (
+                      <EmptyState
+                        title="No users in directory"
+                        description="Get started by creating the first platform user account."
+                        action={
+                          <button
+                            type="button"
+                            className="button button--primary"
+                            onClick={openCreate}
+                          >
+                            Create user
+                          </button>
+                        }
+                        size="sm"
+                      />
+                    )}
                   </td>
-                  <td className="secondary-cell date-cell">{formatDate(user.createdAt)}</td>
-                  <td><div className="row-actions">
-                    <button className="icon-button" type="button" title="View details" aria-label={`View ${user.name}`} onClick={() => void openView(user)}>↗</button>
-                    <button className="icon-button" type="button" title="Edit user" aria-label={`Edit ${user.name}`} onClick={() => openEdit(user)}>✎</button>
-                    <button className="icon-button" type="button" title="Reset password" aria-label={`Reset password for ${user.name}`} onClick={() => { setPasswordResetUser(user); setNewPassword(''); setPasswordResetError('') }}>↻</button>
-                    <button className={`icon-button ${user.status === 'Active' ? 'icon-button--danger' : 'icon-button--success'}`} type="button" title={user.status === 'Active' ? 'Deactivate user' : 'Activate user'} aria-label={`${user.status === 'Active' ? 'Deactivate' : 'Activate'} ${user.name}`} onClick={() => toggleStatus(user)}>{user.status === 'Active' ? '⊘' : '✓'}</button>
-                    <button className="icon-button icon-button--danger" type="button" title="Delete user" aria-label={`Delete ${user.name}`} onClick={() => removeUser(user)}>×</button>
-                  </div></td>
                 </tr>
-              ))}
-              {isLoading && <tr><td colSpan={9} className="user-no-results">Loading users...</td></tr>}
-              {!isLoading && !loadError && pageUsers.length === 0 && <tr><td colSpan={9} className="user-no-results">No users match your search or filters.</td></tr>}
+              ) : (
+                pageUsers.map((user) => (
+                  <tr key={user.id}>
+                    <td><span className="user-id-chip">{user.userId}</span></td>
+                    <td><div className="user-cell">
+                      <Avatar name={user.name} size="sm" />
+                      <span className="user-identity"><strong>{user.name}</strong><span>Platform account</span></span>
+                    </div></td>
+                    <td><span className="user-email"><span className="email-glyph" aria-hidden="true">✉</span>{user.email}</span></td>
+                    <td><span className="role-badge"><span className="role-glyph" aria-hidden="true">◈</span>{user.role}</span></td>
+                    <td className="secondary-cell">{user.phone || '—'}</td>
+                    <td className="project-cell">{user.projects.length ? user.projects.join(', ') : '—'}</td>
+                    <td>
+                      <select
+                        className={`user-row-status status-badge--${user.status.toLowerCase()}`}
+                        aria-label={`Change ${user.name} status`}
+                        value={user.status}
+                        onChange={(event) => void changeUserStatus(
+                          user,
+                          event.target.value === 'Active' ? 'Active' : 'Inactive',
+                        )}
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
+                    </td>
+                    <td className="secondary-cell date-cell">{formatDate(user.createdAt)}</td>
+                    <td><div className="row-actions">
+                      <button className="icon-button" type="button" title="View details" aria-label={`View ${user.name}`} onClick={() => void openView(user)}>↗</button>
+                      <button className="icon-button" type="button" title="Edit user" aria-label={`Edit ${user.name}`} onClick={() => openEdit(user)}>✎</button>
+                      <button className="icon-button" type="button" title="Reset password" aria-label={`Reset password for ${user.name}`} onClick={() => { setPasswordResetUser(user); setNewPassword(''); setPasswordResetError('') }}>↻</button>
+                      <button className={`icon-button ${user.status === 'Active' ? 'icon-button--danger' : 'icon-button--success'}`} type="button" title={user.status === 'Active' ? 'Deactivate user' : 'Activate user'} aria-label={`${user.status === 'Active' ? 'Deactivate' : 'Activate'} ${user.name}`} onClick={() => toggleStatus(user)}>{user.status === 'Active' ? '⊘' : '✓'}</button>
+                      <button className="icon-button icon-button--danger" type="button" title="Delete user" aria-label={`Delete ${user.name}`} onClick={() => removeUser(user)}>×</button>
+                    </div></td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

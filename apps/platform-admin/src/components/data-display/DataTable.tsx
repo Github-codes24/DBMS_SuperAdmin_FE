@@ -8,11 +8,11 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  FolderOpen,
 } from 'lucide-react'
 import { TableSearch } from './TableSearch'
 import { TablePagination } from './TablePagination'
 import { ExpandableTableRow } from './ExpandableTableRow'
+import { TableSkeletonRows, EmptyState, NoSearchResults, LoadingSpinner } from '../feedback'
 import './dataDisplay.css'
 
 export interface DataTableColumn<T> {
@@ -68,6 +68,7 @@ export interface DataTableProps<T> {
 
   // States
   loading?: boolean
+  loadingVariant?: 'skeleton' | 'spinner'
   loadingMessage?: ReactNode
   emptyTitle?: ReactNode
   emptyMessage?: ReactNode
@@ -125,6 +126,7 @@ export function DataTable<T>({
 
   // States
   loading = false,
+  loadingVariant = 'skeleton',
   loadingMessage = 'Loading records...',
   emptyTitle = 'No records found',
   emptyMessage = 'There are no items to display matching the criteria.',
@@ -391,24 +393,41 @@ export function DataTable<T>({
 
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={totalCols}>
-                  <div className="app-table-loading">
-                    <div className="app-table-spinner" />
-                    <span>{loadingMessage}</span>
-                  </div>
-                </td>
-              </tr>
+              loadingVariant === 'spinner' ? (
+                <tr>
+                  <td colSpan={totalCols}>
+                    <div className="app-table-loading">
+                      <LoadingSpinner label={loadingMessage} />
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                <TableSkeletonRows
+                  rows={pageSize || 5}
+                  columns={columns.length}
+                  hasSelection={selectable}
+                  hasActions={Boolean(rowActions)}
+                />
+              )
             ) : paginatedData.length === 0 ? (
               <tr>
                 <td colSpan={totalCols}>
-                  <div className="app-table-empty">
-                    <div className="app-table-empty__icon">
-                      {emptyIcon || <FolderOpen size={44} strokeWidth={1.5} />}
-                    </div>
-                    <h4 className="app-table-empty__title">{emptyTitle}</h4>
-                    <p className="app-table-empty__message">{emptyMessage}</p>
-                  </div>
+                  {searchValue ? (
+                    <NoSearchResults
+                      query={searchValue}
+                      onClearSearch={
+                        onSearchChange
+                          ? () => onSearchChange('')
+                          : () => setInternalSearch('')
+                      }
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={emptyIcon}
+                      title={emptyTitle}
+                      description={emptyMessage}
+                    />
+                  )}
                 </td>
               </tr>
             ) : (

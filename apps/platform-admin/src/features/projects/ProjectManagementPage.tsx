@@ -37,6 +37,7 @@ import ResponsiveLayout from "../../components/layout/ResponsiveLayout";
 import { useToast, useConfirm } from "../../context";
 import { Modal, ImagePreview } from "../../components/overlays";
 import { StatisticsCard, StatusBadge, DataDetailView } from "../../components/data-display";
+import { CardSkeleton, EmptyState, NoSearchResults } from "../../components/feedback";
 import {
   DEFAULT_PROJECT_THEME,
   initialProjectAdmins,
@@ -1077,13 +1078,31 @@ function ProjectManagementPage() {
                 </div>
 
                 {isLoadingProjects ? (
-                  <div className="pm-loading-state">Loading projects…</div>
+                  <CardSkeleton count={6} variant="project" />
                 ) : visibleProjects.length === 0 ? (
-                  <div className="pm-empty-state">
-                    {projects.length === 0
-                      ? 'No projects yet. Click "Add Project" to create the first one.'
-                      : "No projects match your search or filters."}
-                  </div>
+                  search || statusFilter !== "All" ? (
+                    <NoSearchResults
+                      query={search}
+                      onClearSearch={() => {
+                        setSearch("");
+                        setStatusFilter("All");
+                      }}
+                    />
+                  ) : (
+                    <EmptyState
+                      title="No projects yet"
+                      description="Get started by clicking Add Project to create the first project."
+                      action={
+                        <button
+                          type="button"
+                          className="projects-button projects-button--primary"
+                          onClick={openAddProject}
+                        >
+                          <Plus size={15} /> Add Project
+                        </button>
+                      }
+                    />
+                  )
                 ) : (
                   <div className="pm-cards-grid">
                     {visibleProjects.map((project) => (
