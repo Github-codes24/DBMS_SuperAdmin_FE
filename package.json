@@ -1,4 +1,3 @@
-
 {
   "name": "dbms-superadmin-fe",
   "version": "1.0.0",
@@ -8,6 +7,8 @@
     "packages/*"
   ],
   "scripts": {
+    "dev": "npm run dev:platform",
+    "build": "npm run build:platform",
     "dev:platform": "npm run dev --workspace=platform-admin",
     "build:platform": "npm run build --workspace=platform-admin",
     "lint:platform": "npm run lint --workspace=platform-admin"

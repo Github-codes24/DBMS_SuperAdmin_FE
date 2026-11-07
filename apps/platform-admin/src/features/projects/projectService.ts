@@ -187,16 +187,16 @@ function projectPayload(
   project: Omit<ManagedProject, "id">,
 ): Record<string, unknown> {
   return {
-    name: project.name,
-    description: project.description,
-    logo: project.logo,
-    theme: project.theme,
-    startDate: project.startDate,
-    endDate: project.endDate,
+    name: project.name.trim(),
+    description: (project.description || "").trim(),
+    logo: (project.logo || "").trim(),
+    theme: (project.theme || "#f96321").trim(),
+    startDate: (project.startDate || "").trim(),
+    endDate: (project.endDate || "").trim(),
     status: statusToApi(project.status),
-    adminId: project.adminId,
-    panelLinks: project.panelLinks,
-    userTypes: project.userTypes,
+    adminId: (project.adminId || "").trim(),
+    panelLinks: project.panelLinks ?? [],
+    userTypes: project.userTypes ?? [],
   };
 }
 
@@ -212,7 +212,6 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       Accept: "application/json",
-      "ngrok-skip-browser-warning": "true",
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...init?.headers,
     },
