@@ -9,8 +9,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import {
   ArrowDownUp,
-  ArrowLeft,
-  BriefcaseBusiness,
   Calendar,
   Check,
   ChevronDown,
@@ -20,14 +18,12 @@ import {
   FolderKanban,
   LayoutGrid,
   Mail,
-  Menu,
   CalendarClock,
   PauseCircle,
   Pencil,
   Phone,
   Plus,
   Search,
-  ShieldCheck,
   Trash2,
   Upload,
   UserRound,
@@ -36,8 +32,13 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
-import AdminSidebar from "../../components/AdminSidebar";
-import AuthNavbarAction from "../../components/AuthNavbarAction";
+import ResponsiveLayout from "../../components/layout/ResponsiveLayout";
+import { useToast, useConfirm } from "../../context";
+import { Modal, ImagePreview } from "../../components/overlays";
+import { StatisticsCard, StatusBadge, DataDetailView } from "../../components/data-display";
+import { CardSkeleton, EmptyState, NoSearchResults } from "../../components/feedback";
+import { PrimaryButton, SecondaryButton, DangerButton, BackButton } from "../../components/ui/buttons";
+import { AlertMessage } from "../../components/notifications";
 import {
   DEFAULT_PROJECT_THEME,
   initialProjectAdmins,
@@ -211,40 +212,14 @@ interface SummaryCardProps {
 }
 function SummaryCard({ title, value, icon, tone }: SummaryCardProps) {
   return (
-    <article className="projects-summary-card">
-      <div className="projects-summary-top">
-        <span>{title}</span>
-        <span
-          className={`projects-summary-icon projects-summary-icon--${tone}`}
-        >
-          {icon}
-        </span>
-      </div>
-      <strong>{value.toLocaleString()}</strong>
-      <small>Across the platform</small>
-    </article>
-  );
-}
-
-function ModalHeading({
-  id,
-  title,
-  onClose,
-}: {
-  id: string;
-  title: string;
-  onClose: () => void;
-}) {
-  return (
-    <div className="projects-modal-heading">
-      <div>
-        <span className="projects-modal-kicker">PROJECT MANAGEMENT</span>
-        <h2 id={id}>{title}</h2>
-      </div>
-      <button type="button" aria-label="Close dialog" onClick={onClose}>
-        <X size={18} />
-      </button>
-    </div>
+    <StatisticsCard
+      title={title}
+      value={value}
+      icon={icon}
+      tone={tone}
+      subtitle="Across the platform"
+      className="projects-summary-card"
+    />
   );
 }
 
@@ -262,44 +237,22 @@ function ModalActions({
   submitDisabled?: boolean;
 }) {
   return (
-    <div className="projects-modal-actions">
-      <button
-        className="projects-button projects-button--secondary"
+    <div className="projects-modal-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+      <SecondaryButton
         type="button"
         onClick={onCancel}
       >
         {cancelLabel}
-      </button>
+      </SecondaryButton>
       {!hideSubmit && (
-        <button
-          className="projects-button projects-button--primary"
+        <PrimaryButton
           type="submit"
           disabled={submitDisabled}
+          icon={<Check size={15} />}
         >
-          <Check size={15} />
           {submitLabel}
-        </button>
+        </PrimaryButton>
       )}
-    </div>
-  );
-}
-
-function Detail({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string;
-  icon?: ReactNode;
-}) {
-  return (
-    <div>
-      <dt>{label}</dt>
-      <dd>
-        {icon}
-        {value}
-      </dd>
     </div>
   );
 }
@@ -307,6 +260,8 @@ function Detail({
 // ─── Main Component ───────────────────────────────────────────────────────────
 function ProjectManagementPage() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
 
   // ── data ──
   const [projects, setProjects] = useState<ManagedProject[]>([]);
@@ -331,7 +286,7 @@ function ProjectManagementPage() {
   const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [viewAdmin, setViewAdmin] = useState<ProjectAdmin | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{ src: string; alt?: string } | null>(null);
 
   // ── form ──
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
@@ -570,8 +525,13 @@ function ProjectManagementPage() {
   }
 
   async function deleteProject(project: ManagedProject) {
-    if (!window.confirm(`Delete "${project.name}"? This cannot be undone.`))
-      return;
+    const confirmed = await confirm({
+      title: `Delete Project: ${project.name}`,
+      message: `Are you sure you want to delete "${project.name}"? This cannot be undone.`,
+      confirmText: "Delete Project",
+      confirmVariant: "danger",
+    });
+    if (!confirmed) return;
     setDeletingProjectId(project.id);
     setProjectLoadError("");
     try {
@@ -579,6 +539,7 @@ function ProjectManagementPage() {
       setProjects((cur) => cur.filter((p) => p.id !== project.id));
       if (detailProject?.id === project.id) setDetailProject(null);
       setNotice(`"${project.name}" deleted successfully.`);
+      toast.success(`"${project.name}" deleted successfully.`);
     } catch (err) {
       if (err instanceof ProjectAuthenticationError) {
         navigate("/login", { replace: true });
@@ -640,34 +601,47 @@ function ProjectManagementPage() {
       }));
     if (!persistAdmins([next, ...rest])) return;
     setAdminModalOpen(false);
-    setNotice(
-      editingAdminId ? "Project Admin updated." : "Project Admin added.",
-    );
+    const msg = editingAdminId ? "Project Admin updated." : "Project Admin added.";
+    setNotice(msg);
+    toast.success(msg);
   }
 
-  function toggleAdminStatus(a: ProjectAdmin) {
+  async function toggleAdminStatus(a: ProjectAdmin) {
     const nextStatus: ProjectAdminStatus =
       a.status === "Active" ? "Inactive" : "Active";
-    if (
-      !window.confirm(
-        `${nextStatus === "Inactive" ? "Deactivate" : "Activate"} ${a.name}?`,
-      )
-    )
-      return;
+    const confirmed = await confirm({
+      title: `${nextStatus === "Inactive" ? "Deactivate" : "Activate"} Project Admin`,
+      message: `Are you sure you want to ${nextStatus === "Inactive" ? "deactivate" : "activate"} ${a.name}?`,
+      confirmText: nextStatus === "Inactive" ? "Deactivate" : "Activate",
+      confirmVariant: nextStatus === "Inactive" ? "warning" : "primary",
+    });
+    if (!confirmed) return;
     if (
       persistAdmins(
         admins.map((item) =>
           item.id === a.id ? { ...item, status: nextStatus } : item,
         ),
       )
-    )
-      setNotice(`${a.name} is now ${nextStatus.toLowerCase()}.`);
+    ) {
+      const msg = `${a.name} is now ${nextStatus.toLowerCase()}.`;
+      setNotice(msg);
+      toast.success(msg);
+    }
   }
 
-  function deleteAdmin(a: ProjectAdmin) {
-    if (!window.confirm(`Delete Project Admin ${a.name}?`)) return;
-    if (persistAdmins(admins.filter((item) => item.id !== a.id)))
-      setNotice(`${a.name} deleted.`);
+  async function deleteAdmin(a: ProjectAdmin) {
+    const confirmed = await confirm({
+      title: "Delete Project Admin",
+      message: `Are you sure you want to delete Project Admin ${a.name}?`,
+      confirmText: "Delete Admin",
+      confirmVariant: "danger",
+    });
+    if (!confirmed) return;
+    if (persistAdmins(admins.filter((item) => item.id !== a.id))) {
+      const msg = `${a.name} deleted.`;
+      setNotice(msg);
+      toast.success(msg);
+    }
   }
 
   void [openEditAdmin, toggleAdminStatus, deleteAdmin];
@@ -733,48 +707,8 @@ function ProjectManagementPage() {
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div className="projects-page">
-      {/* ── Navbar ── */}
-      <header className="projects-navbar">
-        <button
-          className="projects-menu-button"
-          type="button"
-          aria-label="Open navigation menu"
-          onClick={() => setSidebarOpen(true)}
-        >
-          <Menu size={21} />
-        </button>
-        <div className="projects-brand">
-          <span className="projects-brand-mark">
-            <BriefcaseBusiness size={17} />
-          </span>
-          <span>
-            DBMS <strong>SUPER ADMIN</strong>
-          </span>
-        </div>
-        <div className="projects-navbar-section">PROJECT MANAGEMENT</div>
-        <div className="projects-profile">
-          <span className="projects-profile-avatar">SA</span>
-          <span>Super Admin</span>
-        </div>
-        <AuthNavbarAction />
-      </header>
-
-      <div className="projects-workspace">
-        {sidebarOpen && (
-          <button
-            className="projects-backdrop"
-            type="button"
-            aria-label="Close navigation menu"
-            onClick={() => setSidebarOpen(false)}
-          />
-        )}
-        <AdminSidebar
-          drawer
-          open={sidebarOpen}
-          onNavigate={() => setSidebarOpen(false)}
-        />
-
+    <ResponsiveLayout>
+      <div className="projects-page-inner">
         <main className="projects-main">
           {/* ════════════════════════════════════════════════════════════════
               DETAIL VIEW
@@ -783,32 +717,25 @@ function ProjectManagementPage() {
             <div className="pm-detail">
               {/* Back */}
               <div className="pm-detail__back">
-                <button
-                  className="pm-detail__back-btn"
-                  type="button"
-                  onClick={() => setDetailProject(null)}
-                >
-                  <ArrowLeft size={15} /> Back to Projects
-                </button>
+                <BackButton onClick={() => setDetailProject(null)} label="Back to Projects" />
                 <div className="pm-detail__back-actions">
-                  <button
-                    className="projects-button projects-button--secondary"
-                    type="button"
+                  <SecondaryButton
+                    size="sm"
+                    icon={<Pencil size={13} />}
                     onClick={() => openEditProject(detailProject)}
                   >
-                    <Pencil size={13} /> Edit
-                  </button>
-                  <button
-                    className="projects-button projects-button--danger"
-                    type="button"
+                    Edit
+                  </SecondaryButton>
+                  <DangerButton
+                    size="sm"
+                    icon={<Trash2 size={13} />}
                     disabled={deletingProjectId === detailProject.id}
+                    isLoading={deletingProjectId === detailProject.id}
+                    loadingText="Deleting…"
                     onClick={() => void deleteProject(detailProject)}
                   >
-                    <Trash2 size={13} />{" "}
-                    {deletingProjectId === detailProject.id
-                      ? "Deleting…"
-                      : "Delete"}
-                  </button>
+                    Delete
+                  </DangerButton>
                 </div>
               </div>
 
@@ -994,48 +921,39 @@ function ProjectManagementPage() {
                     </p>
                   </div>
                 </div>
-                <div className="projects-heading-actions">
-                  <button
-                    className="projects-button projects-button--secondary"
-                    type="button"
+                <div className="projects-heading-actions" style={{ display: 'flex', gap: '8px' }}>
+                  <SecondaryButton
+                    icon={<UserRoundPlus size={15} />}
                     onClick={openAddAdmin}
                   >
-                    <UserRoundPlus size={15} /> Add Project Admin
-                  </button>
-                  <button
-                    className="projects-button projects-button--primary"
-                    type="button"
+                    Add Project Admin
+                  </SecondaryButton>
+                  <PrimaryButton
+                    icon={<Plus size={16} />}
                     onClick={openAddProject}
                   >
-                    <Plus size={16} /> Add Project
-                  </button>
+                    Add Project
+                  </PrimaryButton>
                 </div>
               </section>
 
               {notice && (
-                <div className="projects-toast" role="status">
-                  <Check size={15} aria-hidden="true" />
-                  {notice}
-                  <button
-                    type="button"
-                    aria-label="Dismiss"
-                    onClick={() => setNotice("")}
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
+                <AlertMessage
+                  variant="success"
+                  message={notice}
+                  onClose={() => setNotice("")}
+                />
               )}
               {projectLoadError && (
-                <div className="projects-load-error" role="alert">
-                  {projectLoadError}
-                  <button
-                    className="projects-button projects-button--secondary"
-                    type="button"
-                    onClick={() => void refreshProjects()}
-                  >
-                    Retry
-                  </button>
-                </div>
+                <AlertMessage
+                  variant="error"
+                  message={projectLoadError}
+                  action={
+                    <SecondaryButton size="sm" onClick={() => void refreshProjects()}>
+                      Retry
+                    </SecondaryButton>
+                  }
+                />
               )}
 
               {/* Stats */}
@@ -1090,13 +1008,12 @@ function ProjectManagementPage() {
                       Click a project to view its panels and user breakdown.
                     </p>
                   </div>
-                  <button
-                    className="projects-button projects-button--primary"
-                    type="button"
+                  <PrimaryButton
+                    icon={<Plus size={15} />}
                     onClick={openAddProject}
                   >
-                    <Plus size={15} /> Add Project
-                  </button>
+                    Add Project
+                  </PrimaryButton>
                 </div>
 
                 <div className="projects-toolbar">
@@ -1143,13 +1060,31 @@ function ProjectManagementPage() {
                 </div>
 
                 {isLoadingProjects ? (
-                  <div className="pm-loading-state">Loading projects…</div>
+                  <CardSkeleton count={6} variant="project" />
                 ) : visibleProjects.length === 0 ? (
-                  <div className="pm-empty-state">
-                    {projects.length === 0
-                      ? 'No projects yet. Click "Add Project" to create the first one.'
-                      : "No projects match your search or filters."}
-                  </div>
+                  search || statusFilter !== "All" ? (
+                    <NoSearchResults
+                      query={search}
+                      onClearSearch={() => {
+                        setSearch("");
+                        setStatusFilter("All");
+                      }}
+                    />
+                  ) : (
+                    <EmptyState
+                      title="No projects yet"
+                      description="Get started by clicking Add Project to create the first project."
+                      action={
+                        <button
+                          type="button"
+                          className="projects-button projects-button--primary"
+                          onClick={openAddProject}
+                        >
+                          <Plus size={15} /> Add Project
+                        </button>
+                      }
+                    />
+                  )
                 ) : (
                   <div className="pm-cards-grid">
                     {visibleProjects.map((project) => (
@@ -1366,28 +1301,17 @@ function ProjectManagementPage() {
             </>
           )}
         </main>
-      </div>
 
       {/* ════ Project create / edit modal ════ */}
-      {projectModalOpen && (
-        <div
-          className="projects-modal-overlay"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setProjectModalOpen(false);
-          }}
-        >
-          <section
-            className="projects-modal pm-form-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="project-form-title"
-          >
-            <ModalHeading
-              id="project-form-title"
-              title={editingProjectId ? "Edit Project" : "Add Project"}
-              onClose={() => setProjectModalOpen(false)}
-            />
-            <form onSubmit={saveProject} noValidate>
+      <Modal
+        isOpen={projectModalOpen}
+        onClose={() => setProjectModalOpen(false)}
+        kicker="PROJECT MANAGEMENT"
+        title={editingProjectId ? "Edit Project" : "Add Project"}
+        size="lg"
+        className="pm-form-modal"
+      >
+        <form onSubmit={saveProject} noValidate>
               {/* Basic Info */}
               <div className="pm-form-section">
                 <p className="pm-form-section-title">Basic Information</p>
@@ -1458,7 +1382,15 @@ function ProjectManagementPage() {
                                 style={{
                                   background:
                                     projectForm.theme || DEFAULT_PROJECT_THEME,
+                                  cursor: "pointer",
                                 }}
+                                title="Click to view full preview"
+                                onClick={() =>
+                                  setPreviewImage({
+                                    src: projectForm.logo,
+                                    alt: projectForm.name || "Project Logo",
+                                  })
+                                }
                               >
                                 <img
                                   src={projectForm.logo}
@@ -1764,35 +1696,20 @@ function ProjectManagementPage() {
                 submitDisabled={isSavingProject}
               />
             </form>
-          </section>
-        </div>
-      )}
+      </Modal>
 
       {/* ════ Admin modal ════ */}
-      {adminModalOpen && (
-        <div
-          className="projects-modal-overlay"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setAdminModalOpen(false);
-          }}
-        >
-          <section
-            className="projects-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="admin-form-title"
-          >
-            <ModalHeading
-              id="admin-form-title"
-              title={
-                editingAdminId ? "Edit Project Admin" : "Add Project Admin"
-              }
-              onClose={() => setAdminModalOpen(false)}
-            />
-            <p className="projects-form-demo-note">
-              Demo only — no login credentials are created.
-            </p>
-            <form onSubmit={saveAdmin} noValidate>
+      <Modal
+        isOpen={adminModalOpen}
+        onClose={() => setAdminModalOpen(false)}
+        kicker="PROJECT MANAGEMENT"
+        title={editingAdminId ? "Edit Project Admin" : "Add Project Admin"}
+        size="md"
+      >
+        <p className="projects-form-demo-note">
+          Demo only — no login credentials are created.
+        </p>
+        <form onSubmit={saveAdmin} noValidate>
               <div className="projects-form-grid">
                 <label className="projects-field projects-field--wide">
                   <span>
@@ -1886,67 +1803,74 @@ function ProjectManagementPage() {
                 }
               />
             </form>
-          </section>
-        </div>
-      )}
+      </Modal>
 
       {/* ════ Admin detail modal ════ */}
-      {viewAdmin && (
-        <div
-          className="projects-modal-overlay"
-          onMouseDown={(e) => {
-            if (e.target === e.currentTarget) setViewAdmin(null);
-          }}
-        >
-          <section
-            className="projects-modal projects-details-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="admin-details-title"
-          >
-            <ModalHeading
-              id="admin-details-title"
-              title={viewAdmin.name}
-              onClose={() => setViewAdmin(null)}
-            />
+      <Modal
+        isOpen={Boolean(viewAdmin)}
+        onClose={() => setViewAdmin(null)}
+        kicker="PROJECT MANAGEMENT"
+        title={viewAdmin?.name ?? "Admin Details"}
+        size="md"
+        className="projects-details-modal"
+      >
+        {viewAdmin && (
+          <>
             <p className="projects-form-demo-note">
               Demo record — no credentials stored.
             </p>
-            <dl className="projects-details-grid">
-              <Detail
-                label="Email"
-                value={viewAdmin.email}
-                icon={<Mail size={14} />}
-              />
-              <Detail
-                label="Phone"
-                value={viewAdmin.phone || "Not provided"}
-                icon={<Phone size={14} />}
-              />
-              <Detail
-                label="Username"
-                value={viewAdmin.username || "Not set"}
-              />
-              <Detail label="Account Status" value={viewAdmin.status} />
-              <Detail
-                label="Assigned Projects"
-                value={
-                  adminProjectIds(viewAdmin)
-                    .map((id) => projectName(id))
-                    .filter(Boolean)
-                    .join(", ") || "Unassigned"
-                }
-              />
-            </dl>
+            <DataDetailView
+              columns={2}
+              items={[
+                {
+                  label: "Email",
+                  value: viewAdmin.email,
+                  icon: <Mail size={14} />,
+                  copyable: true,
+                },
+                {
+                  label: "Phone",
+                  value: viewAdmin.phone || "Not provided",
+                  icon: <Phone size={14} />,
+                },
+                {
+                  label: "Username",
+                  value: viewAdmin.username || "Not set",
+                },
+                {
+                  label: "Account Status",
+                  value: <StatusBadge status={viewAdmin.status} size="sm" />,
+                },
+                {
+                  label: "Assigned Projects",
+                  value:
+                    adminProjectIds(viewAdmin)
+                      .map((id) => projectName(id))
+                      .filter(Boolean)
+                      .join(", ") || "Unassigned",
+                  fullWidth: true,
+                },
+              ]}
+            />
             <ModalActions
               onCancel={() => setViewAdmin(null)}
               cancelLabel="Close"
               hideSubmit
             />
-          </section>
-        </div>
-      )}
-    </div>
+          </>
+        )}
+      </Modal>
+
+      {/* ════ Fullscreen logo image preview lightbox ════ */}
+      <ImagePreview
+        isOpen={Boolean(previewImage)}
+        src={previewImage?.src || ""}
+        alt={previewImage?.alt}
+        title={previewImage?.alt}
+        onClose={() => setPreviewImage(null)}
+      />
+      </div>
+    </ResponsiveLayout>
   );
 }
 

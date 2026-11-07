@@ -3,6 +3,7 @@
   box-sizing: border-box;
 }
 
+:root,
 .reports-page {
   --reports-orange: #f96321;
   --reports-ink: #101d35;
@@ -10,13 +11,11 @@
   --reports-muted: #94a3b8;
   --reports-border: #e5eaf1;
   --reports-canvas: #f3f6fa;
-  height: 100vh;
-  height: 100dvh;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-color: #cbd5e1 var(--reports-canvas);
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
+}
+
+.reports-page {
+  width: 100%;
+  min-height: auto;
   background: var(--reports-canvas);
   color: var(--reports-ink);
   font: 13px/1.45 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

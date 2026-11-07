@@ -1,7 +1,13 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import AdminSidebar from '../../components/AdminSidebar'
-import AuthNavbarAction from '../../components/AuthNavbarAction'
+import { Users as UsersIcon, Plus } from 'lucide-react'
+import ResponsiveLayout from '../../components/layout/ResponsiveLayout'
+import { useToast, useConfirm } from '../../context'
+import { AlertMessage } from '../../components/notifications'
+import { Modal } from '../../components/overlays'
+import { Avatar, DataDetailView, StatusBadge } from '../../components/data-display'
+import { TableSkeletonRows, EmptyState, NoSearchResults } from '../../components/feedback'
+import { PrimaryButton, SecondaryButton } from '../../components/ui/buttons'
 import './users.css'
 import {
   createUser,
@@ -78,10 +84,6 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
 }
 
-function initials(name: string) {
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join('').toUpperCase()
-}
-
 function UserManagementPage() {
   const navigate = useNavigate()
   const [users, setUsers] = useState<UserRecord[]>([])
@@ -104,7 +106,8 @@ function UserManagementPage() {
   const [passwordResetError, setPasswordResetError] = useState('')
   const [isResettingPassword, setIsResettingPassword] = useState(false)
   const [formError, setFormError] = useState('')
-  const [toast, setToast] = useState('')
+  const { toast } = useToast()
+  const { confirm } = useConfirm()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -141,7 +144,6 @@ function UserManagementPage() {
     setLoadError('')
     setter(value)
     setPage(1)
-    setToast('')
     setActionError('')
   }
 
@@ -210,7 +212,7 @@ function UserManagementPage() {
         setUsers((current) => current.map((user) =>
           user.id === updatedRecord.id ? updatedRecord : user,
         ))
-        setToast('User updated successfully.')
+        toast.success('User updated successfully.')
       } else {
         const createdUser = await createUser({ ...input, password: form.password })
         const createdRecord = fromApiUser(createdUser, projectOptions)
@@ -219,7 +221,7 @@ function UserManagementPage() {
           ...current.filter((user) => user.id !== createdRecord.id),
         ].slice(0, PAGE_SIZE))
         setTotalUsers((current) => current + 1)
-        setToast('User created successfully.')
+        toast.success('User created successfully.')
         setSearch('')
         setRoleFilter('All')
         setStatusFilter('All')
@@ -248,7 +250,7 @@ function UserManagementPage() {
       setUsers((current) => current.map((currentUser) =>
         currentUser.id === updatedRecord.id ? updatedRecord : currentUser,
       ))
-      setToast(`User ${nextStatus.toLowerCase()} successfully.`)
+      toast.success(`User ${nextStatus.toLowerCase()} successfully.`)
     } catch (error) {
       if (error instanceof AuthenticationError) {
         setActionError(getErrorMessage(error))
@@ -260,7 +262,13 @@ function UserManagementPage() {
 
   async function toggleStatus(user: UserRecord) {
     const nextStatus: UserStatus = user.status === 'Active' ? 'Inactive' : 'Active'
-    if (!window.confirm(`${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} ${user.name}?`)) return
+    const confirmed = await confirm({
+      title: `${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} User`,
+      message: `Are you sure you want to ${nextStatus === 'Inactive' ? 'deactivate' : 'activate'} ${user.name}?`,
+      confirmText: nextStatus === 'Inactive' ? 'Deactivate' : 'Activate',
+      confirmVariant: nextStatus === 'Inactive' ? 'warning' : 'primary',
+    })
+    if (!confirmed) return
     await changeUserStatus(user, nextStatus)
   }
 
@@ -293,7 +301,7 @@ function UserManagementPage() {
     setPasswordResetError('')
     try {
       await resetUserPassword(passwordResetUser.id, newPassword)
-      setToast(`Password reset for ${passwordResetUser.name}.`)
+      toast.success(`Password reset for ${passwordResetUser.name}.`)
       setPasswordResetUser(null)
       setNewPassword('')
     } catch (error) {
@@ -314,11 +322,17 @@ function UserManagementPage() {
   }
 
   async function removeUser(user: UserRecord) {
-    if (!window.confirm(`Delete ${user.name}? This action cannot be undone.`)) return
+    const confirmed = await confirm({
+      title: 'Delete User',
+      message: `Are you sure you want to delete ${user.name}? This action cannot be undone.`,
+      confirmText: 'Delete User',
+      confirmVariant: 'danger',
+    })
+    if (!confirmed) return
     setActionError('')
     try {
       await deleteUser(user.id)
-      setToast('User deleted successfully.')
+      toast.success('User deleted successfully.')
       if (page > 1 && totalUsers - 1 <= (page - 1) * PAGE_SIZE) {
         setIsLoading(true)
         setLoadError('')
@@ -338,45 +352,52 @@ function UserManagementPage() {
   }
 
   return (
-    <div className="user-admin-shell">
-      <header className="user-admin-navbar">
-        <span className="user-admin-navbar-title">DBMS <strong>SUPER ADMIN</strong></span>
-        <span className="user-admin-navbar-section">USER MANAGEMENT</span>
-        <span className="user-admin-navbar-user"><span aria-hidden="true" /> Super Admin</span>
-        <AuthNavbarAction />
-      </header>
-      <div className="user-admin-body">
-        <AdminSidebar />
-
-        <div className="user-admin-main">
-        <main className="page-content user-management-page">
-      <section className="page-heading user-page-heading">
-        <div>
-          <div className="user-heading-kicker"><span className="kicker-line" /> ACCESS CONTROL</div>
-          <h1>User Management</h1>
-          <p className="page-description">Create and manage platform user accounts.</p>
-        </div>
-        <button className="button button--primary create-button" type="button" onClick={openCreate}>
-          <span aria-hidden="true">＋</span> Create User
-        </button>
-      </section>
-
-      {toast && <div className="toast user-toast" role="status">{toast}</div>}
+    <ResponsiveLayout
+      title="User Management"
+      description="Create and manage platform user accounts."
+      icon={<UsersIcon size={24} />}
+      headerActions={
+        <PrimaryButton icon={<Plus size={16} />} onClick={openCreate}>
+          Create User
+        </PrimaryButton>
+      }
+    >
+      <div className="user-management-page">
       {actionError && (
-        <div className="inline-alert inline-alert--error" role="alert">
-          {actionError}
-          {actionError === 'Your session has expired. Please sign in again.' && (
-            <button type="button" onClick={() => navigate('/login', { replace: true })}>Sign in</button>
-          )}
-        </div>
+        <AlertMessage
+          type="error"
+          description={actionError}
+          dismissible
+          onClose={() => setActionError('')}
+          action={
+            actionError === 'Your session has expired. Please sign in again.' ? (
+              <SecondaryButton
+                size="sm"
+                onClick={() => navigate('/login', { replace: true })}
+              >
+                Sign in
+              </SecondaryButton>
+            ) : undefined
+          }
+        />
       )}
       {loadError && (
-        <div className="inline-alert inline-alert--error" role="alert">
-          {loadError}
-          {loadError === 'Your session has expired. Please sign in again.' && (
-            <button type="button" onClick={() => navigate('/login', { replace: true })}>Sign in</button>
-          )}
-        </div>
+        <AlertMessage
+          type="error"
+          description={loadError}
+          dismissible
+          onClose={() => setLoadError('')}
+          action={
+            loadError === 'Your session has expired. Please sign in again.' ? (
+              <SecondaryButton
+                size="sm"
+                onClick={() => navigate('/login', { replace: true })}
+              >
+                Sign in
+              </SecondaryButton>
+            ) : undefined
+          }
+        />
       )}
 
       <section className="users-card user-filter-card" aria-label="User search and filters">
@@ -431,43 +452,75 @@ function UserManagementPage() {
               <th scope="col"><span className="visually-hidden">Actions</span></th>
             </tr></thead>
             <tbody>
-              {pageUsers.map((user) => (
-                <tr key={user.id}>
-                  <td><span className="user-id-chip">{user.userId}</span></td>
-                  <td><div className="user-cell">
-                    <span className="user-avatar" aria-hidden="true">{initials(user.name)}</span>
-                    <span className="user-identity"><strong>{user.name}</strong><span>Platform account</span></span>
-                  </div></td>
-                  <td><span className="user-email"><span className="email-glyph" aria-hidden="true">✉</span>{user.email}</span></td>
-                  <td><span className="role-badge"><span className="role-glyph" aria-hidden="true">◈</span>{user.role}</span></td>
-                  <td className="secondary-cell">{user.phone || '—'}</td>
-                  <td className="project-cell">{user.projects.length ? user.projects.join(', ') : '—'}</td>
-                  <td>
-                    <select
-                      className={`user-row-status status-badge--${user.status.toLowerCase()}`}
-                      aria-label={`Change ${user.name} status`}
-                      value={user.status}
-                      onChange={(event) => void changeUserStatus(
-                        user,
-                        event.target.value === 'Active' ? 'Active' : 'Inactive',
-                      )}
-                    >
-                      <option value="Active">Active</option>
-                      <option value="Inactive">Inactive</option>
-                    </select>
+              {isLoading ? (
+                <TableSkeletonRows rows={PAGE_SIZE} columns={7} hasActions />
+              ) : pageUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={9}>
+                    {search || roleFilter !== 'All' || statusFilter !== 'All' ? (
+                      <NoSearchResults
+                        query={search}
+                        onClearSearch={() => {
+                          setSearch('')
+                          setRoleFilter('All')
+                          setStatusFilter('All')
+                        }}
+                      />
+                    ) : (
+                      <EmptyState
+                        title="No users in directory"
+                        description="Get started by creating the first platform user account."
+                        action={
+                          <button
+                            type="button"
+                            className="button button--primary"
+                            onClick={openCreate}
+                          >
+                            Create user
+                          </button>
+                        }
+                        size="sm"
+                      />
+                    )}
                   </td>
-                  <td className="secondary-cell date-cell">{formatDate(user.createdAt)}</td>
-                  <td><div className="row-actions">
-                    <button className="icon-button" type="button" title="View details" aria-label={`View ${user.name}`} onClick={() => void openView(user)}>↗</button>
-                    <button className="icon-button" type="button" title="Edit user" aria-label={`Edit ${user.name}`} onClick={() => openEdit(user)}>✎</button>
-                    <button className="icon-button" type="button" title="Reset password" aria-label={`Reset password for ${user.name}`} onClick={() => { setPasswordResetUser(user); setNewPassword(''); setPasswordResetError('') }}>↻</button>
-                    <button className={`icon-button ${user.status === 'Active' ? 'icon-button--danger' : 'icon-button--success'}`} type="button" title={user.status === 'Active' ? 'Deactivate user' : 'Activate user'} aria-label={`${user.status === 'Active' ? 'Deactivate' : 'Activate'} ${user.name}`} onClick={() => toggleStatus(user)}>{user.status === 'Active' ? '⊘' : '✓'}</button>
-                    <button className="icon-button icon-button--danger" type="button" title="Delete user" aria-label={`Delete ${user.name}`} onClick={() => removeUser(user)}>×</button>
-                  </div></td>
                 </tr>
-              ))}
-              {isLoading && <tr><td colSpan={9} className="user-no-results">Loading users...</td></tr>}
-              {!isLoading && !loadError && pageUsers.length === 0 && <tr><td colSpan={9} className="user-no-results">No users match your search or filters.</td></tr>}
+              ) : (
+                pageUsers.map((user) => (
+                  <tr key={user.id}>
+                    <td><span className="user-id-chip">{user.userId}</span></td>
+                    <td><div className="user-cell">
+                      <Avatar name={user.name} size="sm" />
+                      <span className="user-identity"><strong>{user.name}</strong><span>Platform account</span></span>
+                    </div></td>
+                    <td><span className="user-email"><span className="email-glyph" aria-hidden="true">✉</span>{user.email}</span></td>
+                    <td><span className="role-badge"><span className="role-glyph" aria-hidden="true">◈</span>{user.role}</span></td>
+                    <td className="secondary-cell">{user.phone || '—'}</td>
+                    <td className="project-cell">{user.projects.length ? user.projects.join(', ') : '—'}</td>
+                    <td>
+                      <select
+                        className={`user-row-status status-badge--${user.status.toLowerCase()}`}
+                        aria-label={`Change ${user.name} status`}
+                        value={user.status}
+                        onChange={(event) => void changeUserStatus(
+                          user,
+                          event.target.value === 'Active' ? 'Active' : 'Inactive',
+                        )}
+                      >
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                      </select>
+                    </td>
+                    <td className="secondary-cell date-cell">{formatDate(user.createdAt)}</td>
+                    <td><div className="row-actions">
+                      <button className="icon-button" type="button" title="View details" aria-label={`View ${user.name}`} onClick={() => void openView(user)}>↗</button>
+                      <button className="icon-button" type="button" title="Edit user" aria-label={`Edit ${user.name}`} onClick={() => openEdit(user)}>✎</button>
+                      <button className="icon-button" type="button" title="Reset password" aria-label={`Reset password for ${user.name}`} onClick={() => { setPasswordResetUser(user); setNewPassword(''); setPasswordResetError('') }}>↻</button>
+                      <button className={`icon-button ${user.status === 'Active' ? 'icon-button--danger' : 'icon-button--success'}`} type="button" title={user.status === 'Active' ? 'Deactivate user' : 'Activate user'} aria-label={`${user.status === 'Active' ? 'Deactivate' : 'Activate'} ${user.name}`} onClick={() => toggleStatus(user)}>{user.status === 'Active' ? '⊘' : '✓'}</button>
+                      <button className="icon-button icon-button--danger" type="button" title="Delete user" aria-label={`Delete ${user.name}`} onClick={() => removeUser(user)}>×</button>
+                    </div></td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -483,126 +536,144 @@ function UserManagementPage() {
 
       <footer className="user-page-footer">DBMS SUPER ADMIN <span>•</span> USER DIRECTORY</footer>
 
-      {isFormOpen && (
-        <div className="modal-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) closeForm()
-        }}>
-          <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="user-form-title">
-            <div className="modal-header">
-              <div><p className="eyebrow">ACCESS CONTROL</p><h2 id="user-form-title">{editingId ? 'Edit user details' : 'Create user account'}</h2></div>
-              <button type="button" className="modal-close" onClick={closeForm} aria-label="Close">×</button>
-            </div>
-            <form className="user-form modal-body" onSubmit={saveUser} noValidate>
-              <p className="form-demo-hint">Changes are saved to the platform user directory.</p>
-              {formError && <div className="inline-alert inline-alert--error" role="alert">{formError}</div>}
-              <label className="field"><span>Full name <span className="required-mark">*</span></span><input autoComplete="name" maxLength={100} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></label>
-              <label className="field"><span>Email address <span className="required-mark">*</span></span><input type="email" autoComplete="email" maxLength={254} value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></label>
-              {!editingId && <label className="field"><span>Password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required /></label>}
-              <label className="field"><span>Role <span className="required-mark">*</span></span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>{ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
-              <label className="field assigned-projects-field">
-                <span>Assigned projects <span className="required-mark">*</span></span>
-                <select
-                  required
-                  aria-required="true"
-                  aria-invalid={formError === 'At least one assigned project is required.'}
-                  disabled={projectOptions.length === 0}
-                  value=""
-                  onChange={(event) => {
-                    const selectedProject = event.target.value
-                    if (!selectedProject) return
-                    setForm((current) => ({
-                      ...current,
-                      projects: current.projects.includes(selectedProject)
-                        ? current.projects
-                        : [...current.projects, selectedProject],
-                    }))
-                    if (formError === 'At least one assigned project is required.') setFormError('')
-                  }}
-                >
-                  <option value="">{projectOptions.length ? 'Select a project' : 'Projects unavailable'}</option>
-                  {projectOptions.map((project) => (
-                    <option key={project.id} value={project.id} disabled={form.projects.includes(project.id)}>
-                      {project.name}{form.projects.includes(project.id) ? ' (assigned)' : ''}
-                    </option>
-                  ))}
-                </select>
-                {form.projects.length > 0 && (
-                  <div className="selected-projects" aria-label="Selected projects">
-                    {form.projects.map((project) => (
-                      <span className="selected-project-chip" key={project}>
-                        {projectOptions.find((option) => option.id === project)?.name ?? project}
-                        <button
-                          type="button"
-                          aria-label={`Remove ${project}`}
-                          onClick={() => setForm((current) => ({
-                            ...current,
-                            projects: current.projects.filter((assigned) => assigned !== project),
-                          }))}
-                        >×</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <span className={`field-hint ${formError === 'At least one assigned project is required.' ? 'field-error' : ''}`}>
-                  {formError === 'At least one assigned project is required.'
-                    ? formError
-                    : 'Required. Select one or more projects.'}
-                </span>
-              </label>
-              <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closeForm}>Cancel</button><button className="button button--primary" type="submit" disabled={isSaving || projectOptions.length === 0}>{isSaving ? 'Saving...' : editingId ? 'Save changes' : 'Create user'}</button></div>
-            </form>
-          </section>
-        </div>
-      )}
+      <Modal
+        isOpen={isFormOpen}
+        onClose={closeForm}
+        kicker="ACCESS CONTROL"
+        title={editingId ? 'Edit user details' : 'Create user account'}
+        size="md"
+      >
+        <form className="user-form" onSubmit={saveUser} noValidate>
+          <p className="form-demo-hint">Changes are saved to the platform user directory.</p>
+          {formError && <div className="inline-alert inline-alert--error" role="alert">{formError}</div>}
+          <label className="field"><span>Full name <span className="required-mark">*</span></span><input autoComplete="name" maxLength={100} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></label>
+          <label className="field"><span>Email address <span className="required-mark">*</span></span><input type="email" autoComplete="email" maxLength={254} value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></label>
+          {!editingId && <label className="field"><span>Password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required /></label>}
+          <label className="field"><span>Role <span className="required-mark">*</span></span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>{ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
+          <label className="field assigned-projects-field">
+            <span>Assigned projects <span className="required-mark">*</span></span>
+            <select
+              required
+              aria-required="true"
+              aria-invalid={formError === 'At least one assigned project is required.'}
+              disabled={projectOptions.length === 0}
+              value=""
+              onChange={(event) => {
+                const selectedProject = event.target.value
+                if (!selectedProject) return
+                setForm((current) => ({
+                  ...current,
+                  projects: current.projects.includes(selectedProject)
+                    ? current.projects
+                    : [...current.projects, selectedProject],
+                }))
+                if (formError === 'At least one assigned project is required.') setFormError('')
+              }}
+            >
+              <option value="">{projectOptions.length ? 'Select a project' : 'Projects unavailable'}</option>
+              {projectOptions.map((project) => (
+                <option key={project.id} value={project.id} disabled={form.projects.includes(project.id)}>
+                  {project.name}{form.projects.includes(project.id) ? ' (assigned)' : ''}
+                </option>
+              ))}
+            </select>
+            {form.projects.length > 0 && (
+              <div className="selected-projects" aria-label="Selected projects">
+                {form.projects.map((project) => (
+                  <span className="selected-project-chip" key={project}>
+                    {projectOptions.find((option) => option.id === project)?.name ?? project}
+                    <button
+                      type="button"
+                      aria-label={`Remove ${project}`}
+                      onClick={() => setForm((current) => ({
+                        ...current,
+                        projects: current.projects.filter((assigned) => assigned !== project),
+                      }))}
+                    >×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <span className={`field-hint ${formError === 'At least one assigned project is required.' ? 'field-error' : ''}`}>
+              {formError === 'At least one assigned project is required.'
+                ? formError
+                : 'Required. Select one or more projects.'}
+            </span>
+          </label>
+          <div className="modal-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+            <SecondaryButton onClick={closeForm}>Cancel</SecondaryButton>
+            <PrimaryButton
+              type="submit"
+              disabled={isSaving || projectOptions.length === 0}
+              isLoading={isSaving}
+              loadingText="Saving..."
+            >
+              {editingId ? 'Save changes' : 'Create user'}
+            </PrimaryButton>
+          </div>
+        </form>
+      </Modal>
 
-      {viewingUser && (
-        <div className="modal-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setViewingUser(null)
-        }}>
-          <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="user-detail-title">
-            <div className="modal-header">
-              <div><p className="eyebrow">USER PROFILE</p><h2 id="user-detail-title">{viewingUser.name}</h2></div>
-              <button type="button" className="modal-close" onClick={() => setViewingUser(null)} aria-label="Close">×</button>
-            </div>
-            <div className="modal-body">
-              <dl className="details-grid">
-                <div><dt>User ID</dt><dd>{viewingUser.userId}</dd></div>
-                <div><dt>Full name</dt><dd>{viewingUser.name}</dd></div>
-                <div><dt>Email address</dt><dd>{viewingUser.email}</dd></div>
-                <div><dt>Phone number</dt><dd>{viewingUser.phone || 'Not provided'}</dd></div>
-                <div><dt>Role</dt><dd>{viewingUser.role}</dd></div>
-                <div><dt>Account status</dt><dd>{viewingUser.status}</dd></div>
-                <div><dt>Assigned projects</dt><dd>{viewingUser.projects.length ? viewingUser.projects.join(', ') : 'None'}</dd></div>
-                <div><dt>Created date</dt><dd>{formatDate(viewingUser.createdAt)}</dd></div>
-              </dl>
-              <div className="modal-actions"><button className="button button--secondary" type="button" onClick={() => setViewingUser(null)}>Close</button></div>
-            </div>
-          </section>
-        </div>
-      )}
+      <Modal
+        isOpen={Boolean(viewingUser)}
+        onClose={() => setViewingUser(null)}
+        kicker="USER PROFILE"
+        title={viewingUser?.name ?? 'User Profile'}
+        size="md"
+        footer={<SecondaryButton onClick={() => setViewingUser(null)}>Close</SecondaryButton>}
+      >
+        {viewingUser && (
+          <DataDetailView
+            columns={2}
+            items={[
+              { label: 'User ID', value: viewingUser.userId, copyable: true },
+              { label: 'Full name', value: viewingUser.name },
+              { label: 'Email address', value: viewingUser.email, copyable: true },
+              { label: 'Phone number', value: viewingUser.phone || 'Not provided' },
+              { label: 'Role', value: viewingUser.role },
+              {
+                label: 'Account status',
+                value: <StatusBadge status={viewingUser.status} size="sm" />,
+              },
+              {
+                label: 'Assigned projects',
+                value: viewingUser.projects.length ? viewingUser.projects.join(', ') : 'None',
+                fullWidth: true,
+              },
+              { label: 'Created date', value: formatDate(viewingUser.createdAt) },
+            ]}
+          />
+        )}
+      </Modal>
 
-      {passwordResetUser && (
-        <div className="modal-backdrop" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) closePasswordReset()
-        }}>
-          <section className="modal-panel" role="dialog" aria-modal="true" aria-labelledby="password-reset-title">
-            <div className="modal-header">
-              <div><p className="eyebrow">ACCOUNT SECURITY</p><h2 id="password-reset-title">Reset password</h2></div>
-              <button type="button" className="modal-close" onClick={closePasswordReset} aria-label="Close">×</button>
+      <Modal
+        isOpen={Boolean(passwordResetUser)}
+        onClose={closePasswordReset}
+        kicker="ACCOUNT SECURITY"
+        title="Reset password"
+        size="sm"
+      >
+        {passwordResetUser && (
+          <form className="user-form" onSubmit={submitPasswordReset}>
+            <p>Set a new password for {passwordResetUser.name}.</p>
+            {passwordResetError && <div className="inline-alert inline-alert--error" role="alert">{passwordResetError}</div>}
+            <label className="field"><span>New password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></label>
+            <div className="modal-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+              <SecondaryButton onClick={closePasswordReset}>Cancel</SecondaryButton>
+              <PrimaryButton
+                type="submit"
+                disabled={isResettingPassword}
+                isLoading={isResettingPassword}
+                loadingText="Saving..."
+              >
+                Reset password
+              </PrimaryButton>
             </div>
-            <form className="user-form modal-body" onSubmit={submitPasswordReset}>
-              <p>Set a new password for {passwordResetUser.name}.</p>
-              {passwordResetError && <div className="inline-alert inline-alert--error" role="alert">{passwordResetError}</div>}
-              <label className="field"><span>New password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></label>
-              <div className="modal-actions"><button className="button button--secondary" type="button" onClick={closePasswordReset}>Cancel</button><button className="button button--primary" type="submit" disabled={isResettingPassword}>{isResettingPassword ? 'Saving...' : 'Reset password'}</button></div>
-            </form>
-          </section>
-        </div>
-      )}
-        </main>
-        </div>
+          </form>
+        )}
+      </Modal>
       </div>
-    </div>
+    </ResponsiveLayout>
   )
 }
 

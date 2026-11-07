@@ -1,14 +1,15 @@
-import { BarChart3, BriefcaseBusiness, ShieldCheck, Users } from 'lucide-react'
+import { BarChart3, BriefcaseBusiness, Settings, ShieldCheck, Users } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
+import { Avatar } from './data-display'
 import './adminSidebar.css'
 
 const navigation = [
-   { label: 'Dashboard', icon: ShieldCheck, href: '/dashboard' },
+  { label: 'Dashboard', icon: ShieldCheck, href: '/dashboard' },
   { label: 'User Management', icon: Users, href: '/users' },
   { label: 'Project Management', icon: BriefcaseBusiness, href: '/project-management' },
   { label: 'Roles & Permissions', icon: ShieldCheck, href: '/roles-permissions' },
   { label: 'Reports & Analytics', icon: BarChart3, href: '/reports-analytics' },
-
+  { label: 'Settings', icon: Settings, href: '/settings' },
 ]
 
 interface AdminSidebarProps {
@@ -29,7 +30,10 @@ function AdminSidebar({ drawer = false, open = false, onNavigate }: AdminSidebar
       <p className="admin-sidebar-label">WORKSPACE</p>
       <nav className="admin-sidebar-nav" aria-label="Main navigation">
         {navigation.map(({ label, icon: Icon, href }) => {
-          const active = pathname === href || (label === 'Project Management' && pathname === '/projects')
+          const active =
+            pathname === href ||
+            (label === 'Project Management' && pathname === '/projects') ||
+            (label === 'Settings' && pathname.startsWith('/settings'))
           return (
             <Link
               className={`admin-sidebar-link${active ? ' admin-sidebar-link--active' : ''}`}
@@ -45,7 +49,7 @@ function AdminSidebar({ drawer = false, open = false, onNavigate }: AdminSidebar
         })}
       </nav>
       <div className="admin-sidebar-profile">
-        <span className="admin-sidebar-avatar">SA</span>
+        <Avatar name="Super Admin" size="sm" />
         <span><strong>Super Admin</strong><small>Platform administrator</small></span>
       </div>
     </aside>

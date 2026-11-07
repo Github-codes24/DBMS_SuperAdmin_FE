@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Menu, Pencil, Plus, RotateCcw, Save, Search, ShieldCheck, Check, Trash2, } from 'lucide-react';
-import AdminSidebar from '../../components/AdminSidebar';
-import AuthNavbarAction from '../../components/AuthNavbarAction';
+import { ChevronDown, Pencil, Plus, RotateCcw, Save, ShieldCheck, Check, Trash2 } from 'lucide-react';
+import ResponsiveLayout from '../../components/layout/ResponsiveLayout';
+import { useToast, useConfirm } from '../../context';
+import { TableSkeletonRows, NoSearchResults } from '../../components/feedback';
+import { StatusBadge, TableSearch } from '../../components/data-display';
+import { AlertMessage } from '../../components/notifications';
+import { PrimaryButton, SecondaryButton, DangerButton } from '../../components/ui/buttons';
 import CreateRoleModal from './CreateRoleModal';
 import { createProjectRole, deleteProjectRole, getProjectRole, getRoleMatrix, listProjectRoles, listRoleActions, listRoleProjects, savePermissions, updateProjectRole, } from './rolesService';
 import './rolesPermissions.css';
@@ -17,6 +21,8 @@ const createPermissions = (permissions, enabled = false) => Object.fromEntries(m
     Object.fromEntries(permissions.map((permission) => [permission, enabled])),
 ]));
 function RolesPermissionsPage() {
+    const { toast } = useToast();
+    const { confirm } = useConfirm();
     // Previous local preview role data is retained for reference; API data now populates this page.
     // const previewRoles = initialRoleOptions
     const [projects, setProjects] = useState([]);
@@ -27,7 +33,6 @@ function RolesPermissionsPage() {
     const [permissionState, setPermissionState] = useState({});
     const [expectedVersion, setExpectedVersion] = useState();
     const [filter, setFilter] = useState('');
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isCreateRoleOpen, setIsCreateRoleOpen] = useState(false);
     const [isEditRoleOpen, setIsEditRoleOpen] = useState(false);
     const [saveMessage, setSaveMessage] = useState('');
@@ -204,7 +209,13 @@ function RolesPermissionsPage() {
     async function deleteRole() {
         if (!selectedProjectId || !selectedRole)
             return;
-        if (!window.confirm(`Delete the "${selectedRole.name}" role? This cannot be undone.`))
+        const confirmed = await confirm({
+            title: `Delete Role: ${selectedRole.name}`,
+            message: `Are you sure you want to delete the "${selectedRole.name}" role? This cannot be undone.`,
+            confirmText: 'Delete Role',
+            confirmVariant: 'danger',
+        });
+        if (!confirmed)
             return;
         setIsDeleting(true);
         setApiError('');
@@ -221,9 +232,11 @@ function RolesPermissionsPage() {
             setExpectedVersion(undefined);
             setIsLoadingMatrix(Boolean(remainingRoles[0]?.id));
             setSaveMessage('Role deleted.');
+            toast.success(`Role "${selectedRole.name}" deleted successfully.`);
         }
         catch (error) {
             setApiError(error instanceof Error ? error.message : 'Could not delete the role.');
+            toast.error(error instanceof Error ? error.message : 'Could not delete the role.');
         }
         finally {
             setIsDeleting(false);
@@ -253,61 +266,42 @@ function RolesPermissionsPage() {
             setPermissionState((current) => ({ ...current, [selectedRoleId]: state }));
             setExpectedVersion(savedMatrix.version);
             setSaveMessage('Permissions saved.');
+            toast.success('Permissions saved successfully.');
         }
         catch (error) {
             setApiError(error instanceof Error ? error.message : 'Could not save permissions.');
+            toast.error(error instanceof Error ? error.message : 'Could not save permissions.');
         }
         finally {
             setIsSaving(false);
         }
     }
     const isLoading = isLoadingProjects || isLoadingRoles || isLoadingMatrix;
-    return (<div className="roles-page">
-      <header className="roles-navbar">
-        <button className="roles-menu-button" type="button" aria-label="Open navigation menu" onClick={() => setSidebarOpen(true)}>
-          <Menu size={21}/>
-        </button>
-        <div className="roles-brand">
-          <span className="roles-brand-mark"><ShieldCheck size={19}/></span>
-          <span>DBMS <strong>SUPER ADMIN</strong></span>
-        </div>
-        <div className="roles-navbar-section">ROLES &amp; PERMISSIONS</div>
-        <button className="roles-profile" type="button">
-          <span className="roles-profile-avatar">SA</span>
-          <span>Super Admin</span>
-          <ChevronDown size={15}/>
-        </button>
-        <AuthNavbarAction />
-      </header>
 
-      <div className="roles-workspace">
-        {sidebarOpen && <button className="roles-backdrop" type="button" aria-label="Close navigation menu" onClick={() => setSidebarOpen(false)}/>}
-        <AdminSidebar drawer open={sidebarOpen} onNavigate={() => setSidebarOpen(false)}/>
+    const headerActions = (
+      <div className="roles-header-actions" style={{ display: 'flex', gap: '8px' }}>
+        <SecondaryButton icon={<Plus size={16}/>} onClick={() => setIsCreateRoleOpen(true)}>
+          Add New Role
+        </SecondaryButton>
+        <PrimaryButton
+          icon={<Save size={16}/>}
+          disabled={!selectedRoleId || isLoading || isSaving}
+          isLoading={isSaving}
+          loadingText="Saving..."
+          onClick={saveRolePermissions}
+        >
+          Save Permissions
+        </PrimaryButton>
+      </div>
+    );
 
-        <main className="roles-main">
-          <section className="roles-header-card">
-            <div className="roles-header-copy">
-              <div className="roles-title-row">
-                <span className="roles-title-icon"><ShieldCheck size={25} strokeWidth={2}/></span>
-                <div className="roles-title-text">
-                  <div className="roles-heading-line">
-                    <h1>Roles &amp; Permissions Management</h1>
-                    <span className="roles-access-badge">Super Admin Access Only</span>
-                  </div>
-                  <p>Only Super Admin has master access to assign and manage module permissions (View, Edit, Import, Delete) for Admin and Telecaller roles.</p>
-                </div>
-              </div>
-            </div>
-            <div className="roles-header-actions">
-              <div className="roles-logged-in"><i /> <span>Logged in: <strong>Super Admin</strong></span></div>
-              <button className="roles-action-button roles-add-button" type="button" onClick={() => setIsCreateRoleOpen(true)}>
-                <Plus size={16}/>Add New Role
-              </button>
-              <button className="roles-action-button roles-save-button" type="button" disabled={!selectedRoleId || isLoading || isSaving} onClick={saveRolePermissions}>
-                <Save size={16}/>{isSaving ? 'Saving...' : 'Save Permissions'}
-              </button>
-            </div>
-          </section>
+    return (
+      <ResponsiveLayout
+        title="Roles & Permissions Management"
+        description="Only Super Admin has master access to assign and manage module permissions (View, Edit, Import, Delete) for Admin and Telecaller roles."
+        icon={<ShieldCheck size={25} strokeWidth={2}/>}
+        headerActions={headerActions}
+      >
 
           <section className="roles-permissions-card" aria-label="Roles permissions">
             <div className="roles-toolbar">
@@ -332,35 +326,32 @@ function RolesPermissionsPage() {
                       </select>
                       <ChevronDown size={14} aria-hidden="true"/>
                     </label>
-                    <span className="roles-count-badge">{activePermissions} of {totalPermissions} Privileges Active</span>
+                    <StatusBadge status={`${activePermissions} of ${totalPermissions} Privileges Active`} variant="primary" size="sm" dot={false} />
                   </div>
                   <p>{selectedRole ? `Configure module-specific access rights for ${selectedRole.name}.` : 'Select a project and role to configure access.'}</p>
                 </div>
               </div>
-              <div className="roles-toolbar-controls">
+              <div className="roles-toolbar-controls" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                 {selectedRole && (<>
-                    <button className="roles-control-button" type="button" disabled={isLoading || isDeleting} onClick={() => setIsEditRoleOpen(true)}>
-                      <Pencil size={14}/>Edit Role
-                    </button>
-                    <button className="roles-control-button" type="button" disabled={isLoading || isDeleting || selectedRole.isSystem} aria-label={`Delete ${selectedRole.name}`} onClick={deleteRole}>
-                      <Trash2 size={14}/>{isDeleting ? 'Deleting...' : 'Delete Role'}
-                    </button>
+                    <SecondaryButton size="sm" icon={<Pencil size={14}/>} disabled={isLoading || isDeleting} onClick={() => setIsEditRoleOpen(true)}>
+                      Edit Role
+                    </SecondaryButton>
+                    <DangerButton size="sm" icon={<Trash2 size={14}/>} disabled={isLoading || isDeleting || selectedRole.isSystem} aria-label={`Delete ${selectedRole.name}`} isLoading={isDeleting} loadingText="Deleting..." onClick={deleteRole}>
+                      Delete Role
+                    </DangerButton>
                   </>)}
-                <label className="roles-search">
-                  <Search size={15}/>
-                  <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filter modules..." aria-label="Filter modules"/>
-                </label>
-                <button className="roles-control-button roles-reset-button" type="button" disabled={!selectedRoleId || isLoading} onClick={() => {
-            setPermissionState((current) => ({ ...current, [selectedRoleId]: createPermissions(permissionColumns) }));
-            setFilter('');
-            setSaveMessage('');
-        }}>
-                  <RotateCcw size={14}/>Reset
-                </button>
+                <TableSearch value={filter} onChange={setFilter} placeholder="Filter modules..." onClear={() => setFilter('')} />
+                <SecondaryButton size="sm" icon={<RotateCcw size={14}/>} disabled={!selectedRoleId || isLoading} onClick={() => {
+                  setPermissionState((current) => ({ ...current, [selectedRoleId]: createPermissions(permissionColumns) }));
+                  setFilter('');
+                  setSaveMessage('');
+                }}>
+                  Reset
+                </SecondaryButton>
               </div>
             </div>
 
-            {apiError && <p className="roles-api-error" role="alert">{apiError}</p>}
+            {apiError && <AlertMessage variant="error" message={apiError} onClose={() => setApiError('')} />}
 
             <div className="roles-table-scroll">
               <table className={`roles-table${showFullAccess ? '' : ' roles-table--without-full-access'}`}>
@@ -375,7 +366,16 @@ function RolesPermissionsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {visibleModules.map(({ name, description }) => (<tr key={name}>
+                  {isLoadingMatrix ? (
+                    <TableSkeletonRows rows={modules.length} columns={tableHeaders.length + 1} />
+                  ) : visibleModules.length === 0 ? (
+                    <tr>
+                      <td colSpan={tableHeaders.length + 1} style={{ padding: 0, border: 'none' }}>
+                        <NoSearchResults query={filter} onClearSearch={() => setFilter('')} />
+                      </td>
+                    </tr>
+                  ) : (
+                    visibleModules.map(({ name, description }) => (<tr key={name}>
                       <td className="roles-module-cell">
                         <div className="roles-module-name">{name}</div>
                         <div className="roles-module-description">{description}</div>
@@ -394,8 +394,8 @@ function RolesPermissionsPage() {
                             </button>
                           </td>);
             })}
-                    </tr>))}
-                  {visibleModules.length === 0 && (<tr><td className="roles-empty-cell" colSpan={tableHeaders.length + 1}>No modules match “{filter}”.</td></tr>)}
+                    </tr>))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -403,16 +403,15 @@ function RolesPermissionsPage() {
               <span><i /> {isLoading ? 'Loading roles and permissions...' : saveMessage || 'Changes are local until saved.'}</span>
               <div className="roles-footer-actions">
                 <span>{saveMessage || `${visibleModules.length} modules`}</span>
-                <button className="roles-action-button roles-save-button" type="button" disabled={!selectedRoleId || isLoading || isSaving} onClick={saveRolePermissions}>
-                  <Save size={15}/>{isSaving ? 'Saving...' : 'Save Changes'}
-                </button>
+                <PrimaryButton size="sm" icon={<Save size={15}/>} disabled={!selectedRoleId || isLoading || isSaving} isLoading={isSaving} loadingText="Saving..." onClick={saveRolePermissions}>
+                  Save Changes
+                </PrimaryButton>
               </div>
             </div>
           </section>
-        </main>
-      </div>
-      {isCreateRoleOpen && (<CreateRoleModal mode="create" roleOptions={roleOptions.map(({ id, name }) => ({ id, name }))} onClose={() => setIsCreateRoleOpen(false)} onSubmit={createRole}/>)}
-      {isEditRoleOpen && selectedRole && (<CreateRoleModal mode="edit" roleOptions={roleOptions.map(({ id, name }) => ({ id, name }))} roleId={selectedRole.id} initialTitle={selectedRole.name} initialDescription={selectedRole.description} onClose={() => setIsEditRoleOpen(false)} onSubmit={updateRole}/>)}
-    </div>);
+        {isCreateRoleOpen && (<CreateRoleModal mode="create" roleOptions={roleOptions.map(({ id, name }) => ({ id, name }))} onClose={() => setIsCreateRoleOpen(false)} onSubmit={createRole}/>)}
+        {isEditRoleOpen && selectedRole && (<CreateRoleModal mode="edit" roleOptions={roleOptions.map(({ id, name }) => ({ id, name }))} roleId={selectedRole.id} initialTitle={selectedRole.name} initialDescription={selectedRole.description} onClose={() => setIsEditRoleOpen(false)} onSubmit={updateRole}/>)}
+      </ResponsiveLayout>
+    );
 }
 export default RolesPermissionsPage;
