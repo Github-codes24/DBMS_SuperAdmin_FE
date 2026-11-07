@@ -15,16 +15,16 @@
   background-color: var(--color-bg-canvas);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 .app-layout-workspace {
   display: flex;
   flex: 1;
   position: relative;
-  min-height: calc(100vh - var(--navbar-height));
   width: 100%;
   max-width: 100%;
+  align-items: flex-start;
 }
 
 .app-layout-main {
@@ -34,7 +34,6 @@
   min-width: 0;
   width: 100%;
   padding: var(--space-4) var(--space-6) var(--space-8);
-  overflow-y: auto;
 }
 
 @media (max-width: 768px) {
@@ -200,14 +199,22 @@
   flex: 0 0 var(--sidebar-width);
   display: flex;
   flex-direction: column;
+  position: sticky;
+  top: calc(var(--navbar-height) + var(--space-3));
+  height: calc(100vh - var(--navbar-height) - var(--space-6));
+  max-height: calc(100dvh - var(--navbar-height) - var(--space-6));
+  overflow-y: auto;
+  overflow-x: hidden;
   margin: var(--space-3) 0 var(--space-3) var(--space-3);
   padding: var(--space-4) var(--space-3) var(--space-3);
   background: var(--color-bg-surface);
-  border: 1px solid var(--color-slate-200);
+  border: 1px solid var(--border-color-default);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
   transition: transform var(--duration-normal) var(--ease-default);
   z-index: 30;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color-strong) transparent;
 }
 
 .app-sidebar-brand {

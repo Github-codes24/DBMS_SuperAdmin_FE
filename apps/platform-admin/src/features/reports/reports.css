@@ -14,13 +14,8 @@
 }
 
 .reports-page {
-  height: 100vh;
-  height: 100dvh;
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-color: #cbd5e1 var(--reports-canvas);
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
+  width: 100%;
+  min-height: auto;
   background: var(--reports-canvas);
   color: var(--reports-ink);
   font: 13px/1.45 Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

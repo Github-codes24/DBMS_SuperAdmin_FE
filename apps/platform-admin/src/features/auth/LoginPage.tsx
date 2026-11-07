@@ -163,7 +163,7 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-[#fff7ed] via-white to-[#fff1e6] flex items-center justify-center p-4 sm:p-6 md:p-10 relative overflow-hidden font-sans">
+    <div className="min-h-screen w-full bg-gradient-to-br from-[#fff7ed] via-white to-[#fff1e6] flex items-center justify-center p-4 sm:p-6 md:p-10 relative overflow-x-hidden overflow-y-auto font-sans">
       {/* Background LTS Orange Curved Shape */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <svg
