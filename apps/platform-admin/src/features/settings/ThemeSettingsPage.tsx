@@ -127,6 +127,8 @@ export function ThemeSettingsPage() {
             type="info"
             title="Live Preview Active"
             description="You have unsaved theme changes active in real-time. Click 'Apply Theme' to persist your preferences or 'Cancel' to revert."
+            overlay={false}
+            dismissible={false}
             action={
               <div style={{ display: 'flex', gap: '6px' }}>
                 <SecondaryButton size="sm" onClick={cancelPreview}>

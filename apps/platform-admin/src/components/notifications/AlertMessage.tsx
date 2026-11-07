@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { CheckCircle2, AlertCircle, AlertTriangle, Info, X } from 'lucide-react'
 import './notifications.css'
 
@@ -16,6 +17,33 @@ export interface AlertMessageProps {
   dismissible?: boolean
   onClose?: () => void
   className?: string
+  /**
+   * Whether to render the alert as a floating popup overlay at top-right.
+   * Defaults to true. Pass false to render inline within page layout.
+   */
+  overlay?: boolean
+  /**
+   * Whether to auto-dismiss the alert after `duration` ms.
+   * Defaults to true when overlay is true; defaults to false when overlay is false.
+   */
+  autoDismiss?: boolean
+  /**
+   * Auto-dismiss duration in milliseconds. Defaults to 3000ms.
+   */
+  duration?: number
+}
+
+function getOrCreateAlertContainer(): HTMLElement {
+  let container = document.getElementById('app-alert-overlay-container')
+  if (!container) {
+    container = document.createElement('div')
+    container.id = 'app-alert-overlay-container'
+    container.className = 'app-alert-overlay-container'
+    container.setAttribute('role', 'region')
+    container.setAttribute('aria-label', 'Floating Alert Notifications')
+    document.body.appendChild(container)
+  }
+  return container
 }
 
 export function AlertMessage({
@@ -27,21 +55,60 @@ export function AlertMessage({
   children,
   icon,
   action,
-  dismissible = false,
+  dismissible,
   onClose,
   className = '',
+  overlay = true,
+  autoDismiss,
+  duration = 3000,
 }: AlertMessageProps) {
   const [isDismissed, setIsDismissed] = useState(false)
-
-  if (isDismissed) return null
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const alertType = variant ?? type ?? 'info'
-  const isDismissible = dismissible || Boolean(onClose)
+  const shouldAutoDismiss = autoDismiss !== undefined ? autoDismiss : overlay
+  const isDismissible = dismissible !== undefined ? dismissible : (overlay ? true : Boolean(onClose))
+  const bodyContent = children || message || description
 
-  const handleClose = () => {
+  // Adjust state during render if content changes (official React pattern)
+  const [prevContent, setPrevContent] = useState(bodyContent)
+  if (bodyContent !== prevContent) {
+    setPrevContent(bodyContent)
+    setIsDismissed(false)
+  }
+
+  const clearTimer = () => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current)
+      timerRef.current = null
+    }
+  }
+
+  // Handle auto-dismiss timer
+  useEffect(() => {
+    if (!shouldAutoDismiss || duration <= 0 || isDismissed) {
+      return
+    }
+
+    clearTimer()
+
+    timerRef.current = setTimeout(() => {
+      setIsDismissed(true)
+      onClose?.()
+    }, duration)
+
+    return () => {
+      clearTimer()
+    }
+  }, [shouldAutoDismiss, duration, bodyContent, alertType, isDismissed, onClose])
+
+  const handleManualClose = () => {
+    clearTimer()
     setIsDismissed(true)
     onClose?.()
   }
+
+  if (isDismissed) return null
 
   const renderIcon = () => {
     if (icon !== undefined) return icon
@@ -58,12 +125,11 @@ export function AlertMessage({
     }
   }
 
-  const bodyContent = children || message || description
-
-  return (
+  const alertContent = (
     <div
-      className={`app-alert app-alert--${alertType} ${className}`}
+      className={`app-alert app-alert--${alertType} ${overlay ? 'app-alert--overlay' : ''} ${className}`.trim()}
       role={alertType === 'error' ? 'alert' : 'status'}
+      aria-live={alertType === 'error' ? 'assertive' : 'polite'}
     >
       {renderIcon()}
       <div className="app-alert-content">
@@ -75,7 +141,7 @@ export function AlertMessage({
         <button
           type="button"
           className="app-alert-close"
-          onClick={handleClose}
+          onClick={handleManualClose}
           aria-label="Dismiss alert"
         >
           <X size={15} />
@@ -83,7 +149,15 @@ export function AlertMessage({
       )}
     </div>
   )
+
+  if (overlay) {
+    if (typeof document === 'undefined') {
+      return null
+    }
+    return createPortal(alertContent, getOrCreateAlertContainer())
+  }
+
+  return alertContent
 }
 
 export default AlertMessage
-

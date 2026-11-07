@@ -163,8 +163,31 @@
 }
 
 /* =========================================================================
-   2. Alert Message (Inline Banner)
+   2. Alert Message & Floating Overlay Container
    ========================================================================= */
+
+.app-alert-overlay-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+  max-width: min(440px, calc(100vw - 32px));
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .app-alert-overlay-container {
+    top: 16px;
+    right: 16px;
+    left: 16px;
+    max-width: none;
+    width: auto;
+  }
+}
 
 .app-alert {
   display: flex;
@@ -177,6 +200,25 @@
   margin-bottom: var(--space-4, 16px);
   box-sizing: border-box;
   width: 100%;
+}
+
+.app-alert--overlay {
+  pointer-events: auto;
+  margin-bottom: 0;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.16), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
+  animation: app-alert-slide-in 240ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  backdrop-filter: blur(8px);
+}
+
+@keyframes app-alert-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(28px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
 
 .app-alert--success {
@@ -201,6 +243,35 @@
   background-color: var(--color-info-50, #f0f9ff);
   border-color: var(--color-info-200, #bae6fd);
   color: #0c4a6e;
+}
+
+/* Dark mode alert styling */
+html.dark .app-alert--success,
+[data-theme='dark'] .app-alert--success {
+  background-color: rgba(22, 163, 74, 0.15);
+  border-color: rgba(22, 163, 74, 0.35);
+  color: #86efac;
+}
+
+html.dark .app-alert--error,
+[data-theme='dark'] .app-alert--error {
+  background-color: rgba(220, 38, 38, 0.15);
+  border-color: rgba(220, 38, 38, 0.35);
+  color: #fca5a5;
+}
+
+html.dark .app-alert--warning,
+[data-theme='dark'] .app-alert--warning {
+  background-color: rgba(217, 119, 6, 0.15);
+  border-color: rgba(217, 119, 6, 0.35);
+  color: #fcd34d;
+}
+
+html.dark .app-alert--info,
+[data-theme='dark'] .app-alert--info {
+  background-color: rgba(2, 132, 199, 0.15);
+  border-color: rgba(2, 132, 199, 0.35);
+  color: #7dd3fc;
 }
 
 .app-alert-icon {
