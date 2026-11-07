@@ -1,7 +1,6 @@
 import {
   useState,
   useEffect,
-  useCallback,
   type MouseEvent,
   type KeyboardEvent,
 } from 'react'
@@ -37,27 +36,23 @@ export function ImagePreview({
   const [scale, setScale] = useState(1)
   const [rotation, setRotation] = useState(0)
 
-  const handleClose = useCallback(() => {
-    setScale(1)
-    setRotation(0)
-    onClose()
-  }, [onClose])
-
   useEffect(() => {
     function handleKeyDown(e: globalThis.KeyboardEvent) {
       if (e.key === 'Escape' && isOpen) {
-        handleClose()
+        onClose()
       }
     }
     if (isOpen) {
       window.addEventListener('keydown', handleKeyDown)
       document.body.style.overflow = 'hidden'
+      setScale(1)
+      setRotation(0)
     }
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
       document.body.style.overflow = ''
     }
-  }, [isOpen, handleClose])
+  }, [isOpen, onClose])
 
   if (!isOpen || !src) return null
 
@@ -95,7 +90,7 @@ export function ImagePreview({
   return (
     <div
       className="app-lightbox-backdrop"
-      onClick={handleClose}
+      onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label={title || 'Image preview'}
@@ -163,7 +158,7 @@ export function ImagePreview({
         <button
           type="button"
           className="app-lightbox-btn"
-          onClick={handleClose}
+          onClick={onClose}
           title="Close (Esc)"
           aria-label="Close image preview"
           onKeyDown={(e: KeyboardEvent<HTMLButtonElement>) => {
@@ -193,3 +188,4 @@ export function ImagePreview({
 }
 
 export default ImagePreview
+

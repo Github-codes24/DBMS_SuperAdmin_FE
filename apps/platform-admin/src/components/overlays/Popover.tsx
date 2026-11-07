@@ -2,7 +2,6 @@ import {
   useState,
   useRef,
   useEffect,
-  useCallback,
   type ReactNode,
   type MouseEvent,
   type CSSProperties,
@@ -43,15 +42,12 @@ export function Popover({
 
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const setIsOpen = useCallback(
-    (next: boolean) => {
-      if (!isControlled) {
-        setInternalIsOpen(next)
-      }
-      onOpenChange?.(next)
-    },
-    [isControlled, onOpenChange]
-  )
+  const setIsOpen = (next: boolean) => {
+    if (!isControlled) {
+      setInternalIsOpen(next)
+    }
+    onOpenChange?.(next)
+  }
 
   useEffect(() => {
     function handleClickOutside(e: globalThis.MouseEvent) {
@@ -77,7 +73,7 @@ export function Popover({
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [isOpen, closeOnClickOutside, closeOnEscape, setIsOpen])
+  }, [isOpen, closeOnClickOutside, closeOnEscape])
 
   const getPositionStyles = (): CSSProperties => {
     const style: CSSProperties = {}
@@ -152,3 +148,4 @@ export function Popover({
 }
 
 export default Popover
+
