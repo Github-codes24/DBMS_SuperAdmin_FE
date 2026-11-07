@@ -29,7 +29,6 @@ import {
   ToggleSwitch,
 } from '../../components/ui/forms'
 import { StatusBadge, StatisticsCard } from '../../components/data-display'
-import { AlertMessage } from '../../components/notifications'
 import { type ThemeMode } from '../../context/theme.types'
 import './themeSettings.css'
 
@@ -130,26 +129,6 @@ export function ThemeSettingsPage() {
       headerActions={headerActions}
     >
       <div className="theme-settings-container">
-        {isDirty && (
-          <AlertMessage
-            type="info"
-            title="Live Preview Active"
-            description="You have unsaved theme changes active in real-time. Click 'Apply Theme' to persist your preferences or 'Cancel' to revert."
-            overlay={false}
-            dismissible={false}
-            action={
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <SecondaryButton size="sm" onClick={cancelPreview}>
-                  Revert
-                </SecondaryButton>
-                <PrimaryButton size="sm" onClick={handleApply}>
-                  Save Now
-                </PrimaryButton>
-              </div>
-            }
-          />
-        )}
-
         <div className="theme-settings-grid">
           {/* ════ LEFT COLUMN: SETTINGS CONTROLS ════ */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

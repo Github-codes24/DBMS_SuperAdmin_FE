@@ -13,9 +13,15 @@ function AuthNavbarAction() {
   }
 
   return (
-    <button className="auth-navbar-action" type="button" onClick={logout}>
+    <button
+      className="auth-navbar-action"
+      type="button"
+      onClick={logout}
+      aria-label="Sign out of DBMS Super Admin"
+      title="Logout"
+    >
       <LogOut size={14} aria-hidden="true" />
-      Logout
+      <span>Logout</span>
     </button>
   )
 }
