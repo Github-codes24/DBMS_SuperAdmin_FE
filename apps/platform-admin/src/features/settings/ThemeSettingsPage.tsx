@@ -104,6 +104,14 @@ export function ThemeSettingsPage() {
       >
         Reset Default
       </SecondaryButton>
+      {isDirty && (
+        <SecondaryButton
+          icon={<X size={15} />}
+          onClick={cancelPreview}
+        >
+          Cancel
+        </SecondaryButton>
+      )}
       <PrimaryButton
         icon={<Save size={15} />}
         onClick={handleApply}
@@ -492,36 +500,6 @@ export function ThemeSettingsPage() {
                 </div>
               </div>
             </section>
-          </div>
-        </div>
-
-        {/* ════ BOTTOM PERSISTENCE ACTION BAR ════ */}
-        <div className="theme-actions-bar">
-          <div className="theme-actions-notice">
-            <Sparkles size={16} />
-            <span>
-              {isDirty
-                ? 'Unsaved changes in preview mode. Click "Apply Theme" to persist.'
-                : 'Theme settings are currently synced with local device storage.'}
-            </span>
-          </div>
-
-          <div className="theme-actions-buttons">
-            <SecondaryButton icon={<RotateCcw size={14} />} onClick={handleReset}>
-              Reset to Default
-            </SecondaryButton>
-            {isDirty && (
-              <SecondaryButton icon={<X size={14} />} onClick={cancelPreview}>
-                Cancel Preview
-              </SecondaryButton>
-            )}
-            <PrimaryButton
-              icon={<Save size={14} />}
-              onClick={handleApply}
-              disabled={!isDirty}
-            >
-              Apply Theme
-            </PrimaryButton>
           </div>
         </div>
       </div>
