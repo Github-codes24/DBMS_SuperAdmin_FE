@@ -1,5 +1,4 @@
-import { clearAccessToken, getAccessToken } from "../auth/authService";
-import { apiBaseUrl } from "../../api";
+import api from "../../api/axiosClient";
 import type {
   ManagedProject,
   PanelLink,
@@ -7,37 +6,12 @@ import type {
   UserType,
 } from "./projectData";
 
-// All project management routes live under /api/platform
-const BASE = `${apiBaseUrl}/platform`;
-
 type ApiRecord = Record<string, unknown>;
 
 export class ProjectAuthenticationError extends Error {
   constructor() {
     super("Your session has expired. Please sign in again.");
     this.name = "ProjectAuthenticationError";
-  }
-}
-
-function isTokenExpired(token: string): boolean {
-  try {
-    const parts = token.split(".");
-    if (parts.length !== 3) return true;
-    const base64Url = parts[1];
-    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join(""),
-    );
-    const payload = JSON.parse(jsonPayload) as { exp?: number };
-    if (typeof payload.exp === "number") {
-      return payload.exp * 1000 <= Date.now() + 10000;
-    }
-    return false;
-  } catch {
-    return true;
   }
 }
 
@@ -201,65 +175,34 @@ function projectPayload(
 }
 
 async function request(path: string, init?: RequestInit): Promise<unknown> {
-  const accessToken = getAccessToken();
-  if (!accessToken || isTokenExpired(accessToken)) {
-    clearAccessToken();
-    throw new ProjectAuthenticationError();
+  const method = (init?.method ?? "GET").toUpperCase();
+  let data: unknown;
+  if (init?.body) {
+    try {
+      data = typeof init.body === "string" ? JSON.parse(init.body) : init.body;
+    } catch {
+      data = init.body;
+    }
   }
 
-  const response = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: "application/json",
-      ...(init?.body ? { "Content-Type": "application/json" } : {}),
-      ...init?.headers,
-    },
-  });
-
-  const responseText = await response.text();
-  console.log("[platform API]", init?.method ?? "GET", path, response.status);
-
-  if (response.status === 401 || response.status === 403) {
-    clearAccessToken();
-    throw new ProjectAuthenticationError();
-  }
-
-  if (!response.ok) {
-    // If backend returned 500 or any error indicating an invalid or expired token
-    if (
-      responseText.includes("INVALID_TOKEN") ||
-      responseText.includes("SESSION_REVOKED") ||
-      responseText.includes("jwt expired") ||
-      responseText.includes("Missing access token")
-    ) {
-      clearAccessToken();
+  try {
+    const response = await api({
+      url: `/platform${path}`,
+      method,
+      data,
+      signal: init?.signal ?? undefined,
+    });
+    return response.data;
+  } catch (error: any) {
+    if (error.response?.status === 401) {
       throw new ProjectAuthenticationError();
     }
-
-    let message = `Request failed (${response.status}).`;
-    if (responseText) {
-      try {
-        const body: unknown = JSON.parse(responseText);
-        if (typeof body === "object" && body !== null && !Array.isArray(body)) {
-          const rec = body as ApiRecord;
-          if (typeof rec.message === "string") message = rec.message;
-          else if (typeof rec.error === "string") message = rec.error;
-        }
-      } catch {
-        message = responseText;
-      }
-    } else if (response.statusText) {
-      message = response.statusText;
-    }
+    const message =
+      error.response?.data?.message ||
+      error.response?.data?.error ||
+      error.message ||
+      "Request failed.";
     throw new Error(message);
-  }
-
-  if (!responseText) return undefined;
-  try {
-    return JSON.parse(responseText) as unknown;
-  } catch {
-    throw new Error("The API returned invalid JSON.");
   }
 }
 

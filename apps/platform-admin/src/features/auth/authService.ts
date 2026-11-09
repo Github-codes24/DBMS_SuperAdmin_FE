@@ -1,4 +1,5 @@
 const accessTokenKey = 'accessToken'
+const refreshTokenKey = 'refreshToken'
 export const authSessionChangeEvent = 'platform-admin:auth-session-change'
 
 export interface AuthUser {
@@ -18,8 +19,23 @@ export function setAccessToken(accessToken: string) {
   window.dispatchEvent(new Event(authSessionChangeEvent))
 }
 
+export function getRefreshToken() {
+  return localStorage.getItem(refreshTokenKey)
+}
+
+export function setRefreshToken(refreshToken: string) {
+  localStorage.setItem(refreshTokenKey, refreshToken)
+}
+
 export function clearAccessToken() {
   localStorage.removeItem(accessTokenKey)
+  window.dispatchEvent(new Event(authSessionChangeEvent))
+}
+
+export function clearAuth() {
+  localStorage.removeItem(accessTokenKey)
+  localStorage.removeItem(refreshTokenKey)
+  localStorage.removeItem('user')
   window.dispatchEvent(new Event(authSessionChangeEvent))
 }
 

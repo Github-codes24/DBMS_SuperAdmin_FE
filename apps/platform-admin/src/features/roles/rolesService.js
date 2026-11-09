@@ -1,5 +1,4 @@
-import { apiBaseUrl } from '../../api';
-import { clearAccessToken, getAccessToken } from '../auth/authService';
+import api from '../../api/axiosClient';
 function record(value) {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
         throw new Error('The roles API returned an invalid response.');
@@ -65,42 +64,35 @@ function errorMessage(value) {
     return undefined;
 }
 async function request(path, init = {}) {
-    const token = getAccessToken();
-    if (!token)
-        throw new Error('Your session has expired. Please sign in again.');
-    const response = await fetch(`${apiBaseUrl}${path}`, {
-        ...init,
-        headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-            ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-            ...init.headers,
-        },
-    });
-    if (response.status === 401) {
-        clearAccessToken();
-        throw new Error('Your session has expired. Please sign in again.');
-    }
-    const body = await response.text();
-    if (!response.ok) {
-        let message = response.statusText || `Request failed (${response.status}).`;
-        if (body) {
-            try {
-                message = errorMessage(JSON.parse(body)) ?? body;
-            }
-            catch {
-                message = body;
-            }
+    const method = (init.method || 'GET').toUpperCase();
+    let data;
+    if (init.body) {
+        try {
+            data = typeof init.body === 'string' ? JSON.parse(init.body) : init.body;
+        } catch {
+            data = init.body;
         }
-        throw new Error(message);
     }
-    if (response.status === 204 || !body)
-        return undefined;
+
     try {
-        return JSON.parse(body);
-    }
-    catch {
-        throw new Error('The roles API returned invalid JSON.');
+        const response = await api({
+            url: path,
+            method,
+            data,
+            signal: init.signal,
+        });
+        return response.data;
+    } catch (error) {
+        if (error.response?.status === 401) {
+            throw new Error('Your session has expired. Please sign in again.');
+        }
+        const message =
+            errorMessage(error.response?.data) ||
+            error.response?.data?.message ||
+            error.response?.data?.error ||
+            error.message ||
+            'Request failed.';
+        throw new Error(message);
     }
 }
 export async function listRoleProjects(signal) {
