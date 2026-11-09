@@ -303,3 +303,62 @@ export async function deleteUser(id: string): Promise<void> {
     method: 'DELETE',
   })
 }
+
+export interface ChildProjectUser {
+  id: string
+  name: string
+  email: string
+  phone: string
+  role: string
+  panel: string
+  status: string
+  storeName?: string
+  createdAt?: string
+}
+
+export interface ChildUserListResult {
+  projectCode: string
+  pagination: {
+    total: number
+    page: number
+    limit: number
+    totalPages: number
+  }
+  users: ChildProjectUser[]
+}
+
+export async function listChildProjectUsers(
+  projectId: string,
+  params: { panel?: string; search?: string; page?: number; limit?: number },
+  signal?: AbortSignal,
+): Promise<ChildUserListResult> {
+  const query = new URLSearchParams()
+  if (params.panel && params.panel !== 'all') query.set('panel', params.panel)
+  if (params.search) query.set('search', params.search)
+  if (params.page) query.set('page', String(params.page))
+  if (params.limit) query.set('limit', String(params.limit))
+
+  const queryString = query.toString() ? `?${query.toString()}` : ''
+  const raw: unknown = await request(
+    `/platform/projects/${encodeURIComponent(projectId)}/bridge/users${queryString}`,
+    { signal },
+  )
+  const rec = asRecord(raw)
+  const data = (rec.data || rec) as ChildUserListResult
+  return data
+}
+
+export async function updateChildProjectUserStatus(
+  projectId: string,
+  userId: string,
+  status: string,
+): Promise<void> {
+  await request(
+    `/platform/projects/${encodeURIComponent(projectId)}/bridge/users/${encodeURIComponent(userId)}/status`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    },
+  )
+}
+

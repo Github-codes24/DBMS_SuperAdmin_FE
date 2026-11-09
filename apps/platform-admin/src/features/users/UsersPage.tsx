@@ -18,7 +18,12 @@ import {
   updateUser,
   updateUserStatus,
   AuthenticationError,
+  listChildProjectUsers,
+  updateChildProjectUserStatus,
+  type ChildProjectUser,
 } from './services/userService'
+import { listProjects } from '../projects/projectService'
+import type { ManagedProject } from '../projects/projectData'
 import type { SelectOption, User } from './types/user.types'
 
 type UserStatus = 'Active' | 'Inactive'
@@ -86,8 +91,15 @@ function formatDate(value: string) {
 
 function UserManagementPage() {
   const navigate = useNavigate()
+  const [projects, setProjects] = useState<ManagedProject[]>([])
+  const [selectedScope, setSelectedScope] = useState<string>('platform')
   const [users, setUsers] = useState<UserRecord[]>([])
   const [totalUsers, setTotalUsers] = useState(0)
+  const [childUsers, setChildUsers] = useState<ChildProjectUser[]>([])
+  const [childTotalUsers, setChildTotalUsers] = useState(0)
+  const [childPanelFilter, setChildPanelFilter] = useState('all')
+  const [viewingChildUser, setViewingChildUser] = useState<ChildProjectUser | null>(null)
+  const [isTogglingChildStatus, setIsTogglingChildStatus] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('All')
   const [statusFilter, setStatusFilter] = useState('All')
@@ -111,33 +123,123 @@ function UserManagementPage() {
 
   useEffect(() => {
     const controller = new AbortController()
-    listUsers({
-      page,
-      pageSize: PAGE_SIZE,
-      search: search.trim(),
-      role: roleFilter === 'All' ? '' : roleFilter,
-      status: statusFilter === 'All' ? '' : statusFilter.toLowerCase(),
-    }, controller.signal)
-      .then((result) => {
-        setUsers(result.users.map((user) => fromApiUser(user, projectOptions)))
-        setTotalUsers(result.total)
+    listProjects(controller.signal)
+      .then((data) => {
+        setProjects(data)
       })
-      .catch((error: unknown) => {
-        if (controller.signal.aborted) return
-        if (error instanceof AuthenticationError) {
-          setLoadError(getErrorMessage(error))
-          return
-        }
-        setLoadError(getErrorMessage(error))
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setIsLoading(false)
+      .catch((err) => {
+        console.warn('Could not load projects for scope selector', err)
       })
     return () => controller.abort()
-  }, [navigate, page, refreshKey, roleFilter, search, statusFilter])
+  }, [])
 
-  const pageCount = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE))
+  useEffect(() => {
+    const controller = new AbortController()
+
+    if (selectedScope === 'platform') {
+      listUsers(
+        {
+          page,
+          pageSize: PAGE_SIZE,
+          search: search.trim(),
+          role: roleFilter === 'All' ? '' : roleFilter,
+          status: statusFilter === 'All' ? '' : statusFilter.toLowerCase(),
+        },
+        controller.signal,
+      )
+        .then((result) => {
+          setUsers(result.users.map((user) => fromApiUser(user, projectOptions)))
+          setTotalUsers(result.total)
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return
+          if (error instanceof AuthenticationError) {
+            setLoadError(getErrorMessage(error))
+            return
+          }
+          setLoadError(getErrorMessage(error))
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setIsLoading(false)
+        })
+    } else {
+      listChildProjectUsers(
+        selectedScope,
+        {
+          panel: childPanelFilter,
+          search: search.trim(),
+          page,
+          limit: PAGE_SIZE,
+        },
+        controller.signal,
+      )
+        .then((result) => {
+          setChildUsers(result.users || [])
+          setChildTotalUsers(result.pagination?.total ?? (result.users ? result.users.length : 0))
+        })
+        .catch((error: unknown) => {
+          if (controller.signal.aborted) return
+          setLoadError(getErrorMessage(error))
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setIsLoading(false)
+        })
+    }
+    return () => controller.abort()
+  }, [selectedScope, childPanelFilter, page, refreshKey, roleFilter, search, statusFilter])
+
+  const selectedProject = projects.find((p) => p.id === selectedScope)
+  const currentTotal = selectedScope === 'platform' ? totalUsers : childTotalUsers
+  const pageCount = Math.max(1, Math.ceil(currentTotal / PAGE_SIZE))
   const pageUsers = users
+
+  function handleScopeChange(scopeId: string) {
+    setSelectedScope(scopeId)
+    setPage(1)
+    setSearch('')
+    setLoadError('')
+    setActionError('')
+    setIsLoading(true)
+  }
+
+  function getPanelLabel(panel: string) {
+    switch (panel) {
+      case 'lts-superadmin':
+        return 'Super Admin Panel'
+      case 'lts-vendor':
+        return 'Vendor Portal'
+      case 'lts-telecaller':
+        return 'Telecaller CRM'
+      default:
+        return panel || 'Child App'
+    }
+  }
+
+  async function handleChildStatusToggle(user: ChildProjectUser) {
+    const isCurrentlyActive = user.status?.toLowerCase() === 'active'
+    const nextStatus = isCurrentlyActive ? 'inactive' : 'active'
+    const confirmed = await confirm({
+      title: `${nextStatus === 'inactive' ? 'Deactivate' : 'Activate'} Child Account`,
+      message: `Are you sure you want to ${nextStatus === 'inactive' ? 'deactivate' : 'activate'} ${user.name} (${user.role}) in ${selectedProject?.name || 'child project'}?`,
+      confirmText: nextStatus === 'inactive' ? 'Deactivate' : 'Activate',
+      confirmVariant: nextStatus === 'inactive' ? 'warning' : 'primary',
+    })
+    if (!confirmed) return
+
+    setIsTogglingChildStatus(user.id)
+    setActionError('')
+    try {
+      await updateChildProjectUserStatus(selectedScope, user.id, nextStatus)
+      setChildUsers((prev) =>
+        prev.map((u) => (u.id === user.id ? { ...u, status: nextStatus } : u)),
+      )
+      toast.success(`User status updated to ${nextStatus} in child database.`)
+    } catch (err) {
+      setActionError(getErrorMessage(err))
+    } finally {
+      setIsTogglingChildStatus(null)
+    }
+  }
 
   function updateFilter(setter: (value: string) => void, value: string) {
     setIsLoading(true)
@@ -357,9 +459,11 @@ function UserManagementPage() {
       description="Create and manage platform user accounts."
       icon={<UsersIcon size={24} />}
       headerActions={
-        <PrimaryButton icon={<Plus size={16} />} onClick={openCreate}>
-          Create User
-        </PrimaryButton>
+        selectedScope === 'platform' ? (
+          <PrimaryButton icon={<Plus size={16} />} onClick={openCreate}>
+            Create User
+          </PrimaryButton>
+        ) : undefined
       }
     >
       <div className="user-management-page">
@@ -401,131 +505,305 @@ function UserManagementPage() {
       )}
 
       <section className="users-card user-filter-card" aria-label="User search and filters">
-        <label className="search-box user-search">
-          <span className="search-icon" aria-hidden="true">⌕</span>
-          <span className="visually-hidden">Search by ID, name, email, or phone</span>
-          <input
-            type="search"
-            placeholder="Search by ID, name, email, phone..."
-            maxLength={100}
-            value={search}
-            onChange={(event) => updateFilter(setSearch, event.target.value)}
-          />
-          {search && <button className="clear-search" type="button" onClick={() => updateFilter(setSearch, '')} aria-label="Clear search">×</button>}
-        </label>
-        <div className="user-filters">
-          <div className="filter-caption"><span className="filter-glyph" aria-hidden="true">☷</span> Filters</div>
-          <label className="filter-select">
-            <span className="visually-hidden">Filter by role</span>
-            <select value={roleFilter} onChange={(event) => updateFilter(setRoleFilter, event.target.value)}>
-              <option value="All">All roles</option>
-              {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
-            </select>
+        <div className="user-scope-tabs" role="tablist" aria-label="User directory scope">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={selectedScope === 'platform'}
+            className={`user-scope-tab ${selectedScope === 'platform' ? 'user-scope-tab--active' : ''}`}
+            onClick={() => handleScopeChange('platform')}
+          >
+            <span>Platform Core</span>
+            <span className="count-pill">{totalUsers}</span>
+          </button>
+          {projects.map((proj) => (
+            <button
+              key={proj.id}
+              type="button"
+              role="tab"
+              aria-selected={selectedScope === proj.id}
+              className={`user-scope-tab ${selectedScope === proj.id ? 'user-scope-tab--active' : ''}`}
+              onClick={() => handleScopeChange(proj.id)}
+            >
+              <span>{proj.name}</span>
+              <span
+                className="user-scope-tag"
+                style={{ backgroundColor: proj.theme || 'var(--color-primary, #f96321)' }}
+              >
+                {proj.projectCode || 'CHILD'}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <label className="search-box user-search">
+            <span className="search-icon" aria-hidden="true">⌕</span>
+            <span className="visually-hidden">Search users</span>
+            <input
+              type="search"
+              placeholder={
+                selectedScope === 'platform'
+                  ? 'Search by ID, name, email, phone...'
+                  : `Search ${selectedProject?.name || 'child'} users by ID, name, email, phone...`
+              }
+              maxLength={100}
+              value={search}
+              onChange={(event) => updateFilter(setSearch, event.target.value)}
+            />
+            {search && (
+              <button
+                className="clear-search"
+                type="button"
+                onClick={() => updateFilter(setSearch, '')}
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
           </label>
-          <label className="filter-select">
-            <span className="visually-hidden">Filter by status</span>
-            <select value={statusFilter} onChange={(event) => updateFilter(setStatusFilter, event.target.value)}>
-              <option value="All">All statuses</option>
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </label>
+          <div className="user-filters">
+            <div className="filter-caption"><span className="filter-glyph" aria-hidden="true">☷</span> Filters</div>
+            {selectedScope === 'platform' ? (
+              <>
+                <label className="filter-select">
+                  <span className="visually-hidden">Filter by role</span>
+                  <select value={roleFilter} onChange={(event) => updateFilter(setRoleFilter, event.target.value)}>
+                    <option value="All">All roles</option>
+                    {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
+                  </select>
+                </label>
+                <label className="filter-select">
+                  <span className="visually-hidden">Filter by status</span>
+                  <select value={statusFilter} onChange={(event) => updateFilter(setStatusFilter, event.target.value)}>
+                    <option value="All">All statuses</option>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </label>
+              </>
+            ) : (
+              <label className="filter-select">
+                <span className="visually-hidden">Filter by panel</span>
+                <select value={childPanelFilter} onChange={(event) => updateFilter(setChildPanelFilter, event.target.value)}>
+                  <option value="all">All Panels & Roles</option>
+                  <option value="lts-superadmin">Super Admin Panel</option>
+                  <option value="lts-telecaller">Telecaller CRM</option>
+                  <option value="lts-vendor">Vendor Portal</option>
+                </select>
+              </label>
+            )}
+          </div>
         </div>
       </section>
 
-      <section className="users-card user-table-card" aria-label="Platform users">
+      <section className="users-card user-table-card" aria-label="User directory table">
         <div className="user-table-heading">
-          <div><h2>Platform users</h2><span className="count-pill">{totalUsers} users</span></div>
-          <span className="table-heading-caption">SUPER ADMIN DIRECTORY</span>
+          <div>
+            <h2>{selectedScope === 'platform' ? 'Platform users' : `${selectedProject?.name || 'Child'} Users`}</h2>
+            <span className="count-pill">{currentTotal} users</span>
+          </div>
+          <span className="table-heading-caption">
+            {selectedScope === 'platform'
+              ? 'SUPER ADMIN DIRECTORY'
+              : `CHILD BRIDGE DIRECTORY (${selectedProject?.projectCode || 'REMOTE'})`}
+          </span>
         </div>
         <div className="table-scroll">
-          <table className="users-table user-management-table">
-            <thead><tr>
-              <th scope="col">USER ID</th>
-              <th scope="col">USER</th>
-              <th scope="col">EMAIL ADDRESS</th>
-              <th scope="col">ROLE</th>
-              <th scope="col">PHONE</th>
-              <th scope="col">PROJECTS</th>
-              <th scope="col">STATUS</th>
-              <th scope="col">CREATED DATE</th>
-              <th scope="col"><span className="visually-hidden">Actions</span></th>
-            </tr></thead>
-            <tbody>
-              {isLoading ? (
-                <TableSkeletonRows rows={PAGE_SIZE} columns={7} hasActions />
-              ) : pageUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={9}>
-                    {search || roleFilter !== 'All' || statusFilter !== 'All' ? (
-                      <NoSearchResults
-                        query={search}
-                        onClearSearch={() => {
-                          setSearch('')
-                          setRoleFilter('All')
-                          setStatusFilter('All')
-                        }}
-                      />
-                    ) : (
-                      <EmptyState
-                        title="No users in directory"
-                        description="Get started by creating the first platform user account."
-                        action={
-                          <button
-                            type="button"
-                            className="button button--primary"
-                            onClick={openCreate}
-                          >
-                            Create user
-                          </button>
-                        }
-                        size="sm"
-                      />
-                    )}
-                  </td>
-                </tr>
-              ) : (
-                pageUsers.map((user) => (
-                  <tr key={user.id}>
-                    <td><span className="user-id-chip">{user.userId}</span></td>
-                    <td><div className="user-cell">
-                      <Avatar name={user.name} size="sm" />
-                      <span className="user-identity"><strong>{user.name}</strong><span>Platform account</span></span>
-                    </div></td>
-                    <td><span className="user-email"><span className="email-glyph" aria-hidden="true">✉</span>{user.email}</span></td>
-                    <td><span className="role-badge"><span className="role-glyph" aria-hidden="true">◈</span>{user.role}</span></td>
-                    <td className="secondary-cell">{user.phone || '—'}</td>
-                    <td className="project-cell">{user.projects.length ? user.projects.join(', ') : '—'}</td>
-                    <td>
-                      <select
-                        className={`user-row-status status-badge--${user.status.toLowerCase()}`}
-                        aria-label={`Change ${user.name} status`}
-                        value={user.status}
-                        onChange={(event) => void changeUserStatus(
-                          user,
-                          event.target.value === 'Active' ? 'Active' : 'Inactive',
-                        )}
-                      >
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                      </select>
+          {selectedScope === 'platform' ? (
+            <table className="users-table user-management-table">
+              <thead><tr>
+                <th scope="col">USER ID</th>
+                <th scope="col">USER</th>
+                <th scope="col">EMAIL ADDRESS</th>
+                <th scope="col">ROLE</th>
+                <th scope="col">PHONE</th>
+                <th scope="col">PROJECTS</th>
+                <th scope="col">STATUS</th>
+                <th scope="col">CREATED DATE</th>
+                <th scope="col"><span className="visually-hidden">Actions</span></th>
+              </tr></thead>
+              <tbody>
+                {isLoading ? (
+                  <TableSkeletonRows rows={PAGE_SIZE} columns={7} hasActions />
+                ) : pageUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={9}>
+                      {search || roleFilter !== 'All' || statusFilter !== 'All' ? (
+                        <NoSearchResults
+                          query={search}
+                          onClearSearch={() => {
+                            setSearch('')
+                            setRoleFilter('All')
+                            setStatusFilter('All')
+                          }}
+                        />
+                      ) : (
+                        <EmptyState
+                          title="No users in directory"
+                          description="Get started by creating the first platform user account."
+                          action={
+                            <button
+                              type="button"
+                              className="button button--primary"
+                              onClick={openCreate}
+                            >
+                              Create user
+                            </button>
+                          }
+                          size="sm"
+                        />
+                      )}
                     </td>
-                    <td className="secondary-cell date-cell">{formatDate(user.createdAt)}</td>
-                    <td><div className="row-actions">
-                      <button className="icon-button" type="button" title="View details" aria-label={`View ${user.name}`} onClick={() => void openView(user)}>↗</button>
-                      <button className="icon-button" type="button" title="Edit user" aria-label={`Edit ${user.name}`} onClick={() => openEdit(user)}>✎</button>
-                      <button className="icon-button" type="button" title="Reset password" aria-label={`Reset password for ${user.name}`} onClick={() => { setPasswordResetUser(user); setNewPassword(''); setPasswordResetError('') }}>↻</button>
-                      <button className={`icon-button ${user.status === 'Active' ? 'icon-button--danger' : 'icon-button--success'}`} type="button" title={user.status === 'Active' ? 'Deactivate user' : 'Activate user'} aria-label={`${user.status === 'Active' ? 'Deactivate' : 'Activate'} ${user.name}`} onClick={() => toggleStatus(user)}>{user.status === 'Active' ? '⊘' : '✓'}</button>
-                      <button className="icon-button icon-button--danger" type="button" title="Delete user" aria-label={`Delete ${user.name}`} onClick={() => removeUser(user)}>×</button>
-                    </div></td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  pageUsers.map((user) => (
+                    <tr key={user.id}>
+                      <td><span className="user-id-chip">{user.userId}</span></td>
+                      <td><div className="user-cell">
+                        <Avatar name={user.name} size="sm" />
+                        <span className="user-identity"><strong>{user.name}</strong><span>Platform account</span></span>
+                      </div></td>
+                      <td><span className="user-email"><span className="email-glyph" aria-hidden="true">✉</span>{user.email}</span></td>
+                      <td><span className="role-badge"><span className="role-glyph" aria-hidden="true">◈</span>{user.role}</span></td>
+                      <td className="secondary-cell">{user.phone || '—'}</td>
+                      <td className="project-cell">{user.projects.length ? user.projects.join(', ') : '—'}</td>
+                      <td>
+                        <select
+                          className={`user-row-status status-badge--${user.status.toLowerCase()}`}
+                          aria-label={`Change ${user.name} status`}
+                          value={user.status}
+                          onChange={(event) => void changeUserStatus(
+                            user,
+                            event.target.value === 'Active' ? 'Active' : 'Inactive',
+                          )}
+                        >
+                          <option value="Active">Active</option>
+                          <option value="Inactive">Inactive</option>
+                        </select>
+                      </td>
+                      <td className="secondary-cell date-cell">{formatDate(user.createdAt)}</td>
+                      <td><div className="row-actions">
+                        <button className="icon-button" type="button" title="View details" aria-label={`View ${user.name}`} onClick={() => void openView(user)}>↗</button>
+                        <button className="icon-button" type="button" title="Edit user" aria-label={`Edit ${user.name}`} onClick={() => openEdit(user)}>✎</button>
+                        <button className="icon-button" type="button" title="Reset password" aria-label={`Reset password for ${user.name}`} onClick={() => { setPasswordResetUser(user); setNewPassword(''); setPasswordResetError('') }}>↻</button>
+                        <button className={`icon-button ${user.status === 'Active' ? 'icon-button--danger' : 'icon-button--success'}`} type="button" title={user.status === 'Active' ? 'Deactivate user' : 'Activate user'} aria-label={`${user.status === 'Active' ? 'Deactivate' : 'Activate'} ${user.name}`} onClick={() => toggleStatus(user)}>{user.status === 'Active' ? '⊘' : '✓'}</button>
+                        <button className="icon-button icon-button--danger" type="button" title="Delete user" aria-label={`Delete ${user.name}`} onClick={() => removeUser(user)}>×</button>
+                      </div></td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          ) : (
+            <table className="users-table user-management-table">
+              <thead>
+                <tr>
+                  <th scope="col">USER ID</th>
+                  <th scope="col">USER</th>
+                  <th scope="col">EMAIL ADDRESS</th>
+                  <th scope="col">ROLE</th>
+                  <th scope="col">PANEL SOURCE</th>
+                  <th scope="col">CONTACT / STORE</th>
+                  <th scope="col">STATUS</th>
+                  <th scope="col">CREATED DATE</th>
+                  <th scope="col"><span className="visually-hidden">Actions</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading ? (
+                  <TableSkeletonRows rows={PAGE_SIZE} columns={8} hasActions />
+                ) : childUsers.length === 0 ? (
+                  <tr>
+                    <td colSpan={9}>
+                      {search || childPanelFilter !== 'all' ? (
+                        <NoSearchResults
+                          query={search}
+                          onClearSearch={() => {
+                            setSearch('')
+                            setChildPanelFilter('all')
+                          }}
+                        />
+                      ) : (
+                        <EmptyState
+                          title="No child users found"
+                          description={`No accounts synced from ${selectedProject?.name || 'child project'} via bridge.`}
+                          size="sm"
+                        />
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  childUsers.map((user) => (
+                    <tr key={user.id}>
+                      <td><span className="user-id-chip">{user.id}</span></td>
+                      <td>
+                        <div className="user-cell">
+                          <Avatar name={user.name} size="sm" />
+                          <span className="user-identity">
+                            <strong>{user.name}</strong>
+                            <span>{getPanelLabel(user.panel)}</span>
+                          </span>
+                        </div>
+                      </td>
+                      <td><span className="user-email"><span className="email-glyph" aria-hidden="true">✉</span>{user.email || '—'}</span></td>
+                      <td><span className="role-badge"><span className="role-glyph" aria-hidden="true">◈</span>{user.role}</span></td>
+                      <td>
+                        <span className="user-panel-badge">
+                          {getPanelLabel(user.panel)}
+                        </span>
+                      </td>
+                      <td className="secondary-cell">
+                        <div>{user.phone || '—'}</div>
+                        {user.storeName && (
+                          <div style={{ fontSize: '11px', color: 'var(--color-primary, #f96321)' }}>{user.storeName}</div>
+                        )}
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className={`user-row-status status-badge--${user.status?.toLowerCase() === 'active' ? 'active' : 'inactive'}`}
+                          style={{ cursor: 'pointer', border: 'none' }}
+                          title={`Click to ${user.status?.toLowerCase() === 'active' ? 'deactivate' : 'activate'}`}
+                          disabled={isTogglingChildStatus === user.id}
+                          onClick={() => void handleChildStatusToggle(user)}
+                        >
+                          {user.status?.toLowerCase() === 'active' ? 'Active' : 'Inactive'}
+                        </button>
+                      </td>
+                      <td className="secondary-cell date-cell">{user.createdAt ? formatDate(user.createdAt) : '—'}</td>
+                      <td>
+                        <div className="row-actions">
+                          <button
+                            className="icon-button"
+                            type="button"
+                            title="View details"
+                            aria-label={`View ${user.name}`}
+                            onClick={() => setViewingChildUser(user)}
+                          >
+                            ↗
+                          </button>
+                          <button
+                            className={`icon-button ${user.status?.toLowerCase() === 'active' ? 'icon-button--danger' : 'icon-button--success'}`}
+                            type="button"
+                            title={user.status?.toLowerCase() === 'active' ? 'Deactivate user' : 'Activate user'}
+                            aria-label={`${user.status?.toLowerCase() === 'active' ? 'Deactivate' : 'Activate'} ${user.name}`}
+                            disabled={isTogglingChildStatus === user.id}
+                            onClick={() => void handleChildStatusToggle(user)}
+                          >
+                            {user.status?.toLowerCase() === 'active' ? '⊘' : '✓'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
         <div className="table-footer">
-          <span>Showing <strong>{totalUsers ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, totalUsers)}</strong> of <strong>{totalUsers}</strong> users</span>
+          <span>Showing <strong>{currentTotal ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, currentTotal)}</strong> of <strong>{currentTotal}</strong> users</span>
           <div className="pagination">
             <button className="page-button" type="button" aria-label="Previous page" disabled={page <= 1} onClick={() => { setIsLoading(true); setLoadError(''); setPage((current) => Math.max(1, current - 1)) }}>‹</button>
             <span>Page <strong>{page}</strong> of <strong>{pageCount}</strong></span>
@@ -534,7 +812,7 @@ function UserManagementPage() {
         </div>
       </section>
 
-      <footer className="user-page-footer">DBMS SUPER ADMIN <span>•</span> USER DIRECTORY</footer>
+      <footer className="user-page-footer">DBMS SUPER ADMIN <span>•</span> {selectedScope === 'platform' ? 'USER DIRECTORY' : `${selectedProject?.name?.toUpperCase() || 'CHILD'} DIRECTORY`}</footer>
 
       <Modal
         isOpen={isFormOpen}
@@ -670,6 +948,41 @@ function UserManagementPage() {
               </PrimaryButton>
             </div>
           </form>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(viewingChildUser)}
+        onClose={() => setViewingChildUser(null)}
+        kicker="CHILD PROJECT DIRECTORY"
+        title={viewingChildUser?.name ?? 'Child User Details'}
+        size="md"
+        footer={<SecondaryButton onClick={() => setViewingChildUser(null)}>Close</SecondaryButton>}
+      >
+        {viewingChildUser && (
+          <DataDetailView
+            columns={2}
+            items={[
+              { label: 'User ID', value: viewingChildUser.id, copyable: true },
+              { label: 'Full name', value: viewingChildUser.name },
+              { label: 'Email address', value: viewingChildUser.email || 'Not provided', copyable: Boolean(viewingChildUser.email) },
+              { label: 'Phone number', value: viewingChildUser.phone || 'Not provided', copyable: Boolean(viewingChildUser.phone) },
+              { label: 'Role', value: viewingChildUser.role },
+              { label: 'Panel Source', value: getPanelLabel(viewingChildUser.panel) },
+              ...(viewingChildUser.storeName ? [{ label: 'Store Name', value: viewingChildUser.storeName }] : []),
+              {
+                label: 'Account status',
+                value: (
+                  <StatusBadge
+                    status={viewingChildUser.status?.toLowerCase() === 'active' ? 'Active' : 'Inactive'}
+                    size="sm"
+                  />
+                ),
+              },
+              { label: 'Project', value: selectedProject?.name ?? 'Child Project' },
+              { label: 'Created date', value: viewingChildUser.createdAt ? formatDate(viewingChildUser.createdAt) : '—' },
+            ]}
+          />
         )}
       </Modal>
       </div>
