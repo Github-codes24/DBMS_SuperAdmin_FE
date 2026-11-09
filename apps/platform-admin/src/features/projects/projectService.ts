@@ -1,11 +1,16 @@
 import { clearAccessToken, getAccessToken } from "../auth/authService";
 import { apiBaseUrl } from "../../api";
 import type {
+  ChildBackendConfig,
+  ChildFrontendApp,
+  ChildHealthStatus,
+  IntegrationStatus,
   ManagedProject,
   PanelLink,
   ProjectStatus,
   UserType,
 } from "./projectData";
+import { DEFAULT_CHILD_BACKEND_CONFIG } from "./projectData";
 
 // All project management routes live under /api/platform
 const BASE = `${apiBaseUrl}/platform`;
@@ -137,6 +142,95 @@ function normalizePanelLinks(value: unknown): PanelLink[] {
     .filter((pl) => pl.name || pl.url);
 }
 
+function normalizeIntegrationStatus(value: unknown): IntegrationStatus {
+  const raw = String(value ?? "unlinked")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+  switch (raw) {
+    case "connected":
+      return "Connected";
+    case "registered":
+      return "Registered";
+    case "sync_failed":
+    case "failed":
+      return "Sync Failed";
+    case "unlinked":
+    default:
+      return "Unlinked";
+  }
+}
+
+function integrationStatusToApi(status?: IntegrationStatus): string {
+  switch (status) {
+    case "Connected":
+      return "connected";
+    case "Registered":
+      return "registered";
+    case "Sync Failed":
+      return "sync_failed";
+    case "Unlinked":
+    default:
+      return "unlinked";
+  }
+}
+
+function normalizeFrontendApps(value: unknown): ChildFrontendApp[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(
+      (item): item is ApiRecord => typeof item === "object" && item !== null,
+    )
+    .map((item) => ({
+      appKey: optionalString(item.appKey || item.key),
+      name: optionalString(item.name),
+      baseUrl: optionalString(item.baseUrl || item.url),
+      allowedRoles: Array.isArray(item.allowedRoles)
+        ? item.allowedRoles.map((r) => String(r).trim()).filter(Boolean)
+        : [],
+      ssoCallbackPath: optionalString(item.ssoCallbackPath) || "/sso/callback",
+      isDefault: Boolean(item.isDefault),
+    }))
+    .filter((app) => app.appKey || app.name || app.baseUrl);
+}
+
+function normalizeBackendConfig(value: unknown): ChildBackendConfig {
+  if (typeof value !== "object" || value === null) {
+    return { ...DEFAULT_CHILD_BACKEND_CONFIG };
+  }
+  const r = value as ApiRecord;
+  const auth = String(r.authType || "api_key").toLowerCase();
+  const validAuth: "api_key" | "hmac" | "service_jwt" =
+    auth === "hmac" || auth === "service_jwt" ? auth : "api_key";
+
+  return {
+    baseUrl: optionalString(r.baseUrl),
+    bridgePrefix: optionalString(r.bridgePrefix) || "/api/v1/platform-bridge",
+    authType: validAuth,
+    secretKeyId: optionalString(r.secretKeyId),
+    timeoutMs:
+      typeof r.timeoutMs === "number" ? r.timeoutMs : Number(r.timeoutMs || 5000),
+    retryAttempts:
+      typeof r.retryAttempts === "number"
+        ? r.retryAttempts
+        : Number(r.retryAttempts ?? 2),
+  };
+}
+
+function normalizeHealthStatus(value: unknown): ChildHealthStatus {
+  if (typeof value !== "object" || value === null) {
+    return { isHealthy: false };
+  }
+  const r = value as ApiRecord;
+  return {
+    isHealthy: Boolean(r.isHealthy),
+    latencyMs: typeof r.latencyMs === "number" ? r.latencyMs : Number(r.latencyMs || 0),
+    lastCheckedAt: r.lastCheckedAt ? String(r.lastCheckedAt) : null,
+    errorMessage: optionalString(r.errorMessage),
+    version: optionalString(r.version),
+  };
+}
+
 function normalizeUserTypes(value: unknown): UserType[] {
   if (!Array.isArray(value)) return [];
   return value
@@ -158,6 +252,7 @@ function mapProject(value: unknown): ManagedProject {
       record._id ?? record.id ?? record.projectId,
       "a project identifier",
     ),
+    projectCode: optionalString(record.projectCode).toUpperCase(),
     name: asString(
       record.name ?? record.projectName ?? record.title,
       "a project name",
@@ -171,6 +266,7 @@ function mapProject(value: unknown): ManagedProject {
     ),
     endDate: optionalString(record.endDate ?? record.end_date).slice(0, 10),
     status: normalizeStatus(record.status ?? record.projectStatus),
+    integrationStatus: normalizeIntegrationStatus(record.integrationStatus),
     adminId: relatedId(
       record.adminId ??
         record.projectAdminId ??
@@ -180,6 +276,12 @@ function mapProject(value: unknown): ManagedProject {
     ),
     panelLinks: normalizePanelLinks(record.panelLinks),
     userTypes: normalizeUserTypes(record.userTypes),
+    frontendApps: normalizeFrontendApps(record.frontendApps),
+    backendConfig: normalizeBackendConfig(record.backendConfig),
+    healthStatus: normalizeHealthStatus(record.healthStatus),
+    availableModules: Array.isArray(record.availableModules)
+      ? record.availableModules.map((m) => String(m).trim()).filter(Boolean)
+      : [],
   };
 }
 
@@ -188,15 +290,20 @@ function projectPayload(
 ): Record<string, unknown> {
   return {
     name: project.name.trim(),
+    projectCode: (project.projectCode || "").trim().toUpperCase(),
     description: (project.description || "").trim(),
     logo: (project.logo || "").trim(),
     theme: (project.theme || "#f96321").trim(),
     startDate: (project.startDate || "").trim(),
     endDate: (project.endDate || "").trim(),
     status: statusToApi(project.status),
+    integrationStatus: integrationStatusToApi(project.integrationStatus),
     adminId: (project.adminId || "").trim(),
     panelLinks: project.panelLinks ?? [],
     userTypes: project.userTypes ?? [],
+    frontendApps: project.frontendApps ?? [],
+    backendConfig: project.backendConfig ?? DEFAULT_CHILD_BACKEND_CONFIG,
+    availableModules: project.availableModules ?? [],
   };
 }
 

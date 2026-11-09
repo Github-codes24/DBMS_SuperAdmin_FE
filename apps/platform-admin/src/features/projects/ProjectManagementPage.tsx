@@ -31,6 +31,10 @@ import {
   Users,
   UsersRound,
   X,
+  Globe,
+  Server,
+  Activity,
+  ShieldCheck,
 } from "lucide-react";
 import ResponsiveLayout from "../../components/layout/ResponsiveLayout";
 import { useToast, useConfirm } from "../../context";
@@ -40,9 +44,14 @@ import { CardSkeleton, EmptyState, NoSearchResults } from "../../components/feed
 import { PrimaryButton, SecondaryButton, DangerButton, BackButton } from "../../components/ui/buttons";
 import { AlertMessage } from "../../components/notifications";
 import {
+  DEFAULT_CHILD_BACKEND_CONFIG,
   DEFAULT_PROJECT_THEME,
   initialProjectAdmins,
+  integrationStatuses,
   projectStatuses,
+  type ChildBackendConfig,
+  type ChildFrontendApp,
+  type IntegrationStatus,
   type ManagedProject,
   type PanelLink,
   type ProjectAdmin,
@@ -69,15 +78,20 @@ const PROJECT_ADMINS_STORAGE_KEY = "platform-admin.project-admins";
 
 const emptyProjectForm: ProjectForm = {
   name: "",
+  projectCode: "",
   description: "",
   logo: "",
   theme: DEFAULT_PROJECT_THEME,
   startDate: "",
   endDate: "",
   status: "Upcoming",
+  integrationStatus: "Unlinked",
   adminId: "",
   panelLinks: [],
   userTypes: [],
+  frontendApps: [],
+  backendConfig: { ...DEFAULT_CHILD_BACKEND_CONFIG },
+  availableModules: [],
 };
 
 const emptyAdminForm: ProjectAdminForm = {
@@ -458,7 +472,15 @@ function ProjectManagementPage() {
   function openEditProject(project: ManagedProject) {
     const { id, ...values } = project;
     setEditingProjectId(id);
-    setProjectForm(values);
+    setProjectForm({
+      ...emptyProjectForm,
+      ...values,
+      frontendApps: values.frontendApps ? [...values.frontendApps] : [],
+      backendConfig: values.backendConfig
+        ? { ...values.backendConfig }
+        : { ...DEFAULT_CHILD_BACKEND_CONFIG },
+      availableModules: values.availableModules ? [...values.availableModules] : [],
+    });
     setProjectError("");
     setLogoFileError("");
     setLogoUploadMode(project.logo?.startsWith("http") ? "url" : "upload");
@@ -705,6 +727,50 @@ function ProjectManagementPage() {
       ),
     }));
 
+  const addFrontendApp = () =>
+    setProjectForm((f) => ({
+      ...f,
+      frontendApps: [
+        ...(f.frontendApps || []),
+        {
+          appKey: "",
+          name: "",
+          baseUrl: "",
+          allowedRoles: [],
+          ssoCallbackPath: "/sso/callback",
+          isDefault: false,
+        },
+      ],
+    }));
+  const removeFrontendApp = (i: number) =>
+    setProjectForm((f) => ({
+      ...f,
+      frontendApps: (f.frontendApps || []).filter((_, idx) => idx !== i),
+    }));
+  const updateFrontendApp = (
+    i: number,
+    field: keyof ChildFrontendApp,
+    val: string | boolean | string[],
+  ) =>
+    setProjectForm((f) => ({
+      ...f,
+      frontendApps: (f.frontendApps || []).map((app, idx) =>
+        idx === i ? { ...app, [field]: val } : app,
+      ),
+    }));
+
+  const updateBackendConfig = (
+    field: keyof ChildBackendConfig,
+    val: string | number,
+  ) =>
+    setProjectForm((f) => ({
+      ...f,
+      backendConfig: {
+        ...(f.backendConfig || DEFAULT_CHILD_BACKEND_CONFIG),
+        [field]: val,
+      },
+    }));
+
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <ResponsiveLayout>
@@ -756,12 +822,26 @@ function ProjectManagementPage() {
                   />
                   <div className="pm-detail__header-info">
                     <div className="pm-detail__header-top">
-                      <h2 className="pm-detail__title">{detailProject.name}</h2>
-                      <span
-                        className={`projects-status projects-status--${statusClass(detailProject.status)}`}
-                      >
-                        {detailProject.status}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h2 className="pm-detail__title">{detailProject.name}</h2>
+                        {detailProject.projectCode && (
+                          <span className="pm-project-code-tag">
+                            {detailProject.projectCode}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {detailProject.integrationStatus && detailProject.integrationStatus !== "Unlinked" && (
+                          <span className={`pm-integration-badge pm-integration-badge--${detailProject.integrationStatus.toLowerCase().replace(/\s+/g, '-')}`}>
+                            {detailProject.integrationStatus}
+                          </span>
+                        )}
+                        <span
+                          className={`projects-status projects-status--${statusClass(detailProject.status)}`}
+                        >
+                          {detailProject.status}
+                        </span>
+                      </div>
                     </div>
                     {detailProject.description && (
                       <p className="pm-detail__description">
@@ -863,6 +943,97 @@ function ProjectManagementPage() {
                     </div>
                   )}
                 </section>
+
+                {/* Child Frontend Applications */}
+                {detailProject.frontendApps && detailProject.frontendApps.length > 0 && (
+                  <section className="projects-card">
+                    <div className="projects-section-heading">
+                      <div>
+                        <h2>Frontend Applications ({detailProject.frontendApps.length})</h2>
+                        <p>Child project frontend applications configured for single sign-on.</p>
+                      </div>
+                    </div>
+                    <div className="pm-panels-grid">
+                      {detailProject.frontendApps.map((app, i) => (
+                        <div key={i} className="pm-panel-card">
+                          <span
+                            className="pm-panel-card__icon"
+                            style={{
+                              background: detailProject.theme || DEFAULT_PROJECT_THEME,
+                            }}
+                          >
+                            <Globe size={14} />
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <span className="pm-panel-card__name">{app.name}</span>
+                              {app.isDefault && (
+                                <span className="pm-project-code-tag" style={{ fontSize: '9px', padding: '0 4px' }}>
+                                  Default
+                                </span>
+                              )}
+                            </div>
+                            <span style={{ fontSize: '11px', color: 'var(--color-slate-500)', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {app.baseUrl} {app.ssoCallbackPath && `(${app.ssoCallbackPath})`}
+                            </span>
+                          </div>
+                          <a
+                            href={app.baseUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="pm-panel-card__launch"
+                            title={`Open ${app.name} in new tab`}
+                          >
+                            <ExternalLink size={11} /> Launch App
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Backend API Bridge */}
+                {detailProject.backendConfig?.baseUrl && (
+                  <section className="projects-card">
+                    <div className="projects-section-heading">
+                      <div>
+                        <h2>Backend API Bridge</h2>
+                        <p>Standardized integration connection to child project services.</p>
+                      </div>
+                      {detailProject.healthStatus?.isHealthy ? (
+                        <StatusBadge status="Healthy" variant="success" size="sm" />
+                      ) : (
+                        <StatusBadge status="Bridge Ready" variant="primary" size="sm" />
+                      )}
+                    </div>
+                    <div className="pm-bridge-detail-grid">
+                      <div className="pm-bridge-stat-box">
+                        <span className="pm-bridge-stat-label">Child Backend URL</span>
+                        <span className="pm-bridge-stat-val">
+                          <Server size={14} /> {detailProject.backendConfig.baseUrl}
+                        </span>
+                      </div>
+                      <div className="pm-bridge-stat-box">
+                        <span className="pm-bridge-stat-label">Bridge Endpoint Prefix</span>
+                        <span className="pm-bridge-stat-val">
+                          {detailProject.backendConfig.bridgePrefix || "/api/v1/platform-bridge"}
+                        </span>
+                      </div>
+                      <div className="pm-bridge-stat-box">
+                        <span className="pm-bridge-stat-label">Auth Protocol</span>
+                        <span className="pm-bridge-stat-val" style={{ textTransform: 'uppercase' }}>
+                          <ShieldCheck size={14} /> {detailProject.backendConfig.authType || "api_key"}
+                        </span>
+                      </div>
+                      <div className="pm-bridge-stat-box">
+                        <span className="pm-bridge-stat-label">Integration State</span>
+                        <span className="pm-bridge-stat-val">
+                          <Activity size={14} /> {detailProject.integrationStatus || "Registered"}
+                        </span>
+                      </div>
+                    </div>
+                  </section>
+                )}
 
                 {/* User Types */}
                 <section className="projects-card">
@@ -1101,17 +1272,31 @@ function ProjectManagementPage() {
                         <div className="pm-project-card__accent" />
                         <div className="pm-project-card__body">
                           <div className="pm-project-card__header">
-                            <ProjectLogo
-                              name={project.name}
-                              logo={project.logo}
-                              theme={project.theme}
-                              size="sm"
-                            />
-                            <span
-                              className={`projects-status projects-status--${statusClass(project.status)}`}
-                            >
-                              {project.status}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <ProjectLogo
+                                name={project.name}
+                                logo={project.logo}
+                                theme={project.theme}
+                                size="sm"
+                              />
+                              {project.projectCode && (
+                                <span className="pm-project-code-tag">
+                                  {project.projectCode}
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              {project.integrationStatus && project.integrationStatus !== "Unlinked" && (
+                                <span className={`pm-integration-badge pm-integration-badge--${project.integrationStatus.toLowerCase().replace(/\s+/g, '-')}`}>
+                                  {project.integrationStatus}
+                                </span>
+                              )}
+                              <span
+                                className={`projects-status projects-status--${statusClass(project.status)}`}
+                              >
+                                {project.status}
+                              </span>
+                            </div>
                           </div>
                           <h3 className="pm-project-card__name">
                             {project.name}
@@ -1131,6 +1316,13 @@ function ProjectManagementPage() {
                               {project.panelLinks.length} panel
                               {project.panelLinks.length !== 1 ? "s" : ""}
                             </span>
+                            {project.frontendApps && project.frontendApps.length > 0 && (
+                              <span>
+                                <Globe size={10} />{" "}
+                                {project.frontendApps.length} app
+                                {project.frontendApps.length !== 1 ? "s" : ""}
+                              </span>
+                            )}
                             {totalUsers(project) > 0 && (
                               <span>
                                 <Users size={10} />{" "}
@@ -1138,6 +1330,24 @@ function ProjectManagementPage() {
                               </span>
                             )}
                           </div>
+                          {project.frontendApps && project.frontendApps.length > 0 && (
+                            <div className="pm-card-apps-row">
+                              {project.frontendApps.slice(0, 3).map((app, idx) => (
+                                <a
+                                  key={idx}
+                                  href={app.baseUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="pm-card-app-pill"
+                                  title={`Open ${app.name} in new tab`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <ExternalLink size={10} />
+                                  <span>{app.name || app.appKey}</span>
+                                </a>
+                              ))}
+                            </div>
+                          )}
                           <div className="pm-project-card__actions">
                             <button
                               className="pm-project-card__view-btn"
@@ -1316,7 +1526,7 @@ function ProjectManagementPage() {
               <div className="pm-form-section">
                 <p className="pm-form-section-title">Basic Information</p>
                 <div className="projects-form-grid">
-                  <label className="projects-field projects-field--wide">
+                  <label className="projects-field">
                     <span>
                       Project Name <b>*</b>
                     </span>
@@ -1326,8 +1536,24 @@ function ProjectManagementPage() {
                       onChange={(e) =>
                         setProjectForm((f) => ({ ...f, name: e.target.value }))
                       }
-                      placeholder="e.g. Customer Portal"
+                      placeholder="e.g. Local Trade Street"
                       required
+                    />
+                  </label>
+                  <label className="projects-field">
+                    <span>
+                      Project Code <small>(e.g. LTS)</small>
+                    </span>
+                    <input
+                      value={projectForm.projectCode || ""}
+                      onChange={(e) =>
+                        setProjectForm((f) => ({
+                          ...f,
+                          projectCode: e.target.value.toUpperCase(),
+                        }))
+                      }
+                      placeholder="e.g. LTS"
+                      maxLength={12}
                     />
                   </label>
                   <label className="projects-field">
@@ -1342,6 +1568,22 @@ function ProjectManagementPage() {
                       }
                     >
                       {projectStatuses.map((s) => (
+                        <option key={s}>{s}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="projects-field">
+                    <span>Integration Status</span>
+                    <select
+                      value={projectForm.integrationStatus || "Unlinked"}
+                      onChange={(e) =>
+                        setProjectForm((f) => ({
+                          ...f,
+                          integrationStatus: e.target.value as IntegrationStatus,
+                        }))
+                      }
+                    >
+                      {integrationStatuses.map((s) => (
                         <option key={s}>{s}</option>
                       ))}
                     </select>
@@ -1677,6 +1919,130 @@ function ProjectManagementPage() {
                     ))}
                   </select>
                 </label>
+              </div>
+
+              {/* Frontend Applications (Child Frontends) */}
+              <div className="pm-form-section">
+                <div className="pm-form-section-heading">
+                  <p className="pm-form-section-title">
+                    Frontend Applications ({projectForm.frontendApps?.length || 0})
+                  </p>
+                  <button
+                    type="button"
+                    className="pm-add-row-btn"
+                    onClick={addFrontendApp}
+                  >
+                    <Plus size={12} /> Add Application
+                  </button>
+                </div>
+                {(!projectForm.frontendApps || projectForm.frontendApps.length === 0) ? (
+                  <p className="pm-empty-hint">
+                    Configure child frontend portals (e.g. Super Admin Panel, Vendor Portal, Telecaller CRM) for federated launch.
+                  </p>
+                ) : (
+                  <div className="pm-dynamic-list">
+                    {projectForm.frontendApps.map((app, i) => (
+                      <div key={i} className="pm-dynamic-row pm-dynamic-row--app">
+                        <input
+                          value={app.name}
+                          onChange={(e) =>
+                            updateFrontendApp(i, "name", e.target.value)
+                          }
+                          placeholder="App name (e.g. Super Admin Panel)"
+                        />
+                        <input
+                          value={app.appKey}
+                          onChange={(e) =>
+                            updateFrontendApp(i, "appKey", e.target.value.toLowerCase())
+                          }
+                          placeholder="Key (e.g. lts-superadmin)"
+                        />
+                        <input
+                          value={app.baseUrl}
+                          onChange={(e) =>
+                            updateFrontendApp(i, "baseUrl", e.target.value)
+                          }
+                          placeholder="Base URL (e.g. http://localhost:5174)"
+                        />
+                        <button
+                          type="button"
+                          className="pm-remove-btn"
+                          aria-label="Remove application"
+                          onClick={() => removeFrontendApp(i)}
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Backend API Bridge */}
+              <div className="pm-form-section">
+                <p className="pm-form-section-title">Backend API Bridge Configuration</p>
+                <div className="projects-form-grid">
+                  <label className="projects-field projects-field--wide">
+                    <span>Child Backend Base URL</span>
+                    <input
+                      value={projectForm.backendConfig?.baseUrl || ""}
+                      onChange={(e) =>
+                        updateBackendConfig("baseUrl", e.target.value)
+                      }
+                      placeholder="e.g. https://lts-dbms-backend.onrender.com or http://localhost:5000"
+                    />
+                  </label>
+                  <label className="projects-field">
+                    <span>Bridge Prefix</span>
+                    <input
+                      value={projectForm.backendConfig?.bridgePrefix || "/api/v1/platform-bridge"}
+                      onChange={(e) =>
+                        updateBackendConfig("bridgePrefix", e.target.value)
+                      }
+                      placeholder="/api/v1/platform-bridge"
+                    />
+                  </label>
+                  <label className="projects-field">
+                    <span>Auth Protocol</span>
+                    <select
+                      value={projectForm.backendConfig?.authType || "api_key"}
+                      onChange={(e) =>
+                        updateBackendConfig(
+                          "authType",
+                          e.target.value as ChildBackendConfig["authType"],
+                        )
+                      }
+                    >
+                      <option value="api_key">API Key (X-Platform-API-Key)</option>
+                      <option value="hmac">HMAC SHA-256 Signature</option>
+                      <option value="service_jwt">Service JWT Bearer</option>
+                    </select>
+                  </label>
+                  <label className="projects-field">
+                    <span>Secret / API Key ID</span>
+                    <input
+                      type="password"
+                      value={projectForm.backendConfig?.secretKeyId || ""}
+                      onChange={(e) =>
+                        updateBackendConfig("secretKeyId", e.target.value)
+                      }
+                      placeholder="Shared secret or API key"
+                    />
+                  </label>
+                  <label className="projects-field">
+                    <span>Timeout (ms)</span>
+                    <input
+                      type="number"
+                      min="500"
+                      max="60000"
+                      step="500"
+                      value={projectForm.backendConfig?.timeoutMs || 5000}
+                      onChange={(e) =>
+                        updateBackendConfig("timeoutMs", Number(e.target.value))
+                      }
+                    />
+                  </label>
+                </div>
               </div>
 
               {projectError && (

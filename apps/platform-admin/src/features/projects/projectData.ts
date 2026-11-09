@@ -1,5 +1,6 @@
 export type ProjectStatus = "Active" | "Upcoming" | "Completed" | "On Hold";
 export type ProjectAdminStatus = "Active" | "Inactive";
+export type IntegrationStatus = "Unlinked" | "Registered" | "Connected" | "Sync Failed";
 
 export interface PanelLink {
   name: string;
@@ -11,8 +12,35 @@ export interface UserType {
   count: number;
 }
 
+export interface ChildFrontendApp {
+  appKey: string;
+  name: string;
+  baseUrl: string;
+  allowedRoles?: string[];
+  ssoCallbackPath?: string;
+  isDefault?: boolean;
+}
+
+export interface ChildBackendConfig {
+  baseUrl: string;
+  bridgePrefix: string;
+  authType: "api_key" | "hmac" | "service_jwt";
+  secretKeyId?: string;
+  timeoutMs?: number;
+  retryAttempts?: number;
+}
+
+export interface ChildHealthStatus {
+  isHealthy: boolean;
+  latencyMs?: number;
+  lastCheckedAt?: string | null;
+  errorMessage?: string;
+  version?: string;
+}
+
 export interface ManagedProject {
   id: string;
+  projectCode?: string;
   name: string;
   description: string;
   logo: string;
@@ -20,9 +48,14 @@ export interface ManagedProject {
   startDate: string;
   endDate: string;
   status: ProjectStatus;
+  integrationStatus?: IntegrationStatus;
   adminId: string;
   panelLinks: PanelLink[];
   userTypes: UserType[];
+  frontendApps?: ChildFrontendApp[];
+  backendConfig?: ChildBackendConfig;
+  healthStatus?: ChildHealthStatus;
+  availableModules?: string[];
 }
 
 export interface ProjectAdmin {
@@ -42,6 +75,22 @@ export const projectStatuses: ProjectStatus[] = [
   "Completed",
   "On Hold",
 ];
+
+export const integrationStatuses: IntegrationStatus[] = [
+  "Unlinked",
+  "Registered",
+  "Connected",
+  "Sync Failed",
+];
+
+export const DEFAULT_CHILD_BACKEND_CONFIG: ChildBackendConfig = {
+  baseUrl: "",
+  bridgePrefix: "/api/v1/platform-bridge",
+  authType: "api_key",
+  secretKeyId: "",
+  timeoutMs: 5000,
+  retryAttempts: 2,
+};
 
 export const DEFAULT_PROJECT_THEME = "#f96321";
 

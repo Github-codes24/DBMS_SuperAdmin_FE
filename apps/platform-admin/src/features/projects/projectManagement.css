@@ -1978,3 +1978,185 @@
   font-size: 10px;
   margin-top: 2px;
 }
+
+/* =========================================================================
+   Parent-Child Architecture & Integration Styles (Phase 1)
+   ========================================================================= */
+
+.pm-project-code-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--color-slate-100, #f1f5f9);
+  border: 1px solid var(--color-slate-300, #cbd5e1);
+  color: var(--color-slate-700, #334155);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+html.dark .pm-project-code-tag {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--color-slate-200, #e2e8f0);
+}
+
+.pm-integration-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.pm-integration-badge--connected {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.pm-integration-badge--registered {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.pm-integration-badge--sync-failed {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.pm-integration-badge--unlinked {
+  background: #f8fafc;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+html.dark .pm-integration-badge--connected {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+html.dark .pm-integration-badge--registered {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+html.dark .pm-integration-badge--sync-failed {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+html.dark .pm-integration-badge--unlinked {
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.pm-card-apps-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--color-slate-200, #e2e8f0);
+}
+
+html.dark .pm-card-apps-row {
+  border-top-color: var(--border-color-default, #374151);
+}
+
+.pm-card-app-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--color-slate-50, #f8fafc);
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  color: var(--color-slate-700, #334155);
+  font-size: 10px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 120ms ease;
+}
+
+.pm-card-app-pill:hover {
+  background: var(--color-primary-50, #fff7ed);
+  border-color: var(--color-primary, #f96321);
+  color: var(--color-primary, #f96321);
+}
+
+html.dark .pm-card-app-pill {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--color-slate-200, #e2e8f0);
+}
+
+html.dark .pm-card-app-pill:hover {
+  background: rgba(249, 99, 33, 0.15);
+  border-color: var(--color-primary, #f96321);
+  color: #fb923c;
+}
+
+.pm-dynamic-row--app {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.5fr auto;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .pm-dynamic-row--app {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pm-bridge-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.pm-bridge-stat-box {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--color-slate-50, #f8fafc);
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+}
+
+html.dark .pm-bridge-stat-box {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.pm-bridge-stat-label {
+  display: block;
+  font-size: 11px;
+  color: var(--color-slate-500, #64748b);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.pm-bridge-stat-val {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-slate-900, #0f172a);
+}
+
+html.dark .pm-bridge-stat-val {
+  color: var(--color-slate-100, #f1f5f9);
+}
