@@ -36,6 +36,7 @@ import {
   Activity,
   ShieldCheck,
   RefreshCw,
+  Zap,
 } from "lucide-react";
 import ResponsiveLayout from "../../components/layout/ResponsiveLayout";
 import { useToast, useConfirm } from "../../context";
@@ -2095,13 +2096,63 @@ function ProjectManagementPage() {
                   <p className="pm-form-section-title">
                     Frontend Applications ({projectForm.frontendApps?.length || 0})
                   </p>
-                  <button
-                    type="button"
-                    className="pm-add-row-btn"
-                    onClick={addFrontendApp}
-                  >
-                    <Plus size={12} /> Add Application
-                  </button>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    {(!projectForm.frontendApps || projectForm.frontendApps.length === 0) && (
+                      <button
+                        type="button"
+                        className="pm-add-row-btn"
+                        onClick={() => {
+                          setProjectForm((f) => ({
+                            ...f,
+                            projectCode: f.projectCode || "LTS",
+                            backendConfig: {
+                              baseUrl: f.backendConfig?.baseUrl || "http://localhost:5000",
+                              bridgePrefix: "/api/v1/platform-bridge",
+                              authType: "api_key",
+                              secretKeyId: "dbms_platform_bridge_secret_key_2026",
+                              timeoutMs: 5000,
+                              retryAttempts: 2,
+                            },
+                            frontendApps: [
+                              {
+                                appKey: "lts-superadmin",
+                                name: "Super Admin Panel",
+                                baseUrl: "http://localhost:5174",
+                                allowedRoles: ["SUPER_ADMIN", "ADMIN"],
+                                ssoCallbackPath: "/sso/callback",
+                                isDefault: true,
+                              },
+                              {
+                                appKey: "lts-vendor",
+                                name: "Vendor Portal",
+                                baseUrl: "http://localhost:5176",
+                                allowedRoles: ["VENDOR", "SUPER_ADMIN"],
+                                ssoCallbackPath: "/sso/callback",
+                                isDefault: false,
+                              },
+                              {
+                                appKey: "lts-telecaller",
+                                name: "Telecaller CRM",
+                                baseUrl: "http://localhost:5177",
+                                allowedRoles: ["TELECALLER", "SUPER_ADMIN"],
+                                ssoCallbackPath: "/sso/callback",
+                                isDefault: false,
+                              },
+                            ],
+                          }));
+                        }}
+                      >
+                        <Zap size={12} /> Auto-fill LTS Preset
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="pm-add-row-btn"
+                      onClick={addFrontendApp}
+                    >
+                      <Plus size={12} /> Add Application
+                    </button>
+                  </div>
                 </div>
                 {(!projectForm.frontendApps || projectForm.frontendApps.length === 0) ? (
                   <p className="pm-empty-hint">
