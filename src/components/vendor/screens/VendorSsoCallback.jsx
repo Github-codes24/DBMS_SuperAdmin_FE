@@ -135,3 +135,4 @@ export const VendorSsoCallback = ({ onLoginSuccess, onCancel }) => {
     </div>
   );
 };
+
