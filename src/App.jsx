@@ -10,6 +10,7 @@ import Forgot from "./Pages/Forgot";
 import Otp from "./Pages/Otp";
 import Reset from "./Pages/Reset";
 import Success from "./Pages/Success";
+import SsoCallback from "./Pages/SsoCallback";
 import Navbar from "./Components/Navbar";
 import Sidebar from "./Components/Sidebar";
 import Dashboard from "./Components/Dashboard";
@@ -35,6 +36,7 @@ function App() {
       <Route path="/otp" element={<Otp />} />
       <Route path="/reset" element={<Reset />} />
       <Route path="/success" element={<Success />} />
+      <Route path="/sso/callback" element={<SsoCallback />} />
 
       {/* Protected Routes - Login Required */}
       <Route
