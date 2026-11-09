@@ -921,3 +921,59 @@
     grid-column: auto;
   }
 }
+
+/* ── Child Project Scope Selector & Badges (Phase 7) ── */
+.roles-scope-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px 0 18px;
+  overflow-x: auto;
+}
+
+.roles-scope-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  background: var(--color-slate-50, #f8fafc);
+  color: var(--color-slate-600, #475569);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.roles-scope-tab:hover {
+  background: var(--color-slate-100, #f1f5f9);
+  color: var(--color-slate-900, #0f172a);
+}
+
+.roles-scope-tab--active {
+  background: var(--color-primary, #f96321) !important;
+  color: #ffffff !important;
+  border-color: var(--color-primary, #f96321) !important;
+}
+
+html.dark .roles-scope-tab {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--color-slate-300, #cbd5e1);
+}
+
+html.dark .roles-scope-tab:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.roles-scope-tag {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #fff;
+  font-weight: 700;
+  text-transform: uppercase;
+}

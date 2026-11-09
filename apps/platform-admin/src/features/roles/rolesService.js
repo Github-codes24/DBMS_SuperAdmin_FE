@@ -196,3 +196,23 @@ export async function savePermissions(projectId, roleId, expectedVersion, permis
         body: JSON.stringify({ expectedVersion, permissions }),
     });
 }
+
+export async function listChildProjectRoles(projectId, signal) {
+    const response = await request(`/platform/projects/${encodeURIComponent(projectId)}/bridge/roles`, { signal });
+    const data = unwrap(response);
+    return data?.roles ?? [];
+}
+
+export async function listChildProjectModules(projectId, signal) {
+    const response = await request(`/platform/projects/${encodeURIComponent(projectId)}/bridge/modules`, { signal });
+    const data = unwrap(response);
+    return data?.modules ?? [];
+}
+
+export async function saveChildProjectRolePermissions(projectId, roleId, permissions) {
+    const response = await request(`/platform/projects/${encodeURIComponent(projectId)}/bridge/roles/${encodeURIComponent(roleId)}/permissions`, {
+        method: 'PUT',
+        body: JSON.stringify({ permissions }),
+    });
+    return unwrap(response);
+}
