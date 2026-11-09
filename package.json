@@ -4,6 +4,7 @@
   "private": true,
   "workspaces": [
     "apps/*",
+    "apps/lts/*",
     "packages/*"
   ],
   "scripts": {
@@ -11,7 +12,13 @@
     "build": "npm run build:platform",
     "dev:platform": "npm run dev --workspace=platform-admin",
     "build:platform": "npm run build --workspace=platform-admin",
-    "lint:platform": "npm run lint --workspace=platform-admin"
+    "lint:platform": "npm run lint --workspace=platform-admin",
+    "dev:lts:superadmin": "npm run dev --workspace=my-telecaller",
+    "build:lts:superadmin": "npm run build --workspace=my-telecaller",
+    "dev:lts:vendor": "npm run dev --workspace=lts-dbms",
+    "build:lts:vendor": "npm run build --workspace=lts-dbms",
+    "dev:lts:telecaller": "npm run dev --workspace=lts-crm-telecaller",
+    "build:lts:telecaller": "npm run build --workspace=lts-crm-telecaller"
   },
   "dependencies": {
     "react-router-dom": "^7.18.4"
