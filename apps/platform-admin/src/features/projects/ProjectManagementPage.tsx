@@ -67,6 +67,7 @@ import {
   createProject,
   deleteProject as deleteProjectRequest,
   getChildProjectStats,
+  launchProjectSso,
   listProjects,
   ProjectAuthenticationError,
   updateProject,
@@ -304,6 +305,7 @@ function ProjectManagementPage() {
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
   const [childBridgeStats, setChildBridgeStats] = useState<ChildBridgeStats | null>(null);
   const [, setIsLoadingStats] = useState(false);
+  const [launchingAppKey, setLaunchingAppKey] = useState<string | null>(null);
   const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [viewAdmin, setViewAdmin] = useState<ProjectAdmin | null>(null);
@@ -639,6 +641,26 @@ function ProjectManagementPage() {
       toast.error(`Health check failed: ${error.message || "Failed to reach child backend"}`);
     } finally {
       setIsCheckingHealth(false);
+    }
+  };
+
+  const handleLaunchApp = async (project: ManagedProject, app: ChildFrontendApp) => {
+    if (app.ssoCallbackPath && project.backendConfig?.baseUrl) {
+      setLaunchingAppKey(app.appKey || app.name);
+      try {
+        const sso = await launchProjectSso(project.id, app.appKey);
+        window.open(sso.launchUrl, "_blank", "noopener,noreferrer");
+        toast.info(`Opening ${app.name || "application"} with federated SSO session...`);
+      } catch (err: unknown) {
+        const error = err as Error;
+        console.warn("SSO launch ticket exchange could not be initiated:", error);
+        toast.warning(`Direct SSO handoff unavailable (${error.message || "service error"}). Opening default portal URL.`);
+        window.open(app.baseUrl, "_blank", "noopener,noreferrer");
+      } finally {
+        setLaunchingAppKey(null);
+      }
+    } else {
+      window.open(app.baseUrl, "_blank", "noopener,noreferrer");
     }
   };
 
@@ -1070,15 +1092,16 @@ function ProjectManagementPage() {
                               {app.baseUrl} {app.ssoCallbackPath && `(${app.ssoCallbackPath})`}
                             </span>
                           </div>
-                          <a
-                            href={app.baseUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
                             className="pm-panel-card__launch"
                             title={`Open ${app.name} in new tab`}
+                            onClick={() => void handleLaunchApp(detailProject, app)}
+                            disabled={launchingAppKey === (app.appKey || app.name)}
                           >
-                            <ExternalLink size={11} /> Launch App
-                          </a>
+                            <ExternalLink size={11} className={launchingAppKey === (app.appKey || app.name) ? "pm-spin" : ""} />
+                            {launchingAppKey === (app.appKey || app.name) ? "Authenticating..." : "Launch App"}
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1476,18 +1499,20 @@ function ProjectManagementPage() {
                           {project.frontendApps && project.frontendApps.length > 0 && (
                             <div className="pm-card-apps-row">
                               {project.frontendApps.slice(0, 3).map((app, idx) => (
-                                <a
+                                <button
                                   key={idx}
-                                  href={app.baseUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                  type="button"
                                   className="pm-card-app-pill"
                                   title={`Open ${app.name} in new tab`}
-                                  onClick={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    void handleLaunchApp(project, app);
+                                  }}
+                                  disabled={launchingAppKey === (app.appKey || app.name)}
                                 >
-                                  <ExternalLink size={10} />
-                                  <span>{app.name || app.appKey}</span>
-                                </a>
+                                  <ExternalLink size={10} className={launchingAppKey === (app.appKey || app.name) ? "pm-spin" : ""} />
+                                  <span>{launchingAppKey === (app.appKey || app.name) ? "Launching..." : (app.name || app.appKey)}</span>
+                                </button>
                               ))}
                             </div>
                           )}

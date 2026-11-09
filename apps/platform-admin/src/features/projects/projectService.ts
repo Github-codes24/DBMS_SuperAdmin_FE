@@ -460,3 +460,24 @@ export async function getChildProjectModules(id: string): Promise<unknown> {
   return res?.data || res;
 }
 
+export interface SsoLaunchResponse {
+  launchUrl: string;
+  ticket: string;
+  appKey: string;
+  appName: string;
+  expiresInSeconds: number;
+}
+
+export async function launchProjectSso(
+  id: string,
+  appKey?: string,
+  targetRoute?: string,
+): Promise<SsoLaunchResponse> {
+  const res = (await request(`/projects/${encodeURIComponent(id)}/sso/launch`, {
+    method: "POST",
+    body: JSON.stringify({ appKey, targetRoute }),
+  })) as { data?: SsoLaunchResponse };
+  return (res?.data || res) as SsoLaunchResponse;
+}
+
+
