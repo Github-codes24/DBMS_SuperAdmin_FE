@@ -399,3 +399,64 @@ export async function updateProject(
 export async function deleteProject(id: string): Promise<void> {
   await request(`/projects/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
+
+export interface ChildHealthCheckResponse {
+  projectId: string;
+  name: string;
+  integrationStatus: IntegrationStatus;
+  healthStatus: ChildHealthStatus;
+  diagnostics?: Record<string, unknown>;
+}
+
+export interface ChildBridgeStats {
+  projectCode: string;
+  projectName: string;
+  timestamp: string;
+  summary: {
+    totalVendors: number;
+    newVendorsToday: number;
+    totalCustomers: number;
+    newCustomersToday: number;
+    totalTelecallers: number;
+    activeTelecallers: number;
+    totalAdminUsers: number;
+    activeAdminUsers: number;
+    totalSupportTickets: number;
+    pendingSupportTickets: number;
+    totalAuditLogs: number;
+    totalOrders: number;
+  };
+  kpis: Array<{
+    key: string;
+    label: string;
+    value: number;
+    deltaText?: string;
+    status?: string;
+  }>;
+}
+
+export async function checkProjectHealth(
+  id: string,
+): Promise<ChildHealthCheckResponse> {
+  const res = (await request(`/projects/${encodeURIComponent(id)}/health`)) as {
+    data?: ChildHealthCheckResponse;
+  };
+  return (res?.data || res) as ChildHealthCheckResponse;
+}
+
+export async function getChildProjectStats(
+  id: string,
+): Promise<ChildBridgeStats> {
+  const res = (await request(`/projects/${encodeURIComponent(id)}/bridge/stats`)) as {
+    data?: ChildBridgeStats;
+  };
+  return (res?.data || res) as ChildBridgeStats;
+}
+
+export async function getChildProjectModules(id: string): Promise<unknown> {
+  const res = (await request(`/projects/${encodeURIComponent(id)}/bridge/modules`)) as {
+    data?: unknown;
+  };
+  return res?.data || res;
+}
+

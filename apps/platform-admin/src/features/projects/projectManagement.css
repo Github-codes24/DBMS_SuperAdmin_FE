@@ -2160,3 +2160,122 @@ html.dark .pm-bridge-stat-box {
 html.dark .pm-bridge-stat-val {
   color: var(--color-slate-100, #f1f5f9);
 }
+
+.pm-bridge-ping-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-slate-700, #334155);
+  background: var(--color-slate-100, #f1f5f9);
+  border: 1px solid var(--color-slate-300, #cbd5e1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pm-bridge-ping-btn:hover:not(:disabled) {
+  background: var(--color-slate-200, #e2e8f0);
+  border-color: var(--color-slate-400, #94a3b8);
+}
+
+.pm-bridge-ping-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+html.dark .pm-bridge-ping-btn {
+  color: var(--color-slate-200, #e2e8f0);
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+html.dark .pm-bridge-ping-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.pm-spin {
+  animation: pm-spin-keyframes 1s linear infinite;
+}
+
+@keyframes pm-spin-keyframes {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.pm-bridge-live-stats {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--color-slate-200, #e2e8f0);
+}
+
+html.dark .pm-bridge-live-stats {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.pm-bridge-live-stats__title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-slate-500, #64748b);
+  margin-bottom: 10px;
+}
+
+.pm-bridge-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.pm-bridge-kpi-card {
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+html.dark .pm-bridge-kpi-card {
+  background: rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.pm-bridge-kpi-card__label {
+  font-size: 11px;
+  color: var(--color-slate-500, #64748b);
+  margin-bottom: 2px;
+}
+
+.pm-bridge-kpi-card__value {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-slate-900, #0f172a);
+}
+
+html.dark .pm-bridge-kpi-card__value {
+  color: #fff;
+}
+
+.pm-bridge-kpi-card__delta {
+  font-size: 10px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+.pm-bridge-kpi-card__delta--healthy {
+  color: #10b981;
+}
+
+.pm-bridge-kpi-card__delta--warning,
+.pm-bridge-kpi-card__delta--attention {
+  color: #f59e0b;
+}
+

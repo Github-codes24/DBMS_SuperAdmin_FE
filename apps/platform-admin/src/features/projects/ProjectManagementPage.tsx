@@ -35,6 +35,7 @@ import {
   Server,
   Activity,
   ShieldCheck,
+  RefreshCw,
 } from "lucide-react";
 import ResponsiveLayout from "../../components/layout/ResponsiveLayout";
 import { useToast, useConfirm } from "../../context";
@@ -62,11 +63,14 @@ import {
 import "./projectManagement.css";
 import { getFromStorage, saveToStorage } from "../../utils/storage";
 import {
+  checkProjectHealth,
   createProject,
   deleteProject as deleteProjectRequest,
+  getChildProjectStats,
   listProjects,
   ProjectAuthenticationError,
   updateProject,
+  type ChildBridgeStats,
 } from "./projectService";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -297,6 +301,9 @@ function ProjectManagementPage() {
   const [detailProject, setDetailProject] = useState<ManagedProject | null>(
     null,
   );
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+  const [childBridgeStats, setChildBridgeStats] = useState<ChildBridgeStats | null>(null);
+  const [, setIsLoadingStats] = useState(false);
   const [projectModalOpen, setProjectModalOpen] = useState(false);
   const [adminModalOpen, setAdminModalOpen] = useState(false);
   const [viewAdmin, setViewAdmin] = useState<ProjectAdmin | null>(null);
@@ -574,6 +581,92 @@ function ProjectManagementPage() {
       setDeletingProjectId(null);
     }
   }
+
+  const loadChildStats = useCallback(async (projectId: string) => {
+    setIsLoadingStats(true);
+    try {
+      const stats = await getChildProjectStats(projectId);
+      setChildBridgeStats(stats);
+    } catch (err) {
+      console.warn("Could not load child bridge stats:", err);
+      setChildBridgeStats(null);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  }, []);
+
+  const handleHealthCheck = async (project: ManagedProject) => {
+    setIsCheckingHealth(true);
+    try {
+      const res = await checkProjectHealth(project.id);
+      const updatedHealth = res.healthStatus;
+      const updatedIntegration = res.integrationStatus;
+
+      setDetailProject((prev) =>
+        prev && prev.id === project.id
+          ? {
+              ...prev,
+              healthStatus: updatedHealth,
+              integrationStatus: updatedIntegration,
+            }
+          : prev,
+      );
+
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === project.id
+            ? {
+                ...p,
+                healthStatus: updatedHealth,
+                integrationStatus: updatedIntegration,
+              }
+            : p,
+        ),
+      );
+
+      if (updatedHealth.isHealthy) {
+        toast.success(
+          `Child service is online (latency: ${updatedHealth.latencyMs}ms, v${updatedHealth.version || "1.0.0"})`,
+        );
+        void loadChildStats(project.id);
+      } else {
+        toast.error(
+          `Health check failed: ${updatedHealth.errorMessage || "Service unreachable"}`,
+        );
+      }
+    } catch (err: unknown) {
+      const error = err as Error;
+      toast.error(`Health check failed: ${error.message || "Failed to reach child backend"}`);
+    } finally {
+      setIsCheckingHealth(false);
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    if (detailProject?.backendConfig?.baseUrl && detailProject.healthStatus?.isHealthy) {
+      getChildProjectStats(detailProject.id)
+        .then((stats) => {
+          if (active) setChildBridgeStats(stats);
+        })
+        .catch((err) => {
+          console.warn("Could not load child bridge stats:", err);
+          if (active) setChildBridgeStats(null);
+        });
+    } else {
+      const timer = setTimeout(() => {
+        if (active) setChildBridgeStats(null);
+      }, 0);
+      return () => {
+        active = false;
+        clearTimeout(timer);
+      };
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [detailProject?.id, detailProject?.backendConfig?.baseUrl, detailProject?.healthStatus?.isHealthy]);
 
   // ── Admin handlers ────────────────────────────────────────────────────────
   function openAddAdmin() {
@@ -1000,11 +1093,25 @@ function ProjectManagementPage() {
                         <h2>Backend API Bridge</h2>
                         <p>Standardized integration connection to child project services.</p>
                       </div>
-                      {detailProject.healthStatus?.isHealthy ? (
-                        <StatusBadge status="Healthy" variant="success" size="sm" />
-                      ) : (
-                        <StatusBadge status="Bridge Ready" variant="primary" size="sm" />
-                      )}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <button
+                          type="button"
+                          className="pm-bridge-ping-btn"
+                          onClick={() => void handleHealthCheck(detailProject)}
+                          disabled={isCheckingHealth}
+                          title="Run live probe against child service health endpoint"
+                        >
+                          <RefreshCw size={13} className={isCheckingHealth ? "pm-spin" : ""} />
+                          {isCheckingHealth ? "Checking..." : "Ping Service"}
+                        </button>
+                        {detailProject.healthStatus?.isHealthy ? (
+                          <StatusBadge status="Healthy" variant="success" size="sm" />
+                        ) : detailProject.healthStatus?.lastCheckedAt ? (
+                          <StatusBadge status="Degraded" variant="danger" size="sm" />
+                        ) : (
+                          <StatusBadge status="Bridge Ready" variant="primary" size="sm" />
+                        )}
+                      </div>
                     </div>
                     <div className="pm-bridge-detail-grid">
                       <div className="pm-bridge-stat-box">
@@ -1031,7 +1138,43 @@ function ProjectManagementPage() {
                           <Activity size={14} /> {detailProject.integrationStatus || "Registered"}
                         </span>
                       </div>
+                      {detailProject.healthStatus?.lastCheckedAt && (
+                        <>
+                          <div className="pm-bridge-stat-box">
+                            <span className="pm-bridge-stat-label">Roundtrip Latency</span>
+                            <span className="pm-bridge-stat-val">
+                              {detailProject.healthStatus.latencyMs} ms
+                            </span>
+                          </div>
+                          <div className="pm-bridge-stat-box">
+                            <span className="pm-bridge-stat-label">Child Version / Checked</span>
+                            <span className="pm-bridge-stat-val" style={{ fontSize: '0.8rem' }}>
+                              v{detailProject.healthStatus.version || "1.0.0"} &bull; {new Date(detailProject.healthStatus.lastCheckedAt).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </div>
+
+                    {/* Live Child Application Stats */}
+                    {childBridgeStats && (
+                      <div className="pm-bridge-live-stats">
+                        <h3 className="pm-bridge-live-stats__title">Live Child Telemetry &amp; Metrics</h3>
+                        <div className="pm-bridge-kpi-grid">
+                          {childBridgeStats.kpis.map((kpi) => (
+                            <div key={kpi.key} className="pm-bridge-kpi-card">
+                              <span className="pm-bridge-kpi-card__label">{kpi.label}</span>
+                              <span className="pm-bridge-kpi-card__value">{kpi.value.toLocaleString()}</span>
+                              {kpi.deltaText && (
+                                <span className={`pm-bridge-kpi-card__delta pm-bridge-kpi-card__delta--${kpi.status || 'healthy'}`}>
+                                  {kpi.deltaText}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </section>
                 )}
 
