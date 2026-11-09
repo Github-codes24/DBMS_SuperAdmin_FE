@@ -9,6 +9,7 @@ import {
 import Header from "./components/Header";
 import Sidebar from "./components/Sidebar";
 import LoginPage from "./components/LoginPage";
+import TelecallerSsoCallback from "./components/TelecallerSsoCallback";
 import VendorSearch from "./components/VendorSearch";
 import EditVendorModal from "./components/EditVendorModal";
 import CreatePaymentOrderModal from "./components/CreatePaymentOrderModal";
@@ -51,6 +52,9 @@ export default function App() {
   const [isViewOnly, setIsViewOnly] = useState(false);
   const [modalState, setModalState] = useState("none"); // 'none' | 'edit' | 'paymentOrder' | 'paymentHistory' | 'packageSuccess' | 'addVendor'
   const [successMessage, setSuccessMessage] = useState("");
+  const [ssoActive, setSsoActive] = useState(() =>
+    Boolean(new URLSearchParams(window.location.search).get("ticket")),
+  );
 
   const fetchVendors = async (searchQuery = "") => {
     const term = (
@@ -542,6 +546,11 @@ export default function App() {
     );
     setModalState("packageSuccess");
   };
+
+  // If user is redeeming an SSO ticket from Platform Control Plane
+  if (!isAuthenticated && ssoActive) {
+    return <TelecallerSsoCallback onCancel={() => setSsoActive(false)} />;
+  }
 
   // If user is not logged in, render Login Page
   if (!isAuthenticated) {
