@@ -90,6 +90,16 @@ const authSlice = createSlice({
     clearAuthError: (state) => {
       state.error = null;
     },
+    setAuthSession: (state, action) => {
+      state.loading = false;
+      state.isAuthenticated = true;
+      state.token = action.payload.token;
+      state.user = action.payload.user;
+      state.error = null;
+      if (action.payload.token) {
+        localStorage.setItem("token", action.payload.token);
+      }
+    },
     resetAuth: (state) => {
       state.loading = false;
       state.profileLoading = false;
@@ -182,5 +192,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearAuthError, resetAuth } = authSlice.actions;
+export const { clearAuthError, resetAuth, setAuthSession } = authSlice.actions;
 export default authSlice.reducer;

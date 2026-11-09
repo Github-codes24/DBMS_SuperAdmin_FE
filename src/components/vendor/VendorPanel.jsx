@@ -5,12 +5,16 @@ import { VendorHeader } from './VendorHeader';
 import { VendorCanvasView } from './VendorCanvasView';
 import { VendorLiveView } from './VendorLiveView';
 import { VendorLogin } from './screens/VendorLogin';
+import { VendorSsoCallback } from './screens/VendorSsoCallback';
 
 export const VendorPanel = () => {
   const dispatch = useDispatch();
   const { isAuthenticated, token } = useSelector((state) => state.auth);
   const [activeFlowItem, setActiveFlowItem] = useState('02 Vendor Dashboard');
   const [viewMode, setViewMode] = useState('live');
+
+  const searchParams = new URLSearchParams(window.location.search);
+  const [ssoActive, setSsoActive] = useState(Boolean(searchParams.get("ticket")));
 
   // Application Startup Authentication: Fetch profile if token exists
   useEffect(() => {
@@ -22,6 +26,19 @@ export const VendorPanel = () => {
   const handleLogout = () => {
     dispatch(logoutVendor());
   };
+
+  // SSO Authentication Flow
+  if (!isAuthenticated && ssoActive) {
+    return (
+      <VendorSsoCallback
+        onLoginSuccess={() => {
+          setSsoActive(false);
+          setActiveFlowItem('02 Vendor Dashboard');
+        }}
+        onCancel={() => setSsoActive(false)}
+      />
+    );
+  }
 
   // Unauthenticated Screen: Vendor Login screen
   if (!isAuthenticated) {
