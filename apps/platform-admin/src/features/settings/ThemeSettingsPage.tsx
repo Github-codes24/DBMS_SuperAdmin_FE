@@ -29,7 +29,6 @@ import {
   ToggleSwitch,
 } from '../../components/ui/forms'
 import { StatusBadge, StatisticsCard } from '../../components/data-display'
-import { AlertMessage } from '../../components/notifications'
 import { type ThemeMode } from '../../context/theme.types'
 import './themeSettings.css'
 
@@ -104,6 +103,14 @@ export function ThemeSettingsPage() {
       >
         Reset Default
       </SecondaryButton>
+      {isDirty && (
+        <SecondaryButton
+          icon={<X size={15} />}
+          onClick={cancelPreview}
+        >
+          Cancel
+        </SecondaryButton>
+      )}
       <PrimaryButton
         icon={<Save size={15} />}
         onClick={handleApply}
@@ -122,26 +129,6 @@ export function ThemeSettingsPage() {
       headerActions={headerActions}
     >
       <div className="theme-settings-container">
-        {isDirty && (
-          <AlertMessage
-            type="info"
-            title="Live Preview Active"
-            description="You have unsaved theme changes active in real-time. Click 'Apply Theme' to persist your preferences or 'Cancel' to revert."
-            overlay={false}
-            dismissible={false}
-            action={
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <SecondaryButton size="sm" onClick={cancelPreview}>
-                  Revert
-                </SecondaryButton>
-                <PrimaryButton size="sm" onClick={handleApply}>
-                  Save Now
-                </PrimaryButton>
-              </div>
-            }
-          />
-        )}
-
         <div className="theme-settings-grid">
           {/* ════ LEFT COLUMN: SETTINGS CONTROLS ════ */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -492,36 +479,6 @@ export function ThemeSettingsPage() {
                 </div>
               </div>
             </section>
-          </div>
-        </div>
-
-        {/* ════ BOTTOM PERSISTENCE ACTION BAR ════ */}
-        <div className="theme-actions-bar">
-          <div className="theme-actions-notice">
-            <Sparkles size={16} />
-            <span>
-              {isDirty
-                ? 'Unsaved changes in preview mode. Click "Apply Theme" to persist.'
-                : 'Theme settings are currently synced with local device storage.'}
-            </span>
-          </div>
-
-          <div className="theme-actions-buttons">
-            <SecondaryButton icon={<RotateCcw size={14} />} onClick={handleReset}>
-              Reset to Default
-            </SecondaryButton>
-            {isDirty && (
-              <SecondaryButton icon={<X size={14} />} onClick={cancelPreview}>
-                Cancel Preview
-              </SecondaryButton>
-            )}
-            <PrimaryButton
-              icon={<Save size={14} />}
-              onClick={handleApply}
-              disabled={!isDirty}
-            >
-              Apply Theme
-            </PrimaryButton>
           </div>
         </div>
       </div>

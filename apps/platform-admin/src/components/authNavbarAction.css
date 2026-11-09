@@ -1,32 +1,71 @@
 .auth-navbar-action {
   display: inline-flex;
-  min-height: 30px;
+  min-height: 32px;
+  height: 32px;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   gap: 6px;
   margin-left: auto;
-  padding: 0 11px;
-  border: 1px solid rgb(255 255 255 / 45%);
-  border-radius: 9px;
-  background: rgb(255 255 255 / 13%);
-  color: #fff;
-  font: inherit;
-  font-size: 10px;
-  font-weight: 700;
+  padding: 0 12px;
+  border: 1px solid rgba(217, 74, 0, 0.35);
+  border-radius: var(--radius-md, 8px);
+  background: rgba(217, 74, 0, 0.08);
+  color: #d94a00;
+  font-family: var(--font-sans, Inter, sans-serif);
+  font-size: var(--text-xs, 12px);
+  font-weight: var(--weight-semibold, 600);
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
+  opacity: 1 !important;
+  visibility: visible !important;
+  backdrop-filter: blur(4px);
+  transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
 }
 
 .auth-navbar-action:hover {
-  background: #fff;
-  color: #d94a00;
+  background: #d94a00;
+  border-color: #d94a00;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(217, 74, 0, 0.25);
+}
+
+.auth-navbar-action:active {
+  background: #b43d00;
+  border-color: #b43d00;
+  color: #ffffff;
 }
 
 .auth-navbar-action:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid #d94a00;
   outline-offset: 2px;
+}
+
+/* Dark theme styling */
+html.dark .auth-navbar-action,
+[data-theme='dark'] .auth-navbar-action {
+  background: rgba(249, 115, 22, 0.15);
+  border-color: rgba(249, 115, 22, 0.35);
+  color: #fb923c;
+}
+
+html.dark .auth-navbar-action:hover,
+[data-theme='dark'] .auth-navbar-action:hover {
+  background: #f97316;
+  border-color: #f97316;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.35);
+}
+
+/* Responsive adjustment for small screens */
+@media (max-width: 480px) {
+  .auth-navbar-action {
+    height: 30px;
+    min-height: 30px;
+    padding: 0 8px;
+    font-size: 11px;
+    gap: 4px;
+  }
 }

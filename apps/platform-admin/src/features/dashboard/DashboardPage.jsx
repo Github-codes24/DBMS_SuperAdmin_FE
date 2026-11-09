@@ -131,13 +131,11 @@ function DashboardPage() {
       headerActions={headerActions}
     >
       {message && (
-        <div style={{ marginBottom: "1.25rem" }}>
-          <AlertMessage
-            variant="info"
-            message={message}
-            onClose={() => setMessage("")}
-          />
-        </div>
+        <AlertMessage
+          variant="info"
+          message={message}
+          onClose={() => setMessage("")}
+        />
       )}
 
       <section className="reports-kpi-grid" aria-label="Summary statistics">

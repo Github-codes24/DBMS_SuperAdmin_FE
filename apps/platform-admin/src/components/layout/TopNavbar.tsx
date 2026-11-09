@@ -19,9 +19,10 @@ const SECTION_MAP: Record<string, string> = {
   '/project-management': 'Project Management',
   '/projects': 'Project Management',
   '/roles-permissions': 'Roles & Permissions',
-  '/reports-analytics': 'Reports & Analytics',
+  '/reports-analytics': 'Reports',
+  '/reports': 'Reports',
   '/settings': 'Settings',
-  '/settings/appearance': 'Theme & Appearance',
+  '/settings/appearance': 'Settings',
 }
 
 export function TopNavbar({ onMenuClick, sectionTitle, actions }: TopNavbarProps) {

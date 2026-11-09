@@ -2235,9 +2235,9 @@ body {
 }
 
 .user-management-page {
-  width: min(100%, 1520px);
-  min-height: 100vh;
-  padding: 25px clamp(16px, 3vw, 42px) 22px;
+  width: 100%;
+  min-height: auto;
+  padding: 0;
 }
 
 .user-demo-note {
@@ -2611,7 +2611,7 @@ body {
 
 @media (max-width: 760px) {
   .user-management-page {
-    padding: 17px 14px;
+    padding: 0;
   }
 
   .user-page-heading {
@@ -2977,10 +2977,9 @@ body {
 .user-management-page {
   width: 100%;
   height: auto;
-  height: 100%;
   min-height: 0;
   flex: 1 1 auto;
-  padding: 10px clamp(16px, 2.5vw, 34px) 8px;
+  padding: 0;
 }
 
 .user-orange-topbar {
@@ -3094,7 +3093,7 @@ body {
   .user-management-page {
     height: auto;
     min-height: 0;
-    padding: 8px 12px;
+    padding: 0;
   }
 
   .user-page-heading {
@@ -3257,9 +3256,9 @@ body {
 
 @media (max-width: 760px) {
   .user-management-page {
-    height: 100dvh;
+    height: auto;
     gap: 8px;
-    padding: 0 12px 8px;
+    padding: 0;
   }
 
   .user-orange-topbar {

@@ -14,12 +14,12 @@ export function PageHeader({
   title,
   description,
   icon,
-  breadcrumbs = true,
+  breadcrumbs = false,
   actions,
   children,
 }: PageHeaderProps) {
   return (
-    <div className="flex flex-col mb-4">
+    <div className="flex flex-col">
       {/* Optional Breadcrumbs */}
       {breadcrumbs && (
         <Breadcrumbs items={Array.isArray(breadcrumbs) ? breadcrumbs : undefined} />

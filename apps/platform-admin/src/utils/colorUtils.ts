@@ -141,6 +141,8 @@ export interface GeneratedThemeShades {
   shadowBrand: string
   shadowBrandHover: string
   focusRing: string
+  navbarBg: string
+  navbarBorder: string
 }
 
 export function generateThemeShades(
@@ -153,6 +155,20 @@ export function generateThemeShades(
   // In light mode hover is slightly darker; in dark mode hover is slightly brighter
   const hoverDelta = mode === 'dark' ? 8 : -8
   const activeDelta = mode === 'dark' ? 14 : -14
+
+  // Top Navbar background and border:
+  // Dynamically generated from primary theme color (approx. 2-3 shades lighter)
+  // Light mode: lightness 92% with gentle saturation provides a distinct tint with >12:1 WCAG contrast
+  // Dark mode: lightness 14% with gentle saturation provides a cohesive tinted surface with >14:1 WCAG contrast
+  const navbarBg =
+    mode === 'dark'
+      ? hslToHex(hsl.h, Math.min(hsl.s, 35), 14)
+      : hslToHex(hsl.h, Math.min(hsl.s, 45), 92)
+
+  const navbarBorder =
+    mode === 'dark'
+      ? hslToHex(hsl.h, Math.min(hsl.s, 30), 22)
+      : hslToHex(hsl.h, Math.min(hsl.s, 40), 84)
 
   return {
     primary: primaryHex,
@@ -172,6 +188,8 @@ export function generateThemeShades(
     shadowBrand: `0 4px 14px 0 rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`,
     shadowBrandHover: `0 6px 20px 0 rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.35)`,
     focusRing: `0 0 0 2px var(--color-bg-surface), 0 0 0 4px ${primaryHex}`,
+    navbarBg,
+    navbarBorder,
   }
 }
 

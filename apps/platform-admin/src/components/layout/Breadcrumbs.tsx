@@ -10,37 +10,33 @@ interface BreadcrumbsProps {
   items?: BreadcrumbItem[]
 }
 
-const ROUTE_LABELS: Record<string, string> = {
+const MODULE_LABELS: Record<string, string> = {
   dashboard: 'Dashboard',
   users: 'User Management',
   'project-management': 'Project Management',
   projects: 'Project Management',
   'roles-permissions': 'Roles & Permissions',
-  'reports-analytics': 'Reports & Analytics',
+  'reports-analytics': 'Reports',
+  reports: 'Reports',
+  settings: 'Settings',
 }
 
 export function Breadcrumbs({ items }: BreadcrumbsProps) {
   const location = useLocation()
 
-  // Generate dynamic breadcrumbs if custom items are not passed
+  // Generate standardized breadcrumbs matching the Project Management reference pattern
   const breadcrumbList: BreadcrumbItem[] = items ?? (() => {
     const segments = location.pathname.split('/').filter(Boolean)
-    if (segments.length === 0) return [{ label: 'Dashboard' }]
+    const rootSegment = segments[0]?.toLowerCase()
 
-    const list: BreadcrumbItem[] = [{ label: 'Workspace', href: '/users' }]
-    let cumulative = ''
+    const moduleLabel = rootSegment
+      ? (MODULE_LABELS[rootSegment] || rootSegment.charAt(0).toUpperCase() + rootSegment.slice(1).replace(/-/g, ' '))
+      : 'Dashboard'
 
-    segments.forEach((seg, index) => {
-      cumulative += `/${seg}`
-      const isLast = index === segments.length - 1
-      const label = ROUTE_LABELS[seg] || seg.charAt(0).toUpperCase() + seg.slice(1).replace(/-/g, ' ')
-      list.push({
-        label,
-        href: isLast ? undefined : cumulative,
-      })
-    })
-
-    return list
+    return [
+      { label: 'Workspace', href: '/users' },
+      { label: moduleLabel },
+    ]
   })()
 
   return (
@@ -78,4 +74,3 @@ export function Breadcrumbs({ items }: BreadcrumbsProps) {
 }
 
 export default Breadcrumbs
-

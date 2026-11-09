@@ -441,10 +441,10 @@ html.dark .app-alert--info,
 
 .app-notif-bell-btn {
   position: relative;
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--navbar-border, var(--color-slate-200));
   cursor: pointer;
-  color: var(--color-slate-500, #64748b);
+  color: var(--color-slate-700, #334155);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -452,11 +452,25 @@ html.dark .app-alert--info,
   height: 36px;
   border-radius: var(--radius-md, 8px);
   transition: all 150ms ease;
+  backdrop-filter: blur(4px);
 }
 
 .app-notif-bell-btn:hover {
-  background-color: var(--color-slate-100, #f1f5f9);
+  background-color: #ffffff;
   color: var(--color-text-primary, #0f172a);
+}
+
+html.dark .app-notif-bell-btn,
+[data-theme='dark'] .app-notif-bell-btn {
+  background: rgba(17, 24, 39, 0.7);
+  border-color: var(--navbar-border, var(--border-color-default));
+  color: var(--color-text-secondary, #d1d5db);
+}
+
+html.dark .app-notif-bell-btn:hover,
+[data-theme='dark'] .app-notif-bell-btn:hover {
+  background-color: rgba(31, 41, 55, 0.9);
+  color: var(--color-text-primary, #f9fafb);
 }
 
 .app-notif-badge {
