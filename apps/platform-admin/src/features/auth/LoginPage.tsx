@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiBaseUrl } from "../../api";
-import { setAccessToken } from "./authService";
+import { setAccessToken, setRefreshToken } from "./authService";
 import { LoadingButton } from "../../components/ui/buttons";
 import { AlertMessage } from "../../components/notifications";
 import { useTheme } from "../../context";
@@ -149,8 +149,9 @@ function Login() {
       if (typeof data !== "object" || data === null || Array.isArray(data)) {
         throw new Error("Invalid login response: access token is missing.");
       }
-      const { accessToken, user } = data as {
+      const { accessToken, refreshToken, user } = data as {
         accessToken?: unknown;
+        refreshToken?: unknown;
         user?: unknown;
       };
       if (typeof accessToken !== "string" || !accessToken) {
@@ -158,6 +159,9 @@ function Login() {
       }
 
       setAccessToken(accessToken);
+      if (typeof refreshToken === "string" && refreshToken) {
+        setRefreshToken(refreshToken);
+      }
       if (user !== undefined) {
         localStorage.setItem("user", JSON.stringify(user));
       }

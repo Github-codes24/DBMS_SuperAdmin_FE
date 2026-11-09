@@ -7,8 +7,7 @@ import type {
   UserListParams,
   UserListResult,
 } from '../types/user.types'
-import { clearAccessToken, getAccessToken } from '../../auth/authService'
-import { apiBaseUrl } from '../../../api'
+import api from '../../../api/axiosClient'
 
 export class AuthenticationError extends Error {
   constructor() {
@@ -145,50 +144,32 @@ function mapUser(value: unknown): User {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const accessToken = getAccessToken()
-  if (!accessToken) {
-    throw new AuthenticationError()
-  }
-
-  const response = await fetch(`${apiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: 'application/json',
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      ...init?.headers,
-    },
-  })
-
-  if (response.status === 401) {
-    clearAccessToken()
-    throw new AuthenticationError()
-  }
-
-  if (!response.ok) {
-    let message = `Request failed (${response.status}).`
+  const method = (init?.method ?? 'GET').toUpperCase()
+  let data: unknown
+  if (init?.body) {
     try {
-      const body: unknown = await response.json()
-      const bodyMessage = apiErrorMessage(body)
-      if (bodyMessage) message = bodyMessage
-      else if (typeof body === 'object' && body !== null && !Array.isArray(body)) {
-        const error = (body as Record<string, unknown>).error
-        if (typeof error === 'string') message = error
-      }
+      data = typeof init.body === 'string' ? JSON.parse(init.body) : init.body
     } catch {
-      if (response.statusText) message = response.statusText
+      data = init.body
     }
+  }
+
+  try {
+    const response = await api({
+      url: path,
+      method,
+      data,
+      signal: init?.signal ?? undefined,
+    })
+    return response.data as T
+  } catch (error: any) {
+    if (error.response?.status === 401) {
+      throw new AuthenticationError()
+    }
+    const bodyMessage = apiErrorMessage(error.response?.data)
+    const message = bodyMessage || error.response?.data?.message || error.response?.data?.error || error.message || 'Request failed.'
     throw new Error(message)
   }
-
-  if (response.status === 204) return undefined as T
-  const contentType = response.headers.get('content-type') ?? ''
-  if (!contentType.includes('application/json') && !contentType.includes('+json')) {
-    throw new Error('The API returned a non-JSON response. Verify the API base URL and endpoint configuration.')
-  }
-  const responseText = await response.text()
-  if (!responseText) return undefined as T
-  return JSON.parse(responseText) as T
 }
 
 export async function listUsers(
