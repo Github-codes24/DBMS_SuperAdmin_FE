@@ -129,6 +129,34 @@ export async function listProjectRoles(projectId, signal) {
     const response = await request(`/platform/projects/${encodeURIComponent(projectId)}/roles`, { signal });
     return list(response, 'roles').map(parseRole);
 }
+export async function listProjectModules(projectId, signal) {
+    const response = await request(`/platform/projects/${encodeURIComponent(projectId)}/modules`,{ signal });
+    return list(response, 'modules').map((value) => {
+        const module = record(value);
+        return {
+            id: requiredString(module.id ?? module._id ?? module.moduleId, 'a module ID'),
+            key: requiredString(module.key ?? module.moduleKey, 'a module key'),
+            panel: module.panel ?? "default",
+            name: requiredString(module.name ?? module.moduleName, 'a module name'),
+            description: typeof module.description === 'string' ? module.description : '',
+            allowedActions: Array.isArray(module.allowedActions)
+                ? module.allowedActions.map((action) =>
+                    typeof action === 'string' ? action : action.key
+                ).filter(Boolean)
+                : [],
+        };
+    });
+}
+export async function updateModuleActions(projectId, moduleId, actions, signal) {
+    return request(
+        `/platform/projects/${encodeURIComponent(projectId)}/modules/${encodeURIComponent(moduleId)}/actions`,
+        {
+            method: 'PUT',
+            body: JSON.stringify({ actions }),
+            signal,
+        }
+    );
+}
 export async function getProjectRole(projectId, roleId, signal) {
     const response = await request(`/platform/projects/${encodeURIComponent(projectId)}/roles/${encodeURIComponent(roleId)}`, { signal });
     const data = record(unwrap(response));
@@ -138,26 +166,26 @@ export async function getRoleMatrix(projectId, roleId, signal) {
     const response = await request(`/platform/projects/${encodeURIComponent(projectId)}/roles/${encodeURIComponent(roleId)}/matrix`, { signal });
     const data = record(unwrap(response));
     const matrix = record(data.matrix ?? data);
-    const values = matrix.permissions;
-    if (!Array.isArray(values))
+
+    const modules = matrix.modules;
+
+    if (!Array.isArray(modules)) {
         throw new Error('The roles API returned an invalid permissions matrix.');
-    const permissions = values.map((value) => {
-        if (typeof value === 'string')
-            return value;
-        const item = record(value);
-        if (typeof item.key === 'string')
-            return item.key;
-        if (typeof item.moduleKey === 'string' && typeof item.action === 'string') {
-            return `${item.moduleKey}:${item.action}`;
-        }
-        throw new Error('The roles API returned an invalid permission entry.');
-    });
-    const version = matrix.version ?? matrix.expectedVersion ?? matrix.__v;
+    }
+
+    const permissions = modules.flatMap((module) =>
+        (module.granted ?? []).map((action) => `${module.key}:${action}`)
+    );
+
+    const version = matrix.roleVersion ?? matrix.expectedVersion ?? matrix.__v;
+
     if (typeof version !== 'number') {
         throw new Error('The permissions matrix did not include a version required for saving.');
     }
+
     return { permissions, version };
 }
+
 export async function createProjectRole(projectId, input) {
     const response = await request(`/platform/projects/${encodeURIComponent(projectId)}/roles`, {
         method: 'POST',

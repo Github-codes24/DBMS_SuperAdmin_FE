@@ -218,6 +218,10 @@ export async function listUsers(
   }
 }
 
+export async function listRoles(){
+  return request('/platform/roles')
+}
+
 export async function getUser(id: string): Promise<User> {
   const raw: unknown = await request(`/users/${encodeURIComponent(id)}`)
   const record = asRecord(raw)

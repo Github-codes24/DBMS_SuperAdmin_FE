@@ -10,7 +10,7 @@ export const apiBaseUrl = normalizedBaseUrl
     : `${normalizedBaseUrl}/api`
   : defaultApiBaseUrl
 
-const configuredProjectsApiBaseUrl = import.meta.env.VITE_PROJECTS_API_BASE_URL?.trim()
+  const configuredProjectsApiBaseUrl = import.meta.env.VITE_PROJECTS_API_BASE_URL?.trim()
 const normalizedProjectsBaseUrl = (configuredProjectsApiBaseUrl || apiBaseUrl).replace(/\/+$/, '')
 
 export const projectsApiBaseUrl = /\/api$/i.test(normalizedProjectsBaseUrl)
