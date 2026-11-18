@@ -18,6 +18,7 @@ import {
   updateUser,
   updateUserStatus,
   AuthenticationError,
+  listRoles,
 } from './services/userService'
 import type { SelectOption, User } from './types/user.types'
 
@@ -87,6 +88,7 @@ function formatDate(value: string) {
 function UserManagementPage() {
   const navigate = useNavigate()
   const [users, setUsers] = useState<UserRecord[]>([])
+  const [roleOptions, setRoleOptions] = useState<{ value: string; label: string }[]>([])
   const [totalUsers, setTotalUsers] = useState(0)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('All')
@@ -108,6 +110,26 @@ function UserManagementPage() {
   const [formError, setFormError] = useState('')
   const { toast } = useToast()
   const { confirm } = useConfirm()
+
+
+  
+useEffect(() => {
+  listRoles()
+    .then((response: any) => {
+      const items = response.data.data ?? []
+
+      setRoleOptions(
+        items.map((role: any) => ({
+          value: role._id,
+          label: role.name,
+        }))
+      )
+    })
+    .catch((error) => {
+      console.error('Failed to fetch roles:', error)
+    })
+}, [])
+
 
   useEffect(() => {
     const controller = new AbortController()
@@ -164,7 +186,7 @@ function UserManagementPage() {
     setForm({
       name: user.name,
       email: user.email,
-      role: ROLE_OPTIONS.find((role) => role.label === user.role)?.value ?? user.role,
+      role: roleOptions.find((role) => role.label === user.role)?.value ?? user.role,
       password: '',
       projects: user.projects.map((projectName) =>
         projectOptions.find((option) => option.name === projectName)?.id ?? projectName,
@@ -419,7 +441,7 @@ function UserManagementPage() {
             <span className="visually-hidden">Filter by role</span>
             <select value={roleFilter} onChange={(event) => updateFilter(setRoleFilter, event.target.value)}>
               <option value="All">All roles</option>
-              {ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
+              {roleOptions.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}
             </select>
           </label>
           <label className="filter-select">
@@ -549,7 +571,7 @@ function UserManagementPage() {
           <label className="field"><span>Full name <span className="required-mark">*</span></span><input autoComplete="name" maxLength={100} value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} /></label>
           <label className="field"><span>Email address <span className="required-mark">*</span></span><input type="email" autoComplete="email" maxLength={254} value={form.email} onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))} /></label>
           {!editingId && <label className="field"><span>Password <span className="required-mark">*</span></span><input type="password" autoComplete="new-password" minLength={8} maxLength={128} value={form.password} onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))} required /></label>}
-          <label className="field"><span>Role <span className="required-mark">*</span></span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>{ROLE_OPTIONS.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
+          <label className="field"><span>Role <span className="required-mark">*</span></span><select value={form.role} onChange={(event) => setForm((current) => ({ ...current, role: event.target.value }))}>{roleOptions.map((role) => <option key={role.value} value={role.value}>{role.label}</option>)}</select></label>
           <label className="field assigned-projects-field">
             <span>Assigned projects <span className="required-mark">*</span></span>
             <select

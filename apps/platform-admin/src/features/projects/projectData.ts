@@ -13,6 +13,7 @@ export interface UserType {
 
 export interface ManagedProject {
   id: string;
+  projectId?: string;
   name: string;
   description: string;
   logo: string;
@@ -21,8 +22,48 @@ export interface ManagedProject {
   endDate: string;
   status: ProjectStatus;
   adminId: string;
+  admin?: {
+    id?: string;
+    name?: string;
+    email?: string;
+    phone?: string;
+    username?: string;
+  };
   panelLinks: PanelLink[];
   userTypes: UserType[];
+}
+
+export interface ProjectStats {
+  totalProjects: number;
+  activeProjects: number;
+  completedProjects: number;
+  totalProjectAdmins: number;
+  onHoldProjects: number;
+  upcomingProjects: number;
+}
+
+export interface ProjectAdminInput {
+  fullName: string;
+  email: string;
+  phone?: string;
+  username?: string;
+  status?: string;
+  projects?: string[];
+  password?: string;
+}
+
+export interface ProjectUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  projectRole?: {
+    roleId?: string;
+    roleName?: string;
+    isActive?: boolean;
+  };
+  isActive: boolean;
+  createdAt?: string;
 }
 
 export interface ProjectAdmin {
