@@ -47,6 +47,7 @@ import {
   type PanelLink,
   type ProjectAdmin,
   type ProjectAdminStatus,
+  type ProjectStats,
   type ProjectStatus,
   type UserType,
 } from "./projectData";
@@ -54,10 +55,16 @@ import "./projectManagement.css";
 import { getFromStorage, saveToStorage } from "../../utils/storage";
 import {
   createProject,
+  createProjectAdmin,
   deleteProject as deleteProjectRequest,
+  deleteProjectAdmin,
+  getProject,
+  getProjectStats,
+  listProjectAdmins,
   listProjects,
   ProjectAuthenticationError,
   updateProject,
+  updateProjectAdmin,
 } from "./projectService";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -324,14 +331,38 @@ function ProjectManagementPage() {
 
   // ── notifications ──
   const [notice, setNotice] = useState("");
+  const [stats, setStats] = useState<ProjectStats | null>(null);
 
   // ── API ──────────────────────────────────────────────────────────────────
+  const refreshStats = useCallback(async () => {
+    try {
+      const nextStats = await getProjectStats();
+      setStats(nextStats);
+    } catch {
+      // Graceful fallback to client-calculated counts
+    }
+  }, []);
+
+  const refreshAdmins = useCallback(async () => {
+    try {
+      const list = await listProjectAdmins();
+      if (Array.isArray(list) && list.length > 0) {
+        setAdmins(list);
+        saveToStorage(PROJECT_ADMINS_STORAGE_KEY, list);
+      }
+    } catch {
+      // Keep cached admins
+    }
+  }, []);
+
   const refreshProjects = useCallback(async () => {
     setIsLoadingProjects(true);
     try {
       const next = await listProjects();
       setProjects(next);
       setProjectLoadError("");
+      void refreshStats();
+      void refreshAdmins();
       return next;
     } catch (error) {
       if (error instanceof ProjectAuthenticationError) {
@@ -345,30 +376,47 @@ function ProjectManagementPage() {
     } finally {
       setIsLoadingProjects(false);
     }
-  }, [navigate]);
+  }, [navigate, refreshAdmins, refreshStats]);
 
   useEffect(() => {
     const ctrl = new AbortController();
-    listProjects(ctrl.signal)
-      .then((next) => {
-        if (!ctrl.signal.aborted) {
-          setProjects(next);
-          setProjectLoadError("");
-        }
-      })
-      .catch((error: unknown) => {
+    setIsLoadingProjects(true);
+
+    Promise.allSettled([
+      listProjects(undefined, ctrl.signal),
+      getProjectStats(ctrl.signal),
+      listProjectAdmins(ctrl.signal),
+    ])
+      .then(([projRes, statsRes, adminRes]) => {
         if (ctrl.signal.aborted) return;
-        if (error instanceof ProjectAuthenticationError) {
-          navigate("/login", { replace: true });
-          return;
+
+        if (projRes.status === "fulfilled") {
+          setProjects(projRes.value);
+          setProjectLoadError("");
+        } else {
+          const err = projRes.reason;
+          if (err instanceof ProjectAuthenticationError) {
+            navigate("/login", { replace: true });
+            return;
+          }
+          setProjectLoadError(
+            err instanceof Error ? err.message : "Could not load projects.",
+          );
         }
-        setProjectLoadError(
-          error instanceof Error ? error.message : "Could not load projects.",
-        );
+
+        if (statsRes.status === "fulfilled") {
+          setStats(statsRes.value);
+        }
+
+        if (adminRes.status === "fulfilled" && Array.isArray(adminRes.value) && adminRes.value.length > 0) {
+          setAdmins(adminRes.value);
+          saveToStorage(PROJECT_ADMINS_STORAGE_KEY, adminRes.value);
+        }
       })
       .finally(() => {
         if (!ctrl.signal.aborted) setIsLoadingProjects(false);
       });
+
     return () => ctrl.abort();
   }, [navigate]);
 
@@ -416,12 +464,20 @@ function ProjectManagementPage() {
   }, [projects, search, sortAscending, sortField, statusFilter]);
 
   const counts = {
-    total: projects.length,
-    active: projects.filter((p) => p.status === "Active").length,
-    completed: projects.filter((p) => p.status === "Completed").length,
-    hold: projects.filter((p) => p.status === "On Hold").length,
-    upcoming: projects.filter((p) => p.status === "Upcoming").length,
-    admins: admins.length,
+    total: stats?.totalProjects ?? projects.length,
+    active:
+      stats?.activeProjects ??
+      projects.filter((p) => p.status === "Active").length,
+    completed:
+      stats?.completedProjects ??
+      projects.filter((p) => p.status === "Completed").length,
+    hold:
+      stats?.onHoldProjects ??
+      projects.filter((p) => p.status === "On Hold").length,
+    upcoming:
+      stats?.upcomingProjects ??
+      projects.filter((p) => p.status === "Upcoming").length,
+    admins: stats?.totalProjectAdmins ?? admins.length,
   };
 
   function projectName(id: string) {
@@ -431,6 +487,17 @@ function ProjectManagementPage() {
     return admins.find((a) => a.id === id);
   }
   function projectAdmin(p: ManagedProject) {
+    if (p.admin?.name) {
+      return {
+        id: p.admin.id || p.adminId,
+        name: p.admin.name,
+        email: p.admin.email || "",
+        phone: p.admin.phone || "",
+        username: p.admin.username || "",
+        status: "Active" as ProjectAdminStatus,
+        projectIds: [p.id],
+      };
+    }
     return (
       admins.find((a) => a.projectIds.includes(p.id)) ??
       assignedAdmin(p.adminId)
@@ -463,6 +530,18 @@ function ProjectManagementPage() {
     setLogoFileError("");
     setLogoUploadMode(project.logo?.startsWith("http") ? "url" : "upload");
     setProjectModalOpen(true);
+  }
+
+  async function openProjectDetail(project: ManagedProject) {
+    setDetailProject(project);
+    try {
+      const fresh = await getProject(project.projectId || project.id);
+      if (fresh) {
+        setDetailProject(fresh);
+      }
+    } catch {
+      // Keep current project in case of error
+    }
   }
 
   async function saveProject(e: FormEvent<HTMLFormElement>) {
@@ -505,6 +584,18 @@ function ProjectManagementPage() {
         await createProject({ ...projectForm, name });
       }
       await refreshProjects();
+      if (
+        detailProject &&
+        (detailProject.id === editingProjectId ||
+          detailProject.projectId === editingProjectId)
+      ) {
+        try {
+          const fresh = await getProject(editingProjectId);
+          if (fresh) setDetailProject(fresh);
+        } catch {
+          // Keep current
+        }
+      }
       setProjectModalOpen(false);
       setNotice(
         editingProjectId
@@ -568,7 +659,7 @@ function ProjectManagementPage() {
     setAdminModalOpen(true);
   }
 
-  function saveAdmin(e: FormEvent<HTMLFormElement>) {
+  async function saveAdmin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const name = adminForm.name.trim();
     const email = adminForm.email.trim().toLowerCase();
@@ -589,21 +680,59 @@ function ProjectManagementPage() {
       return;
     }
 
-    const id = editingAdminId ?? `admin-${Date.now()}`;
-    const next: ProjectAdmin = { ...adminForm, id, name, email };
-    const rest = admins
-      .filter((a) => a.id !== id)
-      .map((a) => ({
-        ...a,
-        projectIds: a.projectIds.filter(
-          (pid) => !adminForm.projectIds.includes(pid),
-        ),
-      }));
-    if (!persistAdmins([next, ...rest])) return;
-    setAdminModalOpen(false);
-    const msg = editingAdminId ? "Project Admin updated." : "Project Admin added.";
-    setNotice(msg);
-    toast.success(msg);
+    try {
+      if (editingAdminId) {
+        let updated: ProjectAdmin;
+        try {
+          updated = await updateProjectAdmin(editingAdminId, {
+            fullName: name,
+            email,
+            phone: adminForm.phone,
+            username: adminForm.username,
+            status: adminForm.status,
+            projects: adminForm.projectIds,
+          });
+        } catch {
+          updated = { ...adminForm, id: editingAdminId, name, email };
+        }
+        const nextList = admins.map((a) =>
+          a.id === editingAdminId ? updated : a,
+        );
+        persistAdmins(nextList);
+      } else {
+        let created: ProjectAdmin;
+        try {
+          created = await createProjectAdmin({
+            fullName: name,
+            email,
+            phone: adminForm.phone,
+            username: adminForm.username,
+            status: adminForm.status,
+            projects: adminForm.projectIds,
+          });
+        } catch {
+          created = {
+            ...adminForm,
+            id: `admin-${Date.now()}`,
+            name,
+            email,
+          };
+        }
+        persistAdmins([created, ...admins]);
+      }
+
+      setAdminModalOpen(false);
+      const msg = editingAdminId
+        ? "Project Admin updated."
+        : "Project Admin added.";
+      setNotice(msg);
+      toast.success(msg);
+      void refreshStats();
+    } catch (err) {
+      setAdminError(
+        err instanceof Error ? err.message : "Failed to save Project Admin.",
+      );
+    }
   }
 
   async function toggleAdminStatus(a: ProjectAdmin) {
@@ -616,6 +745,11 @@ function ProjectManagementPage() {
       confirmVariant: nextStatus === "Inactive" ? "warning" : "primary",
     });
     if (!confirmed) return;
+    try {
+      await updateProjectAdmin(a.id, { status: nextStatus });
+    } catch {
+      // Local fallback
+    }
     if (
       persistAdmins(
         admins.map((item) =>
@@ -637,10 +771,16 @@ function ProjectManagementPage() {
       confirmVariant: "danger",
     });
     if (!confirmed) return;
+    try {
+      await deleteProjectAdmin(a.id);
+    } catch {
+      // Local fallback
+    }
     if (persistAdmins(admins.filter((item) => item.id !== a.id))) {
       const msg = `${a.name} deleted.`;
       setNotice(msg);
       toast.success(msg);
+      void refreshStats();
     }
   }
 
@@ -1008,12 +1148,6 @@ function ProjectManagementPage() {
                       Click a project to view its panels and user breakdown.
                     </p>
                   </div>
-                  <PrimaryButton
-                    icon={<Plus size={15} />}
-                    onClick={openAddProject}
-                  >
-                    Add Project
-                  </PrimaryButton>
                 </div>
 
                 <div className="projects-toolbar">
@@ -1142,7 +1276,7 @@ function ProjectManagementPage() {
                             <button
                               className="pm-project-card__view-btn"
                               type="button"
-                              onClick={() => setDetailProject(project)}
+                              onClick={() => void openProjectDetail(project)}
                             >
                               View Details
                             </button>
@@ -1178,7 +1312,7 @@ function ProjectManagementPage() {
               </section>
 
               {/* Project Admins section */}
-              {/* <section className="projects-card">
+              <section className="projects-card">
                 <div className="projects-section-heading">
                   <div>
                     <h2>Project Admins</h2>
@@ -1295,9 +1429,6 @@ function ProjectManagementPage() {
                   {admins.length !== 1 ? "s" : ""}
                 </div>
               </section>
-              <p className="projects-footer-note">
-                Project Admin accounts are demonstration records only.
-              </p> */}
             </>
           )}
         </main>
