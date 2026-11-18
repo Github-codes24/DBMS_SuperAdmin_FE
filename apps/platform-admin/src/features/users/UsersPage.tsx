@@ -14,11 +14,11 @@ import {
   deleteUser,
   getUser,
   listUsers,
+  listRoles,
   resetUserPassword,
   updateUser,
   updateUserStatus,
   AuthenticationError,
-  listRoles,
 } from './services/userService'
 import type { SelectOption, User } from './types/user.types'
 
@@ -112,25 +112,22 @@ function UserManagementPage() {
   const { confirm } = useConfirm()
 
 
-  
-useEffect(() => {
+  useEffect(() => {
   listRoles()
-    .then((response: any) => {
-      const items = response.data.data ?? []
-
+    .then((roles: any[]) => {
       setRoleOptions(
-        items.map((role: any) => ({
+        roles.map((role) => ({
           value: role._id,
           label: role.name,
         }))
       )
     })
-    .catch((error) => {
+    .catch((error: unknown) => {
       console.error('Failed to fetch roles:', error)
     })
 }, [])
 
-
+  
   useEffect(() => {
     const controller = new AbortController()
     listUsers({
@@ -141,9 +138,9 @@ useEffect(() => {
       status: statusFilter === 'All' ? '' : statusFilter.toLowerCase(),
     }, controller.signal)
       .then((result) => {
-        setUsers(result.users.map((user) => fromApiUser(user, projectOptions)))
-        setTotalUsers(result.total)
-      })
+  setUsers(result.users.map((user) => fromApiUser(user, projectOptions)))
+  setTotalUsers(result.total)
+})
       .catch((error: unknown) => {
         if (controller.signal.aborted) return
         if (error instanceof AuthenticationError) {

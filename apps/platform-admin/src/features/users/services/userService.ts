@@ -218,8 +218,9 @@ export async function listUsers(
   }
 }
 
-export async function listRoles(){
-  return request('/platform/roles')
+export async function listRoles() {
+  const response: any = await request('/platform/roles')
+  return response.data
 }
 
 export async function getUser(id: string): Promise<User> {
@@ -258,14 +259,20 @@ export async function updateUser(id: string, input: UserInput): Promise<User> {
   return mapUser(record.data ?? record.user ?? record)
 }
 
+// function apiRole(role: string): string {
+//   const normalizedRole = role.toLowerCase().replace(/[\s_-]+/g, '')
+//   if (normalizedRole === 'superadmin') return 'superadmin'
+//   if (normalizedRole === 'admin') return 'admin'
+//   if (normalizedRole === 'manager') return 'manager'
+//   if (normalizedRole === 'user') return 'user'
+//   throw new Error('Select a role supported by the server.')
+// }
+
+
 function apiRole(role: string): string {
-  const normalizedRole = role.toLowerCase().replace(/[\s_-]+/g, '')
-  if (normalizedRole === 'superadmin') return 'superadmin'
-  if (normalizedRole === 'admin') return 'admin'
-  if (normalizedRole === 'manager') return 'manager'
-  if (normalizedRole === 'user') return 'user'
-  throw new Error('Select a role supported by the server.')
+  return role
 }
+
 
 export async function updateUserStatus(id: string, status: AccountStatus): Promise<User> {
   const raw: unknown = await request(`/users/${encodeURIComponent(id)}/status`, {
