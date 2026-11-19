@@ -198,14 +198,14 @@ function RolesPermissionsPage() {
       .then(([role, matrix]) => {
         const state = createPermissions(modules, permissionColumns);
         for (const permission of matrix.permissions) {
-  const [moduleKey, actionKey] = permission.split(":");
-  const module = modules.find((item) => item.key === moduleKey);
-  const action = actions.find((item) => item.key === actionKey);
+          const [moduleKey, actionKey] = permission.split(":");
+          const module = modules.find((item) => item.key === moduleKey);
+          const action = actions.find((item) => item.key === actionKey);
 
-  if (module && action) {
-    state[getModuleId(module)][action.label] = true;
-  }
-}
+          if (module && action) {
+            state[getModuleId(module)][action.label] = true;
+          }
+        }
         setRoleOptions((current) =>
           current.map((item) => (item.id === role.id ? role : item)),
         );
@@ -247,31 +247,31 @@ function RolesPermissionsPage() {
     setApiError("");
   }
   function setModulePermissions(moduleId, value) {
-  setPermissionState((current) => ({
-    ...current,
-    [selectedRoleId]: {
-      ...current[selectedRoleId],
-      [moduleId]: Object.fromEntries(
-        permissionColumns.map((permission) => [permission, value]),
-      ),
-    },
-  }));
-  setSaveMessage("");
-}
-
-function setPermission(moduleId, permission) {
-  setPermissionState((current) => ({
-    ...current,
-    [selectedRoleId]: {
-      ...current[selectedRoleId],
-      [moduleId]: {
-        ...current[selectedRoleId]?.[moduleId],
-        [permission]: !current[selectedRoleId]?.[moduleId]?.[permission],
+    setPermissionState((current) => ({
+      ...current,
+      [selectedRoleId]: {
+        ...current[selectedRoleId],
+        [moduleId]: Object.fromEntries(
+          permissionColumns.map((permission) => [permission, value]),
+        ),
       },
-    },
-  }));
-  setSaveMessage("");
-}
+    }));
+    setSaveMessage("");
+  }
+
+  function setPermission(moduleId, permission) {
+    setPermissionState((current) => ({
+      ...current,
+      [selectedRoleId]: {
+        ...current[selectedRoleId],
+        [moduleId]: {
+          ...current[selectedRoleId]?.[moduleId],
+          [permission]: !current[selectedRoleId]?.[moduleId]?.[permission],
+        },
+      },
+    }));
+    setSaveMessage("");
+  }
 
   async function createRole(title, description, cloneFrom) {
     if (!selectedProjectId)
@@ -288,9 +288,7 @@ function setPermission(moduleId, permission) {
       name: title,
       description,
       // moduleKeys: sourceRole?.moduleKeys ?? [],
-     moduleKeys: sourceRole?.moduleKeys?.length
-  ? sourceRole.moduleKeys
-  : [],
+      moduleKeys: sourceRole?.moduleKeys?.length ? sourceRole.moduleKeys : [],
     });
     setRoleOptions((current) => [...current, createdRole]);
     setSelectedRoleId(createdRole.id);
@@ -323,7 +321,9 @@ function setPermission(moduleId, permission) {
         isActive: selectedRole.isActive,
       },
     );
-    console.log("PATCH moduleKeys:", [...new Set(modules.map((module) => module.key))]);
+    console.log("PATCH moduleKeys:", [
+      ...new Set(modules.map((module) => module.key)),
+    ]);
     setRoleOptions((current) =>
       current.map((role) => (role.id === updatedRole.id ? updatedRole : role)),
     );
@@ -384,7 +384,10 @@ function setPermission(moduleId, permission) {
     try {
       const permissions = modules.flatMap((module) =>
         actions
-          .filter((action) => selectedPermissions[getModuleId(module)]?.[action.label])
+          .filter(
+            (action) =>
+              selectedPermissions[getModuleId(module)]?.[action.label],
+          )
           .map((action) => `${module.key}:${action.key}`),
       );
       await savePermissions(
@@ -399,15 +402,15 @@ function setPermission(moduleId, permission) {
       );
       const state = createPermissions(modules, permissionColumns);
 
-for (const permission of savedMatrix.permissions) {
-  const [moduleKey, actionKey] = permission.split(":");
-  const module = modules.find((item) => item.key === moduleKey);
-  const action = actions.find((item) => item.key === actionKey);
+      for (const permission of savedMatrix.permissions) {
+        const [moduleKey, actionKey] = permission.split(":");
+        const module = modules.find((item) => item.key === moduleKey);
+        const action = actions.find((item) => item.key === actionKey);
 
-  if (module && action) {
-    state[getModuleId(module)][action.label] = true;
-  }
-}
+        if (module && action) {
+          state[getModuleId(module)][action.label] = true;
+        }
+      }
       setPermissionState((current) => ({
         ...current,
         [selectedRoleId]: state,
@@ -625,6 +628,26 @@ for (const permission of savedMatrix.permissions) {
                   rows={modules.length}
                   columns={tableHeaders.length + 1}
                 />
+              ) : modules.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={tableHeaders.length + 1}
+                    style={{ textAlign: "center", padding: "40px 20px" }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: "8px" }}>
+                      No modules available for this project.
+                    </div>
+                    <p
+                      style={{
+                        margin: 0,
+                        color: "var(--text-secondary, #6b7280)",
+                      }}
+                    >
+                      Modules need to be registered before permissions can be
+                      configured.
+                    </p>
+                  </td>
+                </tr>
               ) : visibleModules.length === 0 ? (
                 <tr>
                   <td
@@ -639,50 +662,62 @@ for (const permission of savedMatrix.permissions) {
                 </tr>
               ) : (
                 visibleModules.map((module) => (
-  <tr key={getModuleId(module)}>
-    <td className="roles-module-cell">
-      <div className="roles-module-name">{module.name}</div>
-      <div className="roles-module-description">{module.description}</div>
-    </td>
+                  <tr key={getModuleId(module)}>
+                    <td className="roles-module-cell">
+                      <div className="roles-module-name">{module.name}</div>
+                      <div className="roles-module-description">
+                        {module.description}
+                      </div>
+                    </td>
 
-    {showFullAccess && (
-      <td className="roles-select-cell">
-        <button
-          className="roles-select-all"
-          type="button"
-          disabled={!selectedRoleId || isLoading}
-          onClick={() => {
-            const allSelected = permissionColumns.every(
-              (permission) => selectedPermissions[getModuleId(module)]?.[permission],
-            );
-            setModulePermissions(getModuleId(module), !allSelected)
-          }}
-        >
-          Select All
-        </button>
-      </td>
-    )}
+                    {showFullAccess && (
+                      <td className="roles-select-cell">
+                        <button
+                          className="roles-select-all"
+                          type="button"
+                          disabled={!selectedRoleId || isLoading}
+                          onClick={() => {
+                            const allSelected = permissionColumns.every(
+                              (permission) =>
+                                selectedPermissions[getModuleId(module)]?.[
+                                  permission
+                                ],
+                            );
+                            setModulePermissions(
+                              getModuleId(module),
+                              !allSelected,
+                            );
+                          }}
+                        >
+                          Select All
+                        </button>
+                      </td>
+                    )}
 
-    {permissionColumns.map((permission) => {
-      const checked = Boolean(selectedPermissions[getModuleId(module)]?.[permission]);
+                    {permissionColumns.map((permission) => {
+                      const checked = Boolean(
+                        selectedPermissions[getModuleId(module)]?.[permission],
+                      );
 
-      return (
-        <td className="roles-permission-cell" key={permission}>
-          <button
-            className={`roles-permission-toggle${checked ? " roles-permission-toggle--checked" : ""}`}
-            type="button"
-            aria-label={`${module.name}: ${permission}`}
-            aria-pressed={checked}
-            disabled={!selectedRoleId || isLoading}
-            onClick={() => setPermission(getModuleId(module), permission)}
-          >
-            {checked && <Check size={16} strokeWidth={2.6} />}
-          </button>
-        </td>
-      );
-    })}
-  </tr>
-))
+                      return (
+                        <td className="roles-permission-cell" key={permission}>
+                          <button
+                            className={`roles-permission-toggle${checked ? " roles-permission-toggle--checked" : ""}`}
+                            type="button"
+                            aria-label={`${module.name}: ${permission}`}
+                            aria-pressed={checked}
+                            disabled={!selectedRoleId || isLoading}
+                            onClick={() =>
+                              setPermission(getModuleId(module), permission)
+                            }
+                          >
+                            {checked && <Check size={16} strokeWidth={2.6} />}
+                          </button>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
