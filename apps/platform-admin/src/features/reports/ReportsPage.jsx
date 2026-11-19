@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Activity,
   BarChart3,
@@ -29,7 +29,8 @@ const reportTypes = [
   'Activity Report',
 ]
 
-const dateRanges = ['Today', 'Last 7 Days', 'Last 30 Days', 'This Month', 'Last 3 Months', 'Custom Date Range']
+const supportedReportTypes = new Set(['User Report'])
+const dateRanges = ['Last 7 Days', 'Last 30 Days', 'Last 3 Months', 'Last Year', 'All Time']
 
 const statusesByReport = {
   'Customer Report': ['Active', 'Inactive'],
@@ -44,29 +45,19 @@ const reportTypeValues = {
   'Vendor Report': 'vendors',
   'User Report': 'users',
   'Telecaller Report': 'telecallers',
-  'Activity Report': 'activities',
+  'Activity Report': 'activity',
 }
 
 const reportRangeValues = {
-  Today: '1d',
   'Last 7 Days': '7d',
   'Last 30 Days': '30d',
-  'This Month': 'month',
   'Last 3 Months': '90d',
+  'Last Year': '1y',
+  'All Time': 'all',
 }
 
-function getDateDaysAgo(daysAgo) {
-  const date = new Date()
-  date.setHours(12, 0, 0, 0)
-  date.setDate(date.getDate() - daysAgo)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function getDefaultDates() {
-  return { from: getDateDaysAgo(29), to: getDateDaysAgo(0) }
+function getDefaultFilters() {
+  return { reportType: 'User Report', dateRange: 'Last 30 Days', status: 'All', projectId: '' }
 }
 
 function csvCell(value) {
@@ -80,6 +71,42 @@ function getErrorMessage(error) {
     || 'Unable to load the report.'
 }
 
+async function fetchReportData(filters, page = 1, signal) {
+  const type = reportTypeValues[filters.reportType]
+  const range = reportRangeValues[filters.dateRange]
+  if (!range) throw new Error('Choose a supported report date range.')
+
+  const params = {
+    type,
+    range,
+    status: filters.status.toLowerCase(),
+    page,
+    limit: 10,
+  }
+  if (filters.projectId?.trim()) params.projectId = filters.projectId.trim()
+
+  const response = await api.get('/reports', {
+    params,
+    signal,
+  })
+  const result = response.data
+  if (result?.success === false) {
+    throw new Error(result.message || 'The report could not be generated.')
+  }
+
+  const data = result?.data
+  if (
+    !data?.summary ||
+    !Array.isArray(data.trend) ||
+    !Array.isArray(data.breakdown) ||
+    !Array.isArray(data.rows) ||
+    !data.pagination
+  ) {
+    throw new Error('The reports API returned an invalid response.')
+  }
+  return data
+}
+
 function formatReportDate(value) {
   if (!value) return '—'
   const date = new Date(value)
@@ -87,38 +114,30 @@ function formatReportDate(value) {
 }
 
 function ReportsPage() {
-  const defaultDates = getDefaultDates()
   const [reportType, setReportType] = useState('User Report')
   const [dateRange, setDateRange] = useState('Last 30 Days')
   const [status, setStatus] = useState('All')
-  const [fromDate, setFromDate] = useState(defaultDates.from)
-  const [toDate, setToDate] = useState(defaultDates.to)
+  const [projectId, setProjectId] = useState('')
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState('info')
   const [generatedReport, setGeneratedReport] = useState(null)
   const [reportData, setReportData] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
-
-  const dateRangeIsInvalid = dateRange === 'Custom Date Range'
-    && (!fromDate || !toDate || fromDate > toDate)
-  const dateError = !fromDate || !toDate
-    ? 'Select both dates to generate a report.'
-    : 'From Date must be on or before To Date.'
+  const [isLoading, setIsLoading] = useState(true)
+  const effectiveReportType = reportType
+  const availableStatuses = statusesByReport[effectiveReportType]
+  const effectiveStatus = status === 'All' || availableStatuses.includes(status) ? status : 'All'
 
   function resetFilters() {
-    const dates = getDefaultDates()
     setReportType('User Report')
     setDateRange('Last 30 Days')
     setStatus('All')
-    setFromDate(dates.from)
-    setToDate(dates.to)
+    setProjectId('')
     setMessage('')
     setGeneratedReport(null)
     setReportData(null)
   }
 
   async function loadReport(filters, page = 1) {
-    const type = reportTypeValues[filters.reportType]
     const range = reportRangeValues[filters.dateRange]
     if (!range) {
       setMessageType('warning')
@@ -131,31 +150,7 @@ function ReportsPage() {
     setGeneratedReport(null)
     setMessage('')
     try {
-      const response = await api.get('/reports', {
-        params: {
-          type,
-          range,
-          status: filters.status.toLowerCase(),
-          page,
-          limit: 10,
-        },
-      })
-      const result = response.data
-      if (result?.success === false) {
-        throw new Error(result.message || 'The report could not be generated.')
-      }
-
-      const data = result?.data
-      if (
-        !data?.summary ||
-        !Array.isArray(data.trend) ||
-        !Array.isArray(data.breakdown) ||
-        !Array.isArray(data.rows) ||
-        !data.pagination
-      ) {
-        throw new Error('The reports API returned an invalid response.')
-      }
-
+      const data = await fetchReportData(filters, page)
       setReportData(data)
       setGeneratedReport(filters)
       setMessageType('success')
@@ -168,13 +163,38 @@ function ReportsPage() {
     }
   }
 
+  useEffect(() => {
+    const controller = new AbortController()
+    const filters = getDefaultFilters()
+    fetchReportData(filters, 1, controller.signal)
+      .then((data) => {
+        setReportData(data)
+        setGeneratedReport(filters)
+        setMessageType('success')
+        setMessage(`Report generated: ${filters.reportType}, ${filters.status} status, ${filters.dateRange}.`)
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return
+        setMessageType('error')
+        setMessage(getErrorMessage(error))
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false)
+      })
+    return () => controller.abort()
+  }, [])
+
   function getCurrentFilters() {
-    return { reportType, dateRange, status, fromDate, toDate }
+    return {
+      reportType: effectiveReportType,
+      dateRange,
+      status: effectiveStatus,
+      projectId: effectiveReportType === 'Vendor Report' ? projectId : '',
+    }
   }
 
   function generateReport(event) {
     event.preventDefault()
-    if (dateRangeIsInvalid) return
     void loadReport(getCurrentFilters())
   }
 
@@ -195,13 +215,13 @@ function ReportsPage() {
     const blobUrl = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const link = document.createElement('a')
     link.href = blobUrl
-    link.download = `${reportType.toLowerCase().replaceAll(' ', '-')}.csv`
+    link.download = `${(generatedReport?.reportType ?? effectiveReportType).toLowerCase().replaceAll(' ', '-')}.csv`
     document.body.appendChild(link)
     link.click()
     link.remove()
     window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000)
     setMessageType('success')
-    setMessage(`CSV exported for ${generatedReport?.reportType ?? reportType}.`)
+    setMessage(`CSV exported for ${generatedReport?.reportType ?? effectiveReportType}.`)
   }
 
   const summaryCards = [
@@ -228,7 +248,7 @@ function ReportsPage() {
         onClick={() => void loadReport(generatedReport ?? getCurrentFilters(), reportData?.pagination?.page ?? 1)}
       />
       <PrimaryButton
-        disabled={dateRangeIsInvalid || isLoading || !reportData?.rows?.length}
+        disabled={isLoading || !reportData?.rows?.length}
         onClick={exportReport}
         icon={<Download size={15} />}
       >
@@ -273,8 +293,10 @@ function ReportsPage() {
             <form className="reports-filter-form" onSubmit={generateReport}>
               <label className="reports-field">
                 <span>Report Type</span>
-                <select value={reportType} onChange={(event) => { setReportType(event.target.value); setStatus('All') }}>
-                  {reportTypes.map((type) => <option key={type}>{type}</option>)}
+                <select value={effectiveReportType} onChange={(event) => { setReportType(event.target.value); setStatus('All') }}>
+                  {reportTypes.map((type) => (
+                    <option key={type}>{type}</option>
+                  ))}
                 </select>
               </label>
               <label className="reports-field">
@@ -283,28 +305,30 @@ function ReportsPage() {
                   {dateRanges.map((range) => <option key={range}>{range}</option>)}
                 </select>
               </label>
-              {dateRange === 'Custom Date Range' && (
-                <>
-                  <label className="reports-field">
-                    <span>From Date</span>
-                    <input type="date" required value={fromDate} max={toDate || undefined} onChange={(event) => setFromDate(event.target.value)} />
-                  </label>
-                  <label className="reports-field">
-                    <span>To Date</span>
-                    <input type="date" required value={toDate} min={fromDate || undefined} onChange={(event) => setToDate(event.target.value)} />
-                  </label>
-                </>
-              )}
-              {dateRangeIsInvalid && <p className="reports-date-error" role="alert">{dateError}</p>}
               <label className="reports-field">
                 <span>Status</span>
-                <select value={status} onChange={(event) => setStatus(event.target.value)}>
+                <select value={effectiveStatus} onChange={(event) => setStatus(event.target.value)}>
                   <option>All</option>
-                  {statusesByReport[reportType].map((item) => <option key={item}>{item}</option>)}
+                  {statusesByReport[effectiveReportType].map((item) => <option key={item}>{item}</option>)}
                 </select>
               </label>
+              {effectiveReportType === 'Vendor Report' && (
+                <label className="reports-field">
+                  <span>Project ID (optional)</span>
+                  <input
+                    type="text"
+                    placeholder="Filter by project"
+                    value={projectId}
+                    onChange={(event) => setProjectId(event.target.value)}
+                  />
+                </label>
+              )}
               <div className="reports-filter-actions">
-                <PrimaryButton type="submit" disabled={dateRangeIsInvalid || isLoading} icon={<FileBarChart size={15} />}>
+                <PrimaryButton
+                  type="submit"
+                  disabled={isLoading || !supportedReportTypes.has(effectiveReportType)}
+                  icon={<FileBarChart size={15} />}
+                >
                   {isLoading ? 'Generating…' : 'Generate Report'}
                 </PrimaryButton>
                 <SecondaryButton type="button" onClick={resetFilters} icon={<RotateCcw size={14} />}>
@@ -348,13 +372,13 @@ function ReportsPage() {
           <section className="reports-card reports-table-card">
             <div className="reports-card-heading reports-table-heading">
               <div>
-                <h2>{generatedReport?.reportType ?? reportType} Details</h2>
+                <h2>{generatedReport?.reportType ?? effectiveReportType} Details</h2>
                 <p>{generatedReport
                   ? `Generated for ${generatedReport.status} status, ${generatedReport.dateRange}. ${reportData?.pagination?.total ?? 0} records.`
                   : 'Generate a report to apply the selected filters.'}</p>
               </div>
               <SecondaryButton
-                disabled={dateRangeIsInvalid || isLoading || !reportData?.rows?.length}
+                disabled={isLoading || !reportData?.rows?.length}
                 onClick={exportReport}
                 icon={<Download size={14} />}
               >

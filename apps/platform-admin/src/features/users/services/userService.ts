@@ -3,6 +3,7 @@ import type {
   AssignedProject,
   CreateUserInput,
   User,
+  UserActivity,
   UserInput,
   UserListParams,
   UserListResult,
@@ -13,6 +14,13 @@ export class AuthenticationError extends Error {
   constructor() {
     super('Your session has expired. Please sign in again.')
     this.name = 'AuthenticationError'
+  }
+}
+
+class RouteNotFoundError extends Error {
+  constructor(message: string, cause: unknown) {
+    super(message, { cause })
+    this.name = 'RouteNotFoundError'
   }
 }
 
@@ -28,6 +36,10 @@ function asString(value: unknown, field: string): string {
     throw new Error(`The server response is missing ${field}.`)
   }
   return String(value)
+}
+
+function optionalString(value: unknown, field: string): string | undefined {
+  return value == null ? undefined : asString(value, field)
 }
 
 function apiErrorMessage(value: unknown, field?: string): string | undefined {
@@ -96,12 +108,59 @@ function assignedProjects(value: unknown): AssignedProject[] {
     const record = asRecord(project)
     const id = asString(record.id ?? record._id ?? record.name ?? record.projectName, 'a project identifier')
     const name = asString(record.name ?? record.projectName ?? id, 'a project name')
-    return { id, name }
+    return {
+      id,
+      name,
+      ...(record.description != null ? { description: asString(record.description, 'a project description') } : {}),
+      ...(record.status != null ? { status: asString(record.status, 'a project status') } : {}),
+      ...(record.assignedAt != null ? { assignedAt: asString(record.assignedAt, 'a project assignment date') } : {}),
+    }
+  })
+}
+
+function activityHistory(value: unknown): UserActivity[] | undefined {
+  if (value == null) return undefined
+  if (!Array.isArray(value)) {
+    throw new Error('The server returned an invalid user activity history.')
+  }
+  return value.map((item, index) => {
+    const record = asRecord(item)
+    return {
+      id: optionalString(record.id ?? record._id, 'an activity identifier') ?? String(index),
+      action: asString(record.action ?? record.event ?? record.type, 'an activity action'),
+      createdAt: asString(record.createdAt ?? record.timestamp ?? record.date, 'an activity date'),
+      ...(record.description != null ? { description: asString(record.description, 'an activity description') } : {}),
+      ...(record.ipAddress != null || record.ip != null
+        ? { ipAddress: asString(record.ipAddress ?? record.ip, 'an activity IP address') }
+        : {}),
+      ...(record.device != null ? { device: asString(record.device, 'an activity device') } : {}),
+      ...(record.before !== undefined ? { before: record.before } : {}),
+      ...(record.after !== undefined ? { after: record.after } : {}),
+    }
   })
 }
 
 function mapUser(value: unknown): User {
   const record = asRecord(value)
+  const lastLogin = typeof record.lastLogin === 'object' && record.lastLogin !== null
+    ? asRecord(record.lastLogin)
+    : {}
+  const lastLoginAt = optionalString(
+    record.lastLoginAt
+      ?? lastLogin.at
+      ?? lastLogin.createdAt
+      ?? lastLogin.timestamp
+      ?? (typeof record.lastLogin === 'string' || typeof record.lastLogin === 'number' ? record.lastLogin : undefined),
+    'a last login date',
+  )
+  const lastLoginIp = optionalString(
+    record.lastLoginIp ?? record.lastLoginIP ?? lastLogin.ipAddress ?? lastLogin.ip,
+    'a last login IP address',
+  )
+  const lastLoginDevice = optionalString(
+    record.lastLoginDevice ?? record.deviceInfo ?? lastLogin.device,
+    'a last login device',
+  )
   const roleValue = record.role ?? record.roleName
   let role: string
   if (typeof roleValue === 'object' && roleValue !== null) {
@@ -140,6 +199,12 @@ function mapUser(value: unknown): User {
     ...(record.updatedAt || record.updated_at
       ? { updatedAt: asString(record.updatedAt ?? record.updated_at, 'an update date') }
       : {}),
+    ...(lastLoginAt ? { lastLoginAt } : {}),
+    ...(lastLoginIp ? { lastLoginIp } : {}),
+    ...(lastLoginDevice ? { lastLoginDevice } : {}),
+    ...(record.activityHistory != null || record.activity != null || record.auditLogs != null || record.activities != null
+      ? { activityHistory: activityHistory(record.activityHistory ?? record.activity ?? record.auditLogs ?? record.activities) }
+      : {}),
   }
 }
 
@@ -168,6 +233,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     const bodyMessage = apiErrorMessage(error.response?.data)
     const message = bodyMessage || error.response?.data?.message || error.response?.data?.error || error.message || 'Request failed.'
+    if (error.response?.status === 404 && error.response?.data?.error?.code === 'ROUTE_NOT_FOUND') {
+      throw new RouteNotFoundError(message, error)
+    }
     throw new Error(message)
   }
 }
@@ -225,7 +293,43 @@ export async function listRoles(){
 export async function getUser(id: string): Promise<User> {
   const raw: unknown = await request(`/users/${encodeURIComponent(id)}`)
   const record = asRecord(raw)
-  return mapUser(record.data ?? record.user ?? record)
+  const data = asRecord(record.data ?? record)
+  const user = asRecord(data.user ?? record.user ?? data)
+  return mapUser({ ...record, ...data, ...user })
+}
+
+function auditListItems(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value
+  const response = asRecord(value)
+  const data = response.data
+  if (Array.isArray(data)) return data
+  const nested = typeof data === 'object' && data !== null ? asRecord(data) : {}
+  const items =
+    nested.activities ??
+    nested.auditHistory ??
+    nested.auditLogs ??
+    nested.activity ??
+    nested.events ??
+    nested.items ??
+    nested.logs ??
+    nested.data ??
+    response.activities ??
+    response.auditHistory ??
+    response.auditLogs ??
+    response.activity ??
+    response.events ??
+    response.items ??
+    response.logs
+  if (!Array.isArray(items)) {
+    throw new Error('The server returned an invalid user audit response.')
+  }
+  return items
+}
+
+export async function getUserAudit(id: string, page = 1, limit = 25): Promise<UserActivity[]> {
+  const query = new URLSearchParams({ page: String(page), limit: String(limit) })
+  const raw: unknown = await request(`/users/${encodeURIComponent(id)}/audit?${query.toString()}`)
+  return activityHistory(auditListItems(raw)) ?? []
 }
 
 export async function createUser(input: CreateUserInput): Promise<User> {
@@ -274,6 +378,44 @@ export async function updateUserStatus(id: string, status: AccountStatus): Promi
   })
   const record = asRecord(raw)
   return mapUser(record.data ?? record.user ?? record)
+}
+
+export interface BulkStatusUpdateResult {
+  usedIndividualFallback: boolean
+  updatedUsers: User[]
+  failures: Array<{ userId: string; error: unknown }>
+}
+
+export async function updateUsersStatus(userIds: string[], isActive: boolean): Promise<BulkStatusUpdateResult> {
+  if (userIds.length === 0 || userIds.some((id) => !id.trim())) {
+    throw new Error('Select at least one valid user.')
+  }
+  try {
+    await request('/users/bulk-status', {
+      method: 'PATCH',
+      body: JSON.stringify({ userIds, isActive }),
+    })
+    return { usedIndividualFallback: false, updatedUsers: [], failures: [] }
+  } catch (error) {
+    if (!(error instanceof RouteNotFoundError)) throw error
+
+    const status: AccountStatus = isActive ? 'active' : 'inactive'
+    const results = await Promise.allSettled(
+      userIds.map((id) => updateUserStatus(id, status)),
+    )
+    const authenticationFailure = results.find(
+      (result) => result.status === 'rejected' && result.reason instanceof AuthenticationError,
+    )
+    if (authenticationFailure?.status === 'rejected') throw authenticationFailure.reason
+
+    return {
+      usedIndividualFallback: true,
+      updatedUsers: results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []),
+      failures: results.flatMap((result, index) =>
+        result.status === 'rejected' ? [{ userId: userIds[index], error: result.reason }] : [],
+      ),
+    }
+  }
 }
 
 export async function resetUserPassword(id: string, password: string): Promise<void> {

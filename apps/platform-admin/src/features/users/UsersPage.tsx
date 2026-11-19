@@ -1,11 +1,11 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Users as UsersIcon, Plus } from 'lucide-react'
 import ResponsiveLayout from '../../components/layout/ResponsiveLayout'
 import { useToast, useConfirm } from '../../context'
 import { AlertMessage } from '../../components/notifications'
-import { Modal } from '../../components/overlays'
-import { Avatar, DataDetailView, StatusBadge } from '../../components/data-display'
+import { Modal, SideDrawer } from '../../components/overlays'
+import { Avatar, StatusBadge } from '../../components/data-display'
 import { TableSkeletonRows, EmptyState, NoSearchResults } from '../../components/feedback'
 import { PrimaryButton, SecondaryButton } from '../../components/ui/buttons'
 import './users.css'
@@ -13,10 +13,12 @@ import {
   createUser,
   deleteUser,
   getUser,
+  getUserAudit,
   listUsers,
   resetUserPassword,
   updateUser,
   updateUserStatus,
+  updateUsersStatus,
   AuthenticationError,
   listRoles,
 } from './services/userService'
@@ -85,9 +87,33 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(value))
 }
 
+function formatDateTime(value?: string) {
+  if (!value) return 'Not recorded'
+  const timestamp = Date.parse(value)
+  return Number.isNaN(timestamp)
+    ? value
+    : new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(timestamp)
+}
+
+function formatAuditValue(value: unknown) {
+  if (value == null) return ''
+  if (typeof value === 'string') return value
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
 function UserManagementPage() {
   const navigate = useNavigate()
   const [users, setUsers] = useState<UserRecord[]>([])
+  const [selectedUsers, setSelectedUsers] = useState<Map<string, UserRecord>>(() => new Map())
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false)
+  const [isProjectAssignmentOpen, setIsProjectAssignmentOpen] = useState(false)
+  const [selectedProjectsToAdd, setSelectedProjectsToAdd] = useState<string[]>([])
+  const [isAssigningProjects, setIsAssigningProjects] = useState(false)
+  const [projectAssignmentError, setProjectAssignmentError] = useState('')
   const [roleOptions, setRoleOptions] = useState<{ value: string; label: string }[]>([])
   const [totalUsers, setTotalUsers] = useState(0)
   const [search, setSearch] = useState('')
@@ -102,7 +128,12 @@ function UserManagementPage() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [viewingUser, setViewingUser] = useState<UserRecord | null>(null)
+  const [viewingUser, setViewingUser] = useState<User | null>(null)
+  const [viewingUserPreview, setViewingUserPreview] = useState<UserRecord | null>(null)
+  const [isLoadingUserDetails, setIsLoadingUserDetails] = useState(false)
+  const [userDetailsError, setUserDetailsError] = useState('')
+  const [userActivityError, setUserActivityError] = useState('')
+  const userDetailsRequestId = useRef(0)
   const [passwordResetUser, setPasswordResetUser] = useState<UserRecord | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [passwordResetError, setPasswordResetError] = useState('')
@@ -160,6 +191,187 @@ useEffect(() => {
 
   const pageCount = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE))
   const pageUsers = users
+  const selectedIds = Array.from(selectedUsers.keys())
+  const allPageUsersSelected = pageUsers.length > 0 && pageUsers.every((user) => selectedUsers.has(user.id))
+
+  function updateSelectedUser(user: UserRecord) {
+    setSelectedUsers((current) => {
+      if (!current.has(user.id)) return current
+      const next = new Map(current)
+      next.set(user.id, user)
+      return next
+    })
+  }
+
+  function toggleUserSelection(user: UserRecord, selected: boolean) {
+    setSelectedUsers((current) => {
+      const next = new Map(current)
+      if (selected) next.set(user.id, user)
+      else next.delete(user.id)
+      return next
+    })
+  }
+
+  function togglePageSelection(selected: boolean) {
+    setSelectedUsers((current) => {
+      const next = new Map(current)
+      for (const user of pageUsers) {
+        if (selected) next.set(user.id, user)
+        else next.delete(user.id)
+      }
+      return next
+    })
+  }
+
+  function openProjectAssignment() {
+    setSelectedProjectsToAdd([])
+    setProjectAssignmentError('')
+    setIsProjectAssignmentOpen(true)
+  }
+
+  function closeProjectAssignment() {
+    if (isAssigningProjects) return
+    setIsProjectAssignmentOpen(false)
+    setSelectedProjectsToAdd([])
+    setProjectAssignmentError('')
+  }
+
+  function toggleProjectToAdd(projectId: string) {
+    setSelectedProjectsToAdd((current) => current.includes(projectId)
+      ? current.filter((id) => id !== projectId)
+      : [...current, projectId])
+  }
+
+  async function assignProjectsToSelectedUsers(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (selectedIds.length === 0 || selectedProjectsToAdd.length === 0) return
+
+    setIsAssigningProjects(true)
+    setProjectAssignmentError('')
+    try {
+      const results = await Promise.allSettled(
+        Array.from(selectedUsers.entries(), async ([id, user]) => {
+          const currentProjectIds = user.projects.map((projectName) =>
+            projectOptions.find((project) => project.name === projectName)?.id ?? projectName,
+          )
+          const assignedProjects = Array.from(new Set([...currentProjectIds, ...selectedProjectsToAdd]))
+          if (assignedProjects.length === currentProjectIds.length) {
+            return { id, updatedRecord: null }
+          }
+
+          const role = roleOptions.find((option) => option.label === user.role)?.value ?? user.role
+          const updatedUser = await updateUser(id, {
+            fullName: user.name,
+            email: user.email,
+            role,
+            assignedProjects,
+          })
+          return { id, updatedRecord: fromApiUser(updatedUser, projectOptions) }
+        }),
+      )
+
+      const authenticationFailure = results.find(
+        (result) => result.status === 'rejected' && result.reason instanceof AuthenticationError,
+      )
+      if (authenticationFailure) {
+        navigate('/login', { replace: true })
+        return
+      }
+
+      const successfulResults = results.filter(
+        (result): result is PromiseFulfilledResult<{ id: string; updatedRecord: UserRecord | null }> =>
+          result.status === 'fulfilled',
+      )
+      const failedResults = results.filter(
+        (result): result is PromiseRejectedResult => result.status === 'rejected',
+      )
+      const updatedRecords = successfulResults
+        .map((result) => result.value.updatedRecord)
+        .filter((record): record is UserRecord => record !== null)
+      const failedIds = new Set(
+        results.flatMap((result, index) => result.status === 'rejected' ? [selectedIds[index]] : []),
+      )
+
+      if (updatedRecords.length > 0) {
+        setUsers((current) => current.map((user) =>
+          updatedRecords.find((updated) => updated.id === user.id) ?? user,
+        ))
+        setIsLoading(true)
+        setLoadError('')
+        setRefreshKey((current) => current + 1)
+        toast.success(`${updatedRecords.length} user${updatedRecords.length === 1 ? '' : 's'} updated with the selected projects.`)
+      } else if (failedResults.length === 0) {
+        toast.success('The selected projects are already assigned to all selected users.')
+      }
+
+      setSelectedUsers((current) => new Map(
+        Array.from(current.entries()).filter(([id]) => failedIds.has(id)),
+      ))
+      if (failedResults.length > 0) {
+        const firstError = getErrorMessage(failedResults[0].reason)
+        setProjectAssignmentError(
+          `${failedResults.length} user${failedResults.length === 1 ? '' : 's'} could not be updated. ${firstError}`,
+        )
+      } else {
+        setIsProjectAssignmentOpen(false)
+        setSelectedProjectsToAdd([])
+      }
+    } finally {
+      setIsAssigningProjects(false)
+    }
+  }
+
+  async function changeSelectedUsersStatus(isActive: boolean) {
+    if (selectedIds.length === 0) return
+    const status = isActive ? 'activate' : 'deactivate'
+    const confirmed = await confirm({
+      title: `${isActive ? 'Activate' : 'Deactivate'} selected users`,
+      message: `Are you sure you want to ${status} ${selectedIds.length} selected user${selectedIds.length === 1 ? '' : 's'}?`,
+      confirmText: isActive ? 'Activate selected' : 'Deactivate selected',
+      confirmVariant: isActive ? 'primary' : 'warning',
+    })
+    if (!confirmed) return
+
+    setIsBulkUpdating(true)
+    setActionError('')
+    try {
+      const result = await updateUsersStatus(selectedIds, isActive)
+      if (result.usedIndividualFallback) {
+        const updatedRecords = result.updatedUsers.map((user) => fromApiUser(user, projectOptions))
+        const failedIds = new Set(result.failures.map((failure) => failure.userId))
+        if (updatedRecords.length > 0) {
+          setUsers((current) => current.map((user) =>
+            updatedRecords.find((updated) => updated.id === user.id) ?? user,
+          ))
+          toast.success(
+            `${updatedRecords.length} selected user${updatedRecords.length === 1 ? ' has' : 's have'} been ${isActive ? 'activated' : 'deactivated'} successfully.`,
+          )
+        }
+        setSelectedUsers((current) => new Map(
+          Array.from(current.entries()).filter(([id]) => failedIds.has(id)),
+        ))
+        if (result.failures.length > 0) {
+          setActionError(
+            `The bulk status route was not found. ${result.failures.length} user${result.failures.length === 1 ? '' : 's'} could not be updated individually. ${getErrorMessage(result.failures[0].error)}`,
+          )
+        }
+      } else {
+        toast.success(`${selectedIds.length} selected user${selectedIds.length === 1 ? ' has' : 's have'} been ${isActive ? 'activated' : 'deactivated'} successfully.`)
+        setSelectedUsers(new Map())
+      }
+      setIsLoading(true)
+      setLoadError('')
+      setRefreshKey((current) => current + 1)
+    } catch (error) {
+      if (error instanceof AuthenticationError) {
+        navigate('/login', { replace: true })
+        return
+      }
+      setActionError(getErrorMessage(error))
+    } finally {
+      setIsBulkUpdating(false)
+    }
+  }
 
   function updateFilter(setter: (value: string) => void, value: string) {
     setIsLoading(true)
@@ -234,6 +446,7 @@ useEffect(() => {
         setUsers((current) => current.map((user) =>
           user.id === updatedRecord.id ? updatedRecord : user,
         ))
+        updateSelectedUser(updatedRecord)
         toast.success('User updated successfully.')
       } else {
         const createdUser = await createUser({ ...input, password: form.password })
@@ -272,7 +485,8 @@ useEffect(() => {
       setUsers((current) => current.map((currentUser) =>
         currentUser.id === updatedRecord.id ? updatedRecord : currentUser,
       ))
-      toast.success(`User ${nextStatus.toLowerCase()} successfully.`)
+      updateSelectedUser(updatedRecord)
+      toast.success(`${user.name} has been ${nextStatus === 'Active' ? 'activated' : 'deactivated'} successfully.`)
     } catch (error) {
       if (error instanceof AuthenticationError) {
         setActionError(getErrorMessage(error))
@@ -284,10 +498,11 @@ useEffect(() => {
 
   async function toggleStatus(user: UserRecord) {
     const nextStatus: UserStatus = user.status === 'Active' ? 'Inactive' : 'Active'
+    const action = nextStatus === 'Inactive' ? 'deactivate' : 'activate'
     const confirmed = await confirm({
-      title: `${nextStatus === 'Inactive' ? 'Deactivate' : 'Activate'} User`,
-      message: `Are you sure you want to ${nextStatus === 'Inactive' ? 'deactivate' : 'activate'} ${user.name}?`,
-      confirmText: nextStatus === 'Inactive' ? 'Deactivate' : 'Activate',
+      title: `${action === 'deactivate' ? 'Deactivate' : 'Activate'} ${user.name}?`,
+      message: `This will ${action} ${user.name}'s account. Do you want to continue?`,
+      confirmText: action === 'deactivate' ? 'Yes, deactivate' : 'Yes, activate',
       confirmVariant: nextStatus === 'Inactive' ? 'warning' : 'primary',
     })
     if (!confirmed) return
@@ -295,17 +510,54 @@ useEffect(() => {
   }
 
   async function openView(user: UserRecord) {
-    setActionError('')
+    const requestId = ++userDetailsRequestId.current
+    setViewingUserPreview(user)
+    setViewingUser(null)
+    setUserDetailsError('')
+    setUserActivityError('')
+    setIsLoadingUserDetails(true)
     try {
       const details = await getUser(user.id)
-      setViewingUser(fromApiUser(details, projectOptions))
+      if (requestId !== userDetailsRequestId.current) return
+
+      if (details.activityHistory !== undefined) {
+        setViewingUser(details)
+        return
+      }
+
+      try {
+        const activity = await getUserAudit(user.id, 1, 25)
+        if (requestId === userDetailsRequestId.current) {
+          setViewingUser({ ...details, activityHistory: activity })
+        }
+      } catch (error) {
+        if (requestId !== userDetailsRequestId.current) return
+        if (error instanceof AuthenticationError) {
+          navigate('/login', { replace: true })
+          return
+        }
+        setViewingUser(details)
+        setUserActivityError(getErrorMessage(error))
+      }
     } catch (error) {
+      if (requestId !== userDetailsRequestId.current) return
       if (error instanceof AuthenticationError) {
         navigate('/login', { replace: true })
         return
       }
-      setActionError(getErrorMessage(error))
+      setUserDetailsError(getErrorMessage(error))
+    } finally {
+      if (requestId === userDetailsRequestId.current) setIsLoadingUserDetails(false)
     }
+  }
+
+  function closeUserDetails() {
+    userDetailsRequestId.current += 1
+    setViewingUser(null)
+    setViewingUserPreview(null)
+    setIsLoadingUserDetails(false)
+    setUserDetailsError('')
+    setUserActivityError('')
   }
 
   async function submitPasswordReset(event: FormEvent<HTMLFormElement>) {
@@ -354,6 +606,12 @@ useEffect(() => {
     setActionError('')
     try {
       await deleteUser(user.id)
+      setSelectedUsers((current) => {
+        if (!current.has(user.id)) return current
+        const next = new Map(current)
+        next.delete(user.id)
+        return next
+      })
       toast.success('User deleted successfully.')
       if (page > 1 && totalUsers - 1 <= (page - 1) * PAGE_SIZE) {
         setIsLoading(true)
@@ -463,6 +721,18 @@ useEffect(() => {
         <div className="table-scroll">
           <table className="users-table user-management-table">
             <thead><tr>
+              <th scope="col" className="user-selection-cell">
+                <input
+                  type="checkbox"
+                  aria-label="Select all users on this page"
+                  checked={allPageUsersSelected}
+                  ref={(element) => {
+                    if (element) element.indeterminate = !allPageUsersSelected && pageUsers.some((user) => selectedUsers.has(user.id))
+                  }}
+                  disabled={isLoading || isBulkUpdating || isAssigningProjects || pageUsers.length === 0}
+                  onChange={(event) => togglePageSelection(event.target.checked)}
+                />
+              </th>
               <th scope="col">USER ID</th>
               <th scope="col">USER</th>
               <th scope="col">EMAIL ADDRESS</th>
@@ -475,10 +745,10 @@ useEffect(() => {
             </tr></thead>
             <tbody>
               {isLoading ? (
-                <TableSkeletonRows rows={PAGE_SIZE} columns={7} hasActions />
+                <TableSkeletonRows rows={PAGE_SIZE} columns={8} hasSelection hasActions />
               ) : pageUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={9}>
+                  <td colSpan={10}>
                     {search || roleFilter !== 'All' || statusFilter !== 'All' ? (
                       <NoSearchResults
                         query={search}
@@ -509,6 +779,15 @@ useEffect(() => {
               ) : (
                 pageUsers.map((user) => (
                   <tr key={user.id}>
+                    <td className="user-selection-cell">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${user.name}`}
+                        checked={selectedUsers.has(user.id)}
+                        disabled={isBulkUpdating || isAssigningProjects}
+                        onChange={(event) => toggleUserSelection(user, event.target.checked)}
+                      />
+                    </td>
                     <td><span className="user-id-chip">{user.userId}</span></td>
                     <td><div className="user-cell">
                       <Avatar name={user.name} size="sm" />
@@ -557,6 +836,91 @@ useEffect(() => {
       </section>
 
       <footer className="user-page-footer">DBMS SUPER ADMIN <span>•</span> USER DIRECTORY</footer>
+
+      {selectedUsers.size > 0 && (
+        <div className="user-bulk-action-bar" role="region" aria-label="Bulk user actions">
+          <span className="user-bulk-selection-count">
+            {selectedUsers.size} selected
+          </span>
+          <button
+            type="button"
+            className="button button--primary"
+            disabled={isBulkUpdating || isAssigningProjects || isLoading}
+            onClick={() => void changeSelectedUsersStatus(true)}
+          >
+            Activate Selected
+          </button>
+          <button
+            type="button"
+            className="button button--secondary"
+            disabled={isBulkUpdating || isAssigningProjects || isLoading}
+            onClick={() => void changeSelectedUsersStatus(false)}
+          >
+            Deactivate Selected
+          </button>
+          <button
+            type="button"
+            className="button button--secondary"
+            disabled={isBulkUpdating || isAssigningProjects || isLoading}
+            onClick={openProjectAssignment}
+          >
+            Assign Projects
+          </button>
+          <button
+            type="button"
+            className="user-bulk-clear"
+            disabled={isBulkUpdating || isAssigningProjects}
+            onClick={() => setSelectedUsers(new Map())}
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
+      <Modal
+        isOpen={isProjectAssignmentOpen}
+        onClose={closeProjectAssignment}
+        kicker="PROJECT ASSIGNMENT"
+        title="Add projects to selected users"
+        size="sm"
+      >
+        <form className="user-form" onSubmit={assignProjectsToSelectedUsers}>
+          <p>
+            Add projects to {selectedUsers.size} selected user{selectedUsers.size === 1 ? '' : 's'}.
+            Their current project assignments will be kept.
+          </p>
+          {projectAssignmentError && (
+            <div className="inline-alert inline-alert--error" role="alert">
+              {projectAssignmentError}
+            </div>
+          )}
+          <fieldset className="project-assignment-options">
+            <legend>Projects to add</legend>
+            {projectOptions.map((project) => (
+              <label className="project-assignment-option" key={project.id}>
+                <input
+                  type="checkbox"
+                  checked={selectedProjectsToAdd.includes(project.id)}
+                  disabled={isAssigningProjects || isLoading}
+                  onChange={() => toggleProjectToAdd(project.id)}
+                />
+                <span>{project.name}</span>
+              </label>
+            ))}
+          </fieldset>
+          <div className="modal-actions" style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+            <SecondaryButton onClick={closeProjectAssignment}>Cancel</SecondaryButton>
+            <PrimaryButton
+              type="submit"
+              disabled={isAssigningProjects || isLoading || selectedProjectsToAdd.length === 0}
+              isLoading={isAssigningProjects}
+              loadingText="Assigning..."
+            >
+              Add projects
+            </PrimaryButton>
+          </div>
+        </form>
+      </Modal>
 
       <Modal
         isOpen={isFormOpen}
@@ -636,37 +1000,134 @@ useEffect(() => {
         </form>
       </Modal>
 
-      <Modal
-        isOpen={Boolean(viewingUser)}
-        onClose={() => setViewingUser(null)}
-        kicker="USER PROFILE"
-        title={viewingUser?.name ?? 'User Profile'}
-        size="md"
-        footer={<SecondaryButton onClick={() => setViewingUser(null)}>Close</SecondaryButton>}
+      <SideDrawer
+        isOpen={Boolean(viewingUserPreview)}
+        onClose={closeUserDetails}
+        kicker="USER PROFILE & AUDIT"
+        title={viewingUser?.fullName ?? viewingUserPreview?.name ?? 'User details'}
+        description={viewingUser?.email ?? viewingUserPreview?.email}
+        width="min(520px, 100vw)"
+        bodyClassName="user-audit-drawer-body"
       >
-        {viewingUser && (
-          <DataDetailView
-            columns={2}
-            items={[
-              { label: 'User ID', value: viewingUser.userId, copyable: true },
-              { label: 'Full name', value: viewingUser.name },
-              { label: 'Email address', value: viewingUser.email, copyable: true },
-              { label: 'Phone number', value: viewingUser.phone || 'Not provided' },
-              { label: 'Role', value: viewingUser.role },
-              {
-                label: 'Account status',
-                value: <StatusBadge status={viewingUser.status} size="sm" />,
-              },
-              {
-                label: 'Assigned projects',
-                value: viewingUser.projects.length ? viewingUser.projects.join(', ') : 'None',
-                fullWidth: true,
-              },
-              { label: 'Created date', value: formatDate(viewingUser.createdAt) },
-            ]}
-          />
+        {isLoadingUserDetails && (
+          <div className="user-audit-state" role="status">Loading user details and activity…</div>
         )}
-      </Modal>
+        {userDetailsError && (
+          <AlertMessage type="error" description={userDetailsError} />
+        )}
+        {(viewingUser || viewingUserPreview) && !isLoadingUserDetails && (
+          <>
+            <section className="user-audit-section" aria-labelledby="user-audit-account-heading">
+              <h4 id="user-audit-account-heading">Account details</h4>
+              <dl className="user-audit-details">
+                <div><dt>User ID</dt><dd>{viewingUser?.id ?? viewingUserPreview?.userId}</dd></div>
+                <div><dt>Role</dt><dd>{viewingUser?.role ?? viewingUserPreview?.role}</dd></div>
+                <div>
+                  <dt>Status</dt>
+                  <dd>
+                    <StatusBadge
+                      status={viewingUser?.status === 'active' || viewingUserPreview?.status === 'Active' ? 'Active' : 'Inactive'}
+                      size="sm"
+                    />
+                  </dd>
+                </div>
+                <div><dt>Phone</dt><dd>{viewingUser?.phoneNumber ?? viewingUserPreview?.phone ?? 'Not provided'}</dd></div>
+                <div><dt>Created</dt><dd>{formatDateTime(viewingUser?.createdAt ?? viewingUserPreview?.createdAt)}</dd></div>
+              </dl>
+            </section>
+
+            <section className="user-audit-section" aria-labelledby="user-audit-login-heading">
+              <h4 id="user-audit-login-heading">Last login</h4>
+              <dl className="user-audit-details">
+                <div><dt>Date and time</dt><dd>{formatDateTime(viewingUser?.lastLoginAt)}</dd></div>
+                <div><dt>IP address</dt><dd>{viewingUser?.lastLoginIp ?? 'Not recorded'}</dd></div>
+                <div><dt>Device</dt><dd>{viewingUser?.lastLoginDevice ?? 'Not recorded'}</dd></div>
+              </dl>
+            </section>
+
+            <section className="user-audit-section" aria-labelledby="user-audit-projects-heading">
+              <h4 id="user-audit-projects-heading">Assigned projects</h4>
+              {viewingUser?.assignedProjects.length ? (
+                <ul className="user-audit-project-list">
+                  {viewingUser.assignedProjects.map((project) => (
+                    <li key={project.id}>
+                      <strong>{project.name}</strong>
+                      <span>Project ID: {project.id}</span>
+                      {project.description && <span>{project.description}</span>}
+                      {project.status && <span>Status: {project.status}</span>}
+                      {project.assignedAt && <span>Assigned: {formatDateTime(project.assignedAt)}</span>}
+                    </li>
+                  ))}
+                </ul>
+              ) : !viewingUser && viewingUserPreview?.projects.length ? (
+                <ul className="user-audit-project-list">
+                  {viewingUserPreview.projects.map((project) => (
+                    <li key={project}>
+                      <strong>{project}</strong>
+                      <span>Project details were not returned by the user details API.</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="user-audit-empty">
+                  {viewingUser ? 'No project assignments are recorded.' : 'Project details are unavailable.'}
+                </p>
+              )}
+            </section>
+
+            <section className="user-audit-section" aria-labelledby="user-audit-history-heading">
+              <h4 id="user-audit-history-heading">Historical activity</h4>
+              {userActivityError && (
+                <p className="user-audit-empty" role="alert">
+                  Could not load audit activity: {userActivityError}
+                </p>
+              )}
+              {viewingUser?.activityHistory?.length ? (
+                <ol className="user-audit-timeline">
+                  {viewingUser.activityHistory.map((activity) => (
+                    <li key={activity.id}>
+                      <div className="user-audit-activity-heading">
+                        <strong>{activity.action}</strong>
+                        <time dateTime={activity.createdAt}>{formatDateTime(activity.createdAt)}</time>
+                      </div>
+                      {activity.description && <p>{activity.description}</p>}
+                      {(activity.before != null || activity.after != null) && (
+                        <div className="user-audit-change">
+                          {activity.before != null && (
+                            <div>
+                              <span>Before</span>
+                              <pre>{formatAuditValue(activity.before)}</pre>
+                            </div>
+                          )}
+                          {activity.after != null && (
+                            <div>
+                              <span>After</span>
+                              <pre>{formatAuditValue(activity.after)}</pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {(activity.ipAddress || activity.device) && (
+                        <span className="user-audit-activity-meta">
+                          {[activity.ipAddress, activity.device].filter(Boolean).join(' · ')}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="user-audit-empty">
+                  {userActivityError
+                    ? 'No activity records could be displayed.'
+                    : viewingUser?.activityHistory
+                      ? 'No historical activity is recorded.'
+                      : 'Activity history is not available from the user details API.'}
+                </p>
+              )}
+            </section>
+          </>
+        )}
+      </SideDrawer>
 
       <Modal
         isOpen={Boolean(passwordResetUser)}
