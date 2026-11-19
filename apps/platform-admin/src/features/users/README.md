@@ -47,11 +47,36 @@ clears the stored token.
 |---|---|---|
 | `GET` | `/users?page=&limit=&search=&role=&isActive=&sortBy=&sortOrder=` | List and filter users |
 | `GET` | `/users/:id` | Load a user's full details |
+| `GET` | `/users/:id/audit?page=&limit=` | Load a user's audit history |
 | `POST` | `/users` | Create a user |
 | `PUT` | `/users/:id` | Update editable user fields |
 | `PATCH` | `/users/:id/status` | Update account status |
+| `PATCH` | `/users/bulk-status` | Update status for selected users |
 | `POST` | `/users/:id/reset-password` | Reset a user's password |
 | `DELETE` | `/users/:id` | Delete a user |
+
+Bulk status requests send `{ "userIds": string[], "isActive": boolean }`.
+The users table supports selecting rows across pages, bulk activation or
+deactivation, and project assignment. Project assignment adds the selected
+projects to each selected user's existing assignments through
+`PUT /users/:id`; requests are sent per user and may partially succeed. The
+bulk-status endpoint is preferred for activation/deactivation; if it returns
+`404 ROUTE_NOT_FOUND`, the frontend falls back to the existing per-user status
+endpoint and reports any partial failures. The delete endpoint should
+soft-delete users so existing project history and audit records remain intact.
+
+The user details drawer loads `GET /users/:id` and requests audit records from
+`GET /users/:id/audit?page=1&limit=25`. To populate the login section, return
+optional `lastLoginAt`, `lastLoginIp`, and `lastLoginDevice` fields on the user
+detail response.
+Audit events may be returned as `activity` or `activityHistory`, with `id`,
+`event` or `action`, `createdAt`, `ip` or `ipAddress`, `device`,
+`before`, and `after`. Assigned project objects may include `description`,
+`status`, and `assignedAt` in addition to `id` and `name`. If these fields are
+omitted, the drawer shows an unavailable or not-recorded state rather than
+inventing audit information. Audit endpoint responses may return an array
+directly or wrap events in `data`, `activity`, `activities`, `auditHistory`,
+`auditLogs`, `events`, `items`, or `logs`.
 
 The backend accepts the roles `superadmin`, `admin`, `manager`, and `user`.
 The role filters and form submit only these values. User create/update requests

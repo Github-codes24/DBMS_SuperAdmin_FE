@@ -10,11 +10,29 @@ export interface User {
   status: AccountStatus
   createdAt: string
   updatedAt?: string
+  lastLoginAt?: string
+  lastLoginIp?: string
+  lastLoginDevice?: string
+  activityHistory?: UserActivity[]
 }
 
 export interface AssignedProject {
   id: string
   name: string
+  description?: string
+  status?: string
+  assignedAt?: string
+}
+
+export interface UserActivity {
+  id: string
+  action: string
+  description?: string
+  createdAt: string
+  ipAddress?: string
+  device?: string
+  before?: unknown
+  after?: unknown
 }
 
 export interface SelectOption {
