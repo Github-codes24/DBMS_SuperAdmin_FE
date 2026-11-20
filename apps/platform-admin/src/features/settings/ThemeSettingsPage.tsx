@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Palette,
+  // Palette,
   Sun,
   Moon,
   Monitor,
@@ -13,7 +13,7 @@ import {
   SlidersHorizontal,
   Layers,
 } from 'lucide-react'
-import ResponsiveLayout from '../../components/layout/ResponsiveLayout'
+// import ResponsiveLayout from '../../components/layout/ResponsiveLayout'
 import { useTheme } from '../../context'
 import { useToast } from '../../context'
 import {
@@ -122,13 +122,9 @@ export function ThemeSettingsPage() {
   )
 
   return (
-    <ResponsiveLayout
-      title="Appearance & Theme Settings"
-      description="Personalize the application mode, primary brand colors, and component accents across the entire platform in real-time."
-      icon={<Palette size={24} />}
-      headerActions={headerActions}
-    >
+    
       <div className="theme-settings-container">
+        {headerActions}
         <div className="theme-settings-grid">
           {/* ════ LEFT COLUMN: SETTINGS CONTROLS ════ */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -482,7 +478,6 @@ export function ThemeSettingsPage() {
           </div>
         </div>
       </div>
-    </ResponsiveLayout>
   )
 }
 

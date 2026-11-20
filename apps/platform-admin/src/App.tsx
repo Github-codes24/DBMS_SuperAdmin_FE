@@ -7,13 +7,13 @@ import ReportsPage from "./features/reports/ReportsPage";
 import RolesPermissionsPage from "./features/roles/RolesPermissionsPage";
 import UsersPage from "./features/users/UsersPage";
 import DashboardPage from "./features/dashboard/DashboardPage";
-import ThemeSettingsPage from "./features/settings/ThemeSettingsPage";
+import SettingsPage from "./features/settings/SettingsPage";
 
 function App() {
   return (
     <BrowserRouter>
       <ThemeProvider>
-        <ToastProvider>
+        <ToastProvider> 
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/users" element={<UsersPage />} />
@@ -22,8 +22,8 @@ function App() {
             <Route path="/roles-permissions" element={<RolesPermissionsPage />} />
             <Route path="/reports-analytics" element={<ReportsPage />} />
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/settings" element={<ThemeSettingsPage />} />
-            <Route path="/settings/appearance" element={<ThemeSettingsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/settings/appearance" element={<SettingsPage />} />
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
