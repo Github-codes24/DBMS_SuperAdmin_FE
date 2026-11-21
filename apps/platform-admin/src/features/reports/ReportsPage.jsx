@@ -19,15 +19,10 @@ import { AlertMessage } from '../../components/notifications'
 import { EmptyState } from '../../components/feedback'
 import { PrimaryButton, SecondaryButton, IconButton } from '../../components/ui/buttons'
 import api from '../../api/axiosClient'
+import { listProjects } from '../projects/projectService'
 import './reports.css'
 
-const reportTypes = [
-  'Customer Report',
-  'Vendor Report',
-  'User Report',
-  'Telecaller Report',
-  'Activity Report',
-]
+const reportTypes = ['User Report']
 
 const supportedReportTypes = new Set(reportTypes)
 const customDateRange = 'Custom Range'
@@ -77,9 +72,18 @@ function getBreakdownLabel(item) {
 }
 
 function getErrorMessage(error) {
-  return error.response?.data?.message
-    || error.response?.data?.error
-    || error.message
+  const data = error?.response?.data
+  const message = data?.message
+    || (typeof data?.error === 'string' ? data.error : data?.error?.message || data?.error?.code)
+  const details = Array.isArray(data?.errors)
+    ? data.errors
+      .map((item) => [item?.field, item?.message].filter(Boolean).join(': '))
+      .filter(Boolean)
+      .join('; ')
+    : ''
+
+  return [message, details].filter(Boolean).join(': ')
+    || error?.message
     || 'Unable to load the report.'
 }
 
@@ -106,15 +110,34 @@ function getExportFilename(contentDisposition) {
 async function fetchReportData(filters, page = 1, signal) {
   const type = reportTypeValues[filters.reportType]
   const range = reportRangeValues[filters.dateRange]
-  if (!range) throw new Error('Choose a supported report date range.')
-
-  const params = {
-    type,
-    range,
-    status: filters.status.toLowerCase(),
-    page,
-    limit: filters.reportType === 'Telecaller Report' ? 100 : 10,
+  const isCustomRange = filters.dateRange === customDateRange
+  if (!range && !isCustomRange) throw new Error('Choose a supported report date range.')
+  if (filters.reportType === 'Vendor Report') {
+    throw new Error('Vendor reports are not currently supported. The reports API only accepts type=users.')
   }
+  if (
+    isCustomRange &&
+    (!filters.customStartDate || !filters.customEndDate || filters.customStartDate > filters.customEndDate)
+  ) {
+    throw new Error('Choose a valid start and end date for the custom range.')
+  }
+
+  const params = isCustomRange
+    ? {
+      range: 'custom',
+      from: filters.customStartDate,
+      to: filters.customEndDate,
+      page,
+      limit: 10,
+    }
+    : {
+      type,
+      range,
+      status: filters.status.toLowerCase(),
+      page,
+      limit: 10,
+    }
+  if (isCustomRange && filters.status !== 'All') params.status = filters.status.toLowerCase()
   if (filters.projectId?.trim()) params.projectId = filters.projectId.trim()
 
   const response = await api.get('/reports', {
@@ -261,6 +284,8 @@ function ReportsPage() {
   const [reportData, setReportData] = useState(null)
   const [roleReportData, setRoleReportData] = useState(null)
   const [roleReportError, setRoleReportError] = useState('')
+  const [projects, setProjects] = useState([])
+  const [projectLoadError, setProjectLoadError] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [isRoleReportLoading, setIsRoleReportLoading] = useState(true)
   const [isExporting, setIsExporting] = useState(false)
@@ -269,6 +294,7 @@ function ReportsPage() {
   const availableStatuses = statusesByReport[effectiveReportType]
   const effectiveStatus = status === 'All' || availableStatuses.includes(status) ? status : 'All'
   const canExportUsers = effectiveReportType === 'User Report' && dateRange !== customDateRange
+  const isCustomDateRange = dateRange === customDateRange
 
   function resetFilters() {
     const filters = getDefaultFilters()
@@ -289,7 +315,11 @@ function ReportsPage() {
     reportRequestController.current = null
 
     const range = reportRangeValues[filters.dateRange]
-    if (!range) {
+    const isCustomRange = filters.dateRange === customDateRange
+    const invalidCustomDates =
+      isCustomRange &&
+      (!filters.customStartDate || !filters.customEndDate || filters.customStartDate > filters.customEndDate)
+    if ((!range && !isCustomRange) || invalidCustomDates) {
       setIsLoading(false)
       setReportData(null)
       setGeneratedReport(null)
@@ -297,13 +327,15 @@ function ReportsPage() {
       setRoleReportError('')
       setIsRoleReportLoading(false)
       setMessageType('warning')
-      setMessage('Custom date ranges are not supported by the reports API. Choose a preset date range.')
+      setMessage(isCustomRange
+        ? 'Choose a valid start and end date for the custom range.'
+        : 'Choose a supported report date range.')
       return
     }
 
     const controller = new AbortController()
     reportRequestController.current = controller
-    const shouldLoadRoleReport = filters.reportType === 'User Report'
+    const shouldLoadRoleReport = filters.reportType === 'User Report' && !isCustomRange
     setIsLoading(true)
     setIsRoleReportLoading(shouldLoadRoleReport)
     setReportData(null)
@@ -328,7 +360,10 @@ function ReportsPage() {
       setReportData(reportResult.value)
       setGeneratedReport(filters)
       setMessageType('success')
-      setMessage(`Report generated: ${filters.reportType}, ${filters.status} status, ${filters.dateRange}.`)
+      const period = isCustomRange
+        ? `${filters.customStartDate} to ${filters.customEndDate}`
+        : filters.dateRange
+      setMessage(`Report generated: ${filters.reportType}, ${filters.status} status, ${period}.`)
     } catch (error) {
       if (controller.signal.aborted) return
       setMessageType('error')
@@ -386,12 +421,26 @@ function ReportsPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    listProjects(undefined, controller.signal)
+      .then(setProjects)
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setProjectLoadError(getErrorMessage(error))
+        }
+      })
+    return () => controller.abort()
+  }, [])
+
   function getCurrentFilters() {
     return {
       reportType: effectiveReportType,
       dateRange,
       status: effectiveStatus,
       projectId: ['User Report', 'Vendor Report'].includes(effectiveReportType) ? projectId : '',
+      customStartDate,
+      customEndDate,
     }
   }
 
@@ -402,6 +451,20 @@ function ReportsPage() {
 
   function changeDateRange(nextDateRange) {
     setDateRange(nextDateRange)
+    if (nextDateRange === customDateRange) {
+      reportRequestController.current?.abort()
+      reportRequestController.current = null
+      setCustomStartDate('')
+      setCustomEndDate('')
+      setReportData(null)
+      setRoleReportData(null)
+      setRoleReportError('')
+      setGeneratedReport(null)
+      setIsLoading(false)
+      setIsRoleReportLoading(false)
+      setMessage('')
+      return
+    }
     void loadReport({ ...getCurrentFilters(), dateRange: nextDateRange })
   }
 
@@ -458,6 +521,24 @@ function ReportsPage() {
     { label: 'Blocked', value: reportData?.summary?.blocked ?? '--', icon: Store, tone: 'blue' },
     { label: 'Page Rows', value: reportData?.rows?.length ?? '--', icon: PhoneCall, tone: 'purple' },
   ]
+  const roleSummaryCards = [
+    { label: 'Total Role Assignments', value: roleReportData?.totalUsers ?? '--', icon: Users, tone: 'orange' },
+    {
+      label: 'Total Active Assignments',
+      value: roleReportData ? roleReportData.roles.reduce((total, role) => total + role.activeUsers, 0) : '--',
+      icon: UserRound,
+      tone: 'green',
+    },
+    {
+      label: 'Total Blocked Assignments',
+      value: roleReportData ? roleReportData.roles.reduce((total, role) => total + role.blockedUsers, 0) : '--',
+      icon: Store,
+      tone: 'blue',
+    },
+  ]
+  const displayedSummaryCards = effectiveReportType === 'User Report' && !isCustomDateRange
+    ? roleSummaryCards
+    : summaryCards
   const trendData = (reportData?.trend ?? []).map((item) => ({
     date: item.date,
     count: Number(item.count),
@@ -478,7 +559,7 @@ function ReportsPage() {
   const trendBarWidth = Math.min(28, trendSlotWidth * 0.6)
   const trendLabelInterval = Math.max(1, Math.ceil(trendData.length / 8))
   const trendSeriesLabel = reportTrendLabels[generatedReport?.reportType ?? effectiveReportType]
-  const breakdownSource = effectiveReportType === 'User Report'
+  const breakdownSource = effectiveReportType === 'User Report' && !isCustomDateRange
     ? (roleReportData?.roles ?? []).map((role) => ({
       label: role.roleName,
       count: role.userCount,
@@ -508,6 +589,24 @@ function ReportsPage() {
     }
     return segment
   })
+  const roleChart = {
+    width: Math.max(640, breakdownData.length * 92 + 72),
+    height: 280,
+    left: 44,
+    right: 16,
+    top: 16,
+    bottom: 76,
+  }
+  const rolePlotWidth = roleChart.width - roleChart.left - roleChart.right
+  const rolePlotHeight = roleChart.height - roleChart.top - roleChart.bottom
+  const roleAxisMax = Math.max(4, Math.ceil(Math.max(0, ...breakdownData.map((item) => item.count)) / 4) * 4)
+  const roleSlotWidth = breakdownData.length ? rolePlotWidth / breakdownData.length : 0
+  const roleBarWidth = Math.min(48, roleSlotWidth * 0.62)
+  const generatedReportPeriod = generatedReport
+    ? generatedReport.dateRange === customDateRange
+      ? `${generatedReport.customStartDate} to ${generatedReport.customEndDate}`
+      : generatedReport.dateRange
+    : ''
 
   const headerActions = (
     <div className="reports-header-actions">
@@ -523,7 +622,7 @@ function ReportsPage() {
         icon={<RefreshCw size={15} />}
         ariaLabel="Refresh report"
         variant="secondary"
-        disabled={isLoading || dateRange === customDateRange}
+        disabled={isLoading || (isCustomDateRange && (!customStartDate || !customEndDate))}
         onClick={() => void loadReport(generatedReport ?? getCurrentFilters(), reportData?.pagination?.page ?? 1)}
       />
       <PrimaryButton
@@ -551,15 +650,21 @@ function ReportsPage() {
         />
       )}
 
-      <section className="reports-kpi-grid" aria-label="Summary statistics">
-        {summaryCards.map(({ label, value, icon: Icon, tone }) => (
+      <section
+        className={`reports-kpi-grid ${effectiveReportType === 'User Report' && !isCustomDateRange ? 'reports-kpi-grid--roles' : ''}`}
+        aria-label="Summary statistics"
+      >
+        {displayedSummaryCards.map(({ label, value, icon: Icon, tone }) => (
           <StatisticsCard
             key={label}
             title={label}
             value={value}
             icon={<Icon size={18} />}
             tone={tone}
-            subtitle={reportData ? 'From the current report' : 'Generate a report to load data'}
+            loading={effectiveReportType === 'User Report' && !isCustomDateRange ? isRoleReportLoading : isLoading}
+            subtitle={effectiveReportType === 'User Report' && !isCustomDateRange
+              ? 'From the role-wise report'
+              : 'From the current report'}
           />
         ))}
       </section>
@@ -607,7 +712,7 @@ function ReportsPage() {
                     />
                   </label>
                   <p className="reports-custom-range-note" role="status">
-                    Custom date ranges are not supported by the reports API yet. Choose a preset to generate a report.
+                    The selected end date is included. Apply the dates to generate the report.
                   </p>
                 </>
               )}
@@ -620,14 +725,22 @@ function ReportsPage() {
               </label>
               {['User Report', 'Vendor Report'].includes(effectiveReportType) && (
                 <label className="reports-field">
-                  <span>Project ID (optional)</span>
-                  <input
-                    type="text"
-                    placeholder="All projects or enter a project ID"
+                  <span>Project (optional)</span>
+                  <select
                     value={projectId}
                     onChange={(event) => setProjectId(event.target.value)}
-                  />
+                  >
+                    <option value="">All Projects</option>
+                    {projects.map((project) => (
+                      <option key={project.id} value={project.id}>{project.name}</option>
+                    ))}
+                  </select>
                 </label>
+              )}
+              {projectLoadError && ['User Report', 'Vendor Report'].includes(effectiveReportType) && (
+                <p className="reports-custom-range-note reports-project-error" role="status">
+                  Projects could not be loaded: {projectLoadError}
+                </p>
               )}
               {effectiveReportType !== 'User Report' && (
                 <p className="reports-custom-range-note" role="status">
@@ -637,7 +750,7 @@ function ReportsPage() {
               <div className="reports-filter-actions">
                 <PrimaryButton
                   type="submit"
-                  disabled={isLoading || !supportedReportTypes.has(effectiveReportType) || dateRange === customDateRange}
+                  disabled={isLoading || !supportedReportTypes.has(effectiveReportType)}
                   icon={<FileBarChart size={15} />}
                 >
                   {isLoading ? 'Generating…' : 'Generate Report'}
@@ -742,14 +855,109 @@ function ReportsPage() {
             <article className="reports-card">
               <div className="reports-card-heading">
                 <div>
-                  <h2>{effectiveReportType === 'User Report' ? 'Users by Role' : 'Breakdown'}</h2>
+                  <h2>{effectiveReportType === 'User Report' ? 'Role-wise User Count' : 'Breakdown'}</h2>
                   <p>{effectiveReportType === 'User Report'
-                    ? 'User assignments by project-specific role.'
+                    ? 'User assignments grouped by role.'
                     : 'Records by category.'}</p>
                 </div>
                 <span className="reports-vendor-icon"><Activity size={17} /></span>
               </div>
-              {breakdownData.length ? (
+              {effectiveReportType === 'User Report' ? (
+                breakdownData.length ? (
+                  <div className="reports-role-chart-scroll">
+                    <svg
+                      className="reports-role-chart"
+                      viewBox={`0 0 ${roleChart.width} ${roleChart.height}`}
+                      role="img"
+                      aria-label={`Users by role: ${breakdownData.map((item) => `${item.label} ${item.count}`).join(', ')}`}
+                    >
+                      {Array.from({ length: 5 }, (_, index) => {
+                        const count = (roleAxisMax / 4) * index
+                        const y = roleChart.top + rolePlotHeight - (count / roleAxisMax) * rolePlotHeight
+                        return (
+                          <g key={count}>
+                            <line
+                              x1={roleChart.left}
+                              x2={roleChart.width - roleChart.right}
+                              y1={y}
+                              y2={y}
+                              className="reports-trend-gridline"
+                            />
+                            <text
+                              x={roleChart.left - 10}
+                              y={y + 3}
+                              textAnchor="end"
+                              className="reports-trend-axis-label"
+                            >
+                              {count}
+                            </text>
+                          </g>
+                        )
+                      })}
+                      <text
+                        x="12"
+                        y={roleChart.top + rolePlotHeight / 2}
+                        textAnchor="middle"
+                        className="reports-role-axis-label"
+                        transform={`rotate(-90 12 ${roleChart.top + rolePlotHeight / 2})`}
+                      >
+                        User Count
+                      </text>
+                      {breakdownData.map((item, index) => {
+                        const barHeight = (item.count / roleAxisMax) * rolePlotHeight
+                        const x = roleChart.left + index * roleSlotWidth + (roleSlotWidth - roleBarWidth) / 2
+                        const y = roleChart.top + rolePlotHeight - barHeight
+                        return (
+                          <g key={`${item.label}-${index}`}>
+                            <rect
+                              x={x}
+                              y={y}
+                              width={roleBarWidth}
+                              height={Math.max(barHeight, 1)}
+                              rx="4"
+                              fill={breakdownColors[index % breakdownColors.length]}
+                            >
+                              <title>{`${item.label}: ${item.count} users`}</title>
+                            </rect>
+                            <text
+                              x={x + roleBarWidth / 2}
+                              y={Math.max(roleChart.top + 10, y - 5)}
+                              textAnchor="middle"
+                              className="reports-trend-value-label"
+                            >
+                              {item.count}
+                            </text>
+                            <text
+                              x={x + roleBarWidth / 2}
+                              y={roleChart.height - 52}
+                              textAnchor="middle"
+                              className="reports-role-axis-label"
+                            >
+                              {item.label}
+                            </text>
+                          </g>
+                        )
+                      })}
+                      <text
+                        x={roleChart.left + rolePlotWidth / 2}
+                        y={roleChart.height - 12}
+                        textAnchor="middle"
+                        className="reports-role-axis-label"
+                      >
+                        Role Name
+                      </text>
+                    </svg>
+                  </div>
+                ) : (
+                  <div className="reports-chart-empty" role="status">
+                    {roleReportError
+                      ? `Unable to load role report: ${roleReportError}`
+                      : isRoleReportLoading
+                        ? 'Loading role report…'
+                        : 'No role assignments found for these filters.'}
+                  </div>
+                )
+              ) : breakdownData.length ? (
                 <div className="reports-breakdown">
                   <svg
                     className="reports-breakdown-chart"
@@ -802,22 +1010,57 @@ function ReportsPage() {
                 </div>
               ) : (
                 <div className="reports-breakdown-empty" role="status">
-                  {effectiveReportType === 'User Report' && roleReportError
-                    ? roleReportError
-                    : isRoleReportLoading
-                      ? 'Loading role breakdown…'
-                      : 'No breakdown data available.'}
+                  {isLoading ? 'Loading breakdown…' : 'No breakdown data available.'}
                 </div>
               )}
             </article>
           </section>
 
+          {effectiveReportType === 'User Report' && !isCustomDateRange ? (
+            <section className="reports-card reports-table-card">
+              <div className="reports-card-heading reports-table-heading">
+                <div>
+                  <h2>Role-wise User Details</h2>
+                  <p>{roleReportData
+                    ? `${roleReportData.roles.length} roles · ${roleReportData.totalUsers} total role assignments.`
+                    : 'Role report data will appear here after loading.'}</p>
+                </div>
+              </div>
+              <div className="reports-table-scroll">
+                <table className="reports-table reports-role-table">
+                  <thead>
+                    <tr><th>Role Name</th><th>Total Users</th><th>Active Users</th><th>Blocked Users</th></tr>
+                  </thead>
+                  <tbody>
+                    {roleReportData?.roles?.length ? roleReportData.roles.map((role, index) => (
+                      <tr key={role.roleId ?? `${role.roleName}-${index}`}>
+                        <td>{role.roleName}</td>
+                        <td>{role.userCount.toLocaleString()}</td>
+                        <td>{role.activeUsers.toLocaleString()}</td>
+                        <td>{role.blockedUsers.toLocaleString()}</td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={4} className="reports-role-table-empty">
+                          {isRoleReportLoading
+                            ? 'Loading role report…'
+                            : roleReportError
+                              ? `Unable to load role report: ${roleReportError}`
+                              : 'No role assignments found for these filters.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ) : (
           <section className="reports-card reports-table-card">
             <div className="reports-card-heading reports-table-heading">
               <div>
                 <h2>{generatedReport?.reportType ?? effectiveReportType} Details</h2>
                 <p>{generatedReport
-                  ? `Generated for ${generatedReport.status} status, ${generatedReport.dateRange}. ${reportData?.pagination?.total ?? 0} records.`
+                  ? `Generated for ${generatedReport.status} status, ${generatedReportPeriod}. ${reportData?.pagination?.total ?? 0} records.`
                   : 'Generate a report to apply the selected filters.'}</p>
               </div>
               <SecondaryButton
@@ -876,6 +1119,7 @@ function ReportsPage() {
               </div>
             )}
           </section>
+          )}
           <p className="reports-footnote">{reportData ? 'Report data is provided by the reports API.' : 'Generate a report to load analytics from the reports API.'}</p>
     </ResponsiveLayout>
   )
