@@ -23,10 +23,10 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState("Appearance");
   const { toast } = useToast();
   const [securitySettings, setSecuritySettings] = useState<any>({
-    passwordMinLength: "",
-    sessionTimeoutMinutes: "",
-    maxLoginAttempts: "",
-    lockoutDuration: "",
+    passwordMinLength: 10,
+    sessionTimeoutMinutes: 30,
+    maxLoginAttempts: 3,
+    lockoutDuration: 30,
     requirePasswordComplexity: false,
   });
   const [generalSettings, setGeneralSettings] = useState({

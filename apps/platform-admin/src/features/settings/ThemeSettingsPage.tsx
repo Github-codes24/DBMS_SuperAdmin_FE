@@ -141,7 +141,10 @@ export function ThemeSettingsPage() {
           setCustomHex(savedAccentColor);
         }
         const savedPreferences =
-          settings?.effective?.preferences ?? settings?.preferences ?? {};
+          platformSettings?.defaults ??
+          settings?.effective?.preferences ??
+          settings?.preferences ??
+          {};
 
         setPreferences({
           language:
