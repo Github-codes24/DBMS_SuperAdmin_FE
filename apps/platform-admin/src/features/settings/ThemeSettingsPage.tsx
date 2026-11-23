@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { updatePlatformDefaults, getPlatformSettings, getMySettings } from './settingsService'
 import {
-  Palette,
+  // Palette,
   Sun,
   Moon,
   Monitor,
@@ -13,7 +14,7 @@ import {
   SlidersHorizontal,
   Layers,
 } from 'lucide-react'
-import ResponsiveLayout from '../../components/layout/ResponsiveLayout'
+// import ResponsiveLayout from '../../components/layout/ResponsiveLayout'
 import { useTheme } from '../../context'
 import { useToast } from '../../context'
 import {
@@ -57,11 +58,40 @@ export function ThemeSettingsPage() {
   const [previewRadio, setPreviewRadio] = useState('option1')
   const [previewSwitch, setPreviewSwitch] = useState(true)
   const [customHex, setCustomHex] = useState(customColor)
+  // const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
 
-  const handleApply = () => {
-    applyTheme()
-    toast.success('Theme preferences applied and saved to your device.')
+ const handleApply = async () => {
+  if (!/^#[0-9A-Fa-f]{6}$/.test(primaryColor)) {
+  toast.error("Please enter a valid 6-digit HEX color (e.g. #f96321).");
+  return;
+}
+  try {
+    await updatePlatformDefaults({
+      theme: mode,
+      accentColor: primaryColor,
+      language:
+        preferences.language === "English"
+          ? "en"
+          : preferences.language === "Hindi"
+            ? "hi"
+            : preferences.language,
+      timezone: preferences.timezone,
+      dateFormat: preferences.dateFormat,
+      timeFormat:
+        preferences.timeFormat === "12-hour"
+          ? "12h"
+          : preferences.timeFormat === "24-hour"
+            ? "24h"
+            : preferences.timeFormat,
+      currency: preferences.currency,
+    });
+
+    applyTheme();
+    toast.success("Theme and platform defaults saved successfully.");
+  } catch (error) {
+    toast.error("Failed to save theme settings.");
   }
+};
 
   const handleReset = () => {
     resetToDefault()
@@ -73,6 +103,89 @@ export function ThemeSettingsPage() {
     setCustomHex(hex)
     setCustomColor(hex)
   }
+
+  const [preferences, setPreferences] = useState({language: '',timezone: '',dateFormat: '',timeFormat: '',currency: '',})
+
+  useEffect(() => {
+  const loadPreferences = async () => {
+    try {
+      const data = await getMySettings();
+      const settings = data?.data?.data ?? data?.data ?? data;
+const platformResponse = await getPlatformSettings();
+const platformSettings =
+  platformResponse?.data?.data ?? platformResponse?.data ?? platformResponse;
+
+const savedTheme = platformSettings?.theme;
+const savedAccentColor = platformSettings?.accentColor;
+
+if (savedTheme) {
+  setMode(savedTheme);
+}
+
+if (savedAccentColor) {
+  setCustomColor(savedAccentColor);
+  setCustomHex(savedAccentColor);
+}
+      const savedPreferences =
+        settings?.effective?.preferences ??
+        settings?.preferences ??
+        {};
+
+      setPreferences({
+        language:
+          savedPreferences.language === "en"
+            ? "English"
+            : savedPreferences.language === "hi"
+              ? "Hindi"
+              : savedPreferences.language || "",
+        timezone: savedPreferences.timezone || "",
+        dateFormat: savedPreferences.dateFormat || "",
+        timeFormat:
+          savedPreferences.timeFormat === "12h"
+            ? "12-hour"
+            : savedPreferences.timeFormat === "24h"
+              ? "24-hour"
+              : savedPreferences.timeFormat || "",
+        currency: savedPreferences.currency || "",
+      });
+    } catch (error) {
+      console.error("Failed to load preferences:", error);
+    }
+  };
+
+  loadPreferences();
+}, []);
+
+
+useEffect(() => {
+  const loadPlatformTheme = async () => {
+    try {
+      const response = await getPlatformSettings();
+      const defaults = response?.data?.defaults;
+
+      if (defaults?.theme) {
+        setMode(defaults.theme);
+      }
+
+      if (defaults?.accentColor) {
+        setCustomColor(defaults.accentColor);
+        setCustomHex(defaults.accentColor);
+      }
+    } catch (error) {
+      console.error("Failed to load platform theme:", error);
+    }
+  };
+
+  loadPlatformTheme();
+}, []);
+
+const preferenceOptions = {
+  language: ['English', 'Hindi'],
+  timezone: ['Asia/Kolkata', 'UTC', 'Asia/Dubai', 'America/New_York'],
+  dateFormat: ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'],
+  timeFormat: ['12-hour', '24-hour'],
+  currency: ['INR', 'USD', 'EUR', 'GBP'],
+}
 
   const modeOptions: { id: ThemeMode; title: string; desc: string; icon: typeof Sun }[] = [
     {
@@ -122,13 +235,9 @@ export function ThemeSettingsPage() {
   )
 
   return (
-    <ResponsiveLayout
-      title="Appearance & Theme Settings"
-      description="Personalize the application mode, primary brand colors, and component accents across the entire platform in real-time."
-      icon={<Palette size={24} />}
-      headerActions={headerActions}
-    >
+    
       <div className="theme-settings-container">
+        {headerActions}
         <div className="theme-settings-grid">
           {/* ════ LEFT COLUMN: SETTINGS CONTROLS ════ */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -261,6 +370,125 @@ export function ThemeSettingsPage() {
                 </div>
               </div>
             </section>
+          {/* Default Preferences */}
+<section className="theme-card">
+  <div className="theme-card-header">
+    <div>
+      <h2>Default Preferences</h2>
+      <p>Configure your language, timezone, date, time and currency.</p>
+    </div>
+    <SlidersHorizontal size={18} />
+  </div>
+
+  <div
+    style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+      gap: '18px',
+      marginTop: '20px',
+    }}
+  >
+    {Object.entries(preferenceOptions).map(([key, options]) => (
+      <div
+        key={key}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px',
+          minWidth: 0,
+        }}
+      >
+        <label
+          style={{
+            fontSize: '13px',
+            fontWeight: 600,
+            color: 'var(--color-text-primary)',
+          }}
+        >
+          {key === 'dateFormat'
+            ? 'Date Format'
+            : key === 'timeFormat'
+              ? 'Time Format'
+              : key.charAt(0).toUpperCase() + key.slice(1)}
+        </label>
+
+        <select
+          className="settings-select"
+          value={preferences[key as keyof typeof preferences]}
+          onChange={(e) =>
+            setPreferences((prev) => ({
+              ...prev,
+              [key]: e.target.value,
+            }))
+          }
+          style={{
+            width: '100%',
+            minHeight: '42px',
+            padding: '10px 12px',
+            borderRadius: '8px',
+            border: '1px solid var(--border-color-default, #dbe3ee)',
+            background: 'var(--color-bg-surface, #ffffff)',
+            color: 'var(--color-text-primary, #1e293b)',
+            fontSize: '13px',
+            outline: 'none',
+          }}
+        >
+          <option value="">
+            Select {key === 'dateFormat'
+              ? 'Date Format'
+              : key === 'timeFormat'
+                ? 'Time Format'
+                : key.charAt(0).toUpperCase() + key.slice(1)}
+          </option>
+
+          {options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </div>
+    ))}
+  </div>
+
+  <div
+    style={{
+      display: 'flex',
+      justifyContent: 'flex-end',
+      marginTop: '20px',
+      paddingTop: '16px',
+      borderTop: '1px solid var(--border-color-default, #e2e8f0)',
+    }}
+  >
+    <PrimaryButton
+      onClick={async () => {
+  try {
+await updatePlatformDefaults({
+  language:
+    preferences.language === "English"
+      ? "en"
+      : preferences.language === "Hindi"
+        ? "hi"
+        : preferences.language,
+  timezone: preferences.timezone,
+  dateFormat: preferences.dateFormat,
+  timeFormat:
+    preferences.timeFormat === "12-hour"
+      ? "12h"
+      : preferences.timeFormat === "24-hour"
+        ? "24h"
+        : preferences.timeFormat,
+  currency: preferences.currency,
+});    toast.success('Preferences updated successfully')
+  } catch (error) {
+    toast.error('Failed to update preferences')
+  }
+}}
+    >
+      Save Preferences
+    </PrimaryButton>
+  </div>
+</section>
           </div>
 
           {/* ════ RIGHT COLUMN: REAL-TIME COMPONENT PREVIEW ════ */}
@@ -482,9 +710,7 @@ export function ThemeSettingsPage() {
           </div>
         </div>
       </div>
-    </ResponsiveLayout>
   )
 }
 
 export default ThemeSettingsPage
-
